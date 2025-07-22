@@ -13,7 +13,7 @@
 3. Selecciona tu bot `@L4BI_bot`
 4. Configura el botón del menú:
    - **Texto del botón**: `📊 Formulario Inoculación`
-   - **URL del Web App**: `https://tu-dominio.com/inoculacion`
+   - **URL del Web App**: `https://sirius-laboratorio.vercel.app/inoculacion`
 
 ### 3. Configurar Comandos del Bot
 Envía `/setcommands` a BotFather y agrega:
