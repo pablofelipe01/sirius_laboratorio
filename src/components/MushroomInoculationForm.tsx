@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface InoculationData {
   bagQuantity: number;
@@ -27,6 +27,18 @@ const MushroomInoculationForm = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [batchCode, setBatchCode] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [currentBatchCode, setCurrentBatchCode] = useState<string>('');
+  const [currentTimestamp, setCurrentTimestamp] = useState<string>('');
+  const [isClient, setIsClient] = useState(false);
+
+  // Efecto para hidratación segura
+  useEffect(() => {
+    setIsClient(true);
+    setCurrentBatchCode(generateBatchCode());
+    setCurrentTimestamp(new Date().toISOString());
+  }, []);
 
   const microorganisms = [
     'Pleurotus ostreatus',
@@ -62,31 +74,44 @@ const MushroomInoculationForm = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitStatus('idle');
+    setErrorMessage('');
 
     try {
-      // Aquí iría la lógica para enviar los datos al sistema DataLab
-      console.log('Datos de inoculación:', formData);
-      
-      // Simular una llamada API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSubmitStatus('success');
-      
-      // Reset form después de éxito
-      setFormData({
-        bagQuantity: 0,
-        microorganism: '',
-        inoculationDate: '',
-        researcher: '',
-        notes: '',
-        substrate: '',
-        temperature: 0,
-        humidity: 0,
+      // Enviar datos a la API de Airtable
+      const response = await fetch('/api/inoculacion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSubmitStatus('success');
+        setBatchCode(result.batchCode);
+        
+        // Reset form después de éxito
+        setFormData({
+          bagQuantity: 0,
+          microorganism: '',
+          inoculationDate: '',
+          researcher: '',
+          notes: '',
+          substrate: '',
+          temperature: 0,
+          humidity: 0,
+        });
+      } else {
+        setSubmitStatus('error');
+        setErrorMessage(result.error || 'Error al registrar la inoculación');
+      }
       
     } catch (error) {
-      console.error('Error al registrar la inoculación:', error);
+      console.error('Error al enviar datos:', error);
       setSubmitStatus('error');
+      setErrorMessage('Error de conexión. Por favor, intente nuevamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -115,7 +140,7 @@ const MushroomInoculationForm = () => {
             <div className="text-right">
               <div className="text-sm text-gray-500">Código de Lote</div>
               <div className="text-lg font-mono font-bold text-blue-600">
-                {generateBatchCode()}
+                {isClient ? currentBatchCode : 'Cargando...'}
               </div>
             </div>
           </div>
@@ -128,9 +153,16 @@ const MushroomInoculationForm = () => {
               <svg className="w-5 h-5 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              <span className="text-green-800 font-medium">
-                Inoculación registrada exitosamente en el sistema DataLab
-              </span>
+              <div>
+                <span className="text-green-800 font-medium">
+                  ✅ Inoculación registrada exitosamente en Airtable
+                </span>
+                {batchCode && (
+                  <p className="text-green-700 text-sm mt-1">
+                    Código de lote generado: <strong>{batchCode}</strong>
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -141,9 +173,14 @@ const MushroomInoculationForm = () => {
               <svg className="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
-              <span className="text-red-800 font-medium">
-                Error al registrar la inoculación. Intente nuevamente.
-              </span>
+              <div>
+                <span className="text-red-800 font-medium">
+                  ❌ Error al registrar la inoculación
+                </span>
+                {errorMessage && (
+                  <p className="text-red-700 text-sm mt-1">{errorMessage}</p>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -351,12 +388,12 @@ const MushroomInoculationForm = () => {
         {/* Footer Info */}
         <div className="mt-6 text-center text-sm text-gray-500">
           <p>
-            Este registro será integrado automáticamente al sistema de trazabilidad DataLab
+            📊 Los datos se almacenan automáticamente en Airtable con trazabilidad completa
           </p>
           <p>
-            ID de Sesión: {new Date().getTime().toString(36)} | 
+            🔗 Integración DataLab ↔ Airtable | 
             Usuario: Sistema CIR | 
-            Timestamp: {new Date().toISOString()}
+            Timestamp: {isClient ? currentTimestamp : 'Cargando...'}
           </p>
         </div>
       </div>
