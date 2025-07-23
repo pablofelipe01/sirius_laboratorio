@@ -1,13 +1,21 @@
-import { Metadata } from 'next';
-import MushroomInoculationForm from '@/components/MushroomInoculationForm';
-import TelegramGuard from '@/components/TelegramGuard';
-import Script from 'next/script';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Formulario de Inoculación | DataLab CIR',
-  description: 'Sistema de registro de inoculación de hongos para el Centro de Investigación Regenerativa con integración a Airtable',
-  robots: 'noindex, nofollow',
-};
+import MushroomInoculationForm from '@/components/MushroomInoculationForm';
+import Script from 'next/script';
+import dynamic from 'next/dynamic';
+
+// Import dinámico del TelegramGuard para evitar SSR
+const TelegramGuard = dynamic(() => import('@/components/TelegramGuard'), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-200 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Cargando...</p>
+      </div>
+    </div>
+  )
+});
 
 export default function InoculacionPage() {
   return (

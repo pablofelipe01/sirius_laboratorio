@@ -63,7 +63,7 @@ const MushroomInoculationForm = () => {
       } else {
         setResponsables([]);
       }
-    } catch (error) {
+    } catch {
       setResponsables([]);
     } finally {
       setLoadingResponsables(false);
@@ -150,7 +150,7 @@ const MushroomInoculationForm = () => {
         setSubmitStatus('error');
         setErrorMessage(result.error || 'Error al registrar la inoculación');
       }
-    } catch (error) {
+    } catch {
       setSubmitStatus('error');
       setErrorMessage('Error de conexión. Por favor, intente nuevamente.');
     } finally {
