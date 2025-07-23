@@ -6,15 +6,16 @@ const base = Airtable.base(process.env.AIRTABLE_BASE_ID!);
 
 export async function GET() {
   try {
-    const records = await base('tblw4EqoP381U887L') // Tabla Microorganismos
+
+    const records = await base('tblw4EqoP381U887L')
       .select({
-        fields: ['fld7wGB105JgBCWXj'], // Campo Microorganismo
+        fields: ['fldzlrbfygE3tFtdL', 'fld7wGB105JgBCWXj'],
         sort: [{ field: 'fld7wGB105JgBCWXj', direction: 'asc' }]
       })
       .all();
 
     const microorganismos = records.map(record => ({
-      id: record.id,
+      id: record.fields['fldzlrbfygE3tFtdL'] as string || record.id,
       nombre: record.fields['fld7wGB105JgBCWXj'] as string,
     }));
 

@@ -1,54 +1,67 @@
 'use client';
 
+
 import { useState, useEffect } from 'react';
+
 
 interface InoculationData {
   bagQuantity: number;
   microorganism: string;
   inoculationDate: string;
-  researcher: string;
-  notes: string;
-  substrate: string;
-  temperature: number;
-  humidity: number;
+  responsables: string[];
 }
+
 
 interface Microorganism {
   id: string;
   nombre: string;
 }
 
+interface Responsable {
+  id: string;
+  nombre: string;
+}
+
 const MushroomInoculationForm = () => {
+
   const [formData, setFormData] = useState<InoculationData>({
     bagQuantity: 0,
     microorganism: '',
     inoculationDate: '',
-    researcher: '',
-    notes: '',
-    substrate: '',
-    temperature: 0,
-    humidity: 0,
+    responsables: [],
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [batchCode, setBatchCode] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [currentBatchCode, setCurrentBatchCode] = useState<string>('');
-  const [currentTimestamp, setCurrentTimestamp] = useState<string>('');
-  const [isClient, setIsClient] = useState(false);
+
   const [microorganisms, setMicroorganisms] = useState<Microorganism[]>([]);
   const [loadingMicroorganisms, setLoadingMicroorganisms] = useState(true);
+  const [responsables, setResponsables] = useState<Responsable[]>([]);
+  const [loadingResponsables, setLoadingResponsables] = useState(true);
 
   // Efecto para hidratación segura
+
   useEffect(() => {
-    setIsClient(true);
-    setCurrentBatchCode(generateBatchCode());
-    setCurrentTimestamp(new Date().toISOString());
-    
-    // Cargar microorganismos desde Airtable
     fetchMicroorganisms();
+    fetchResponsables();
   }, []);
+  const fetchResponsables = async () => {
+    try {
+      const response = await fetch('/api/equipo-laboratorio');
+      const data = await response.json();
+      if (data.success) {
+        setResponsables(data.responsables);
+      } else {
+        setResponsables([]);
+      }
+    } catch (error) {
+      setResponsables([]);
+    } finally {
+      setLoadingResponsables(false);
+    }
+  };
 
   const fetchMicroorganisms = async () => {
     try {
@@ -79,23 +92,20 @@ const MushroomInoculationForm = () => {
     }
   };
 
-  const substrates = [
-    'Paja de trigo',
-    'Aserrín de roble',
-    'Aserrín de haya',
-    'Bagazo de caña',
-    'Pulpa de café',
-    'Mezcla personalizada',
-    'Otro (especificar en notas)',
-  ];
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value,
-    }));
+    if (e.target instanceof HTMLSelectElement && e.target.multiple) {
+      const selected = Array.from(e.target.selectedOptions).map(option => option.value);
+      setFormData(prev => ({ ...prev, [name]: selected }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'number' ? parseFloat(value) || 0 : value,
+      }));
+    }
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,26 +127,17 @@ const MushroomInoculationForm = () => {
 
       if (response.ok && result.success) {
         setSubmitStatus('success');
-        setBatchCode(result.batchCode);
-        
-        // Reset form después de éxito
         setFormData({
           bagQuantity: 0,
           microorganism: '',
           inoculationDate: '',
-          researcher: '',
-          notes: '',
-          substrate: '',
-          temperature: 0,
-          humidity: 0,
+          responsables: [],
         });
       } else {
         setSubmitStatus('error');
         setErrorMessage(result.error || 'Error al registrar la inoculación');
       }
-      
     } catch (error) {
-      console.error('Error al enviar datos:', error);
       setSubmitStatus('error');
       setErrorMessage('Error de conexión. Por favor, intente nuevamente.');
     } finally {
@@ -222,272 +223,124 @@ const MushroomInoculationForm = () => {
         {submitStatus === 'error' && (
           <div className="bg-red-50/95 backdrop-blur-sm border border-red-200 rounded-2xl p-6 mb-8 shadow-lg">
             <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-200 py-8">
+      <form onSubmit={handleSubmit} className="w-full max-w-xl bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
+        <h2 className="text-2xl font-bold mb-8 text-center text-gray-800">Registro de Inoculación</h2>
+        {/* Microorganismo */}
+        <div className="mb-6">
+          <label htmlFor="microorganism" className="block text-sm font-semibold text-gray-800 mb-2">
+            Microorganismo *
+          </label>
+          <select
+            id="microorganism"
+            name="microorganism"
+            required
+            value={formData.microorganism}
+            onChange={handleChange}
+            disabled={loadingMicroorganisms}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 disabled:opacity-50"
+          >
+            <option value="">{loadingMicroorganisms ? 'Cargando...' : 'Seleccionar microorganismo'}</option>
+            {microorganisms.map((organism) => (
+              <option key={organism.id} value={organism.nombre}>{organism.nombre}</option>
+            ))}
+          </select>
+        </div>
+        {/* Responsables */}
+        <div className="mb-6">
+          <label htmlFor="responsables" className="block text-sm font-semibold text-gray-800 mb-2">
+            Responsables *
+          </label>
+          <select
+            id="responsables"
+            name="responsables"
+            multiple
+            required
+            value={formData.responsables}
+            onChange={handleChange}
+            disabled={loadingResponsables}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 disabled:opacity-50 h-32"
+          >
+            {loadingResponsables ? (
+              <option>Cargando responsables...</option>
+            ) : responsables.length === 0 ? (
+              <option>No hay responsables disponibles</option>
+            ) : responsables.map((resp) => (
+              <option key={resp.id} value={resp.nombre}>{resp.nombre}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">Puedes seleccionar varios responsables (Ctrl/Cmd + click)</p>
+        </div>
+        {/* Cantidad de Bolsas */}
+        <div className="mb-6">
+          <label htmlFor="bagQuantity" className="block text-sm font-semibold text-gray-800 mb-2">
+            Cantidad de Bolsas Inoculadas *
+          </label>
+          <input
+            type="number"
+            id="bagQuantity"
+            name="bagQuantity"
+            required
+            min="1"
+            value={formData.bagQuantity || ''}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 text-lg"
+            placeholder="Ejemplo: 25"
+          />
+        </div>
+        {/* Fecha de Inoculación */}
+        <div className="mb-8">
+          <label htmlFor="inoculationDate" className="block text-sm font-semibold text-gray-800 mb-2">
+            Fecha de Inoculación *
+          </label>
+          <input
+            type="date"
+            id="inoculationDate"
+            name="inoculationDate"
+            required
+            value={formData.inoculationDate}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 text-lg"
+          />
+        </div>
+        {/* Botón */}
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={isSubmitting || loadingMicroorganisms || loadingResponsables}
+            className={`px-10 py-4 rounded-xl font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 ${
+              isSubmitting || loadingMicroorganisms || loadingResponsables
+                ? 'bg-gray-400 cursor-not-allowed text-white'
+                : 'bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-800 text-white'
+            }`}
+          >
+            {isSubmitting ? (
+              <div className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Registrando...
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-red-800 mb-2">
-                  ❌ Error al registrar la inoculación
-                </h3>
-                <p className="text-red-700">
-                  {errorMessage || 'Ha ocurrido un error inesperado. Por favor, intente nuevamente.'}
-                </p>
-                <p className="text-sm text-red-600 mt-2">
-                  Si el problema persiste, contacte al administrador del sistema.
-                </p>
-              </div>
-            </div>
+            ) : (
+              'Registrar Inoculación'
+            )}
+          </button>
+        </div>
+        {/* Mensaje de éxito o error */}
+        {submitStatus === 'success' && (
+          <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-center">
+            ✅ Inoculación registrada exitosamente
           </div>
         )}
-
-        {/* Form Profesional */}
-        <form onSubmit={handleSubmit} className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Cantidad de Bolsas */}
-            <div className="space-y-2">
-              <label htmlFor="bagQuantity" className="block text-sm font-semibold text-gray-800">
-                Cantidad de Bolsas Inoculadas *
-              </label>
-              <input
-                type="number"
-                id="bagQuantity"
-                name="bagQuantity"
-                required
-                min="1"
-                value={formData.bagQuantity || ''}
-                onChange={handleChange}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg"
-                placeholder="Ejemplo: 25"
-              />
-            </div>
-
-            {/* Microorganismo Dinámico */}
-            <div className="space-y-2">
-              <label htmlFor="microorganism" className="block text-sm font-semibold text-gray-800">
-                Microorganismo * 
-                {loadingMicroorganisms && (
-                  <span className="ml-2 text-blue-600">
-                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  </span>
-                )}
-              </label>
-              <select
-                id="microorganism"
-                name="microorganism"
-                required
-                value={formData.microorganism}
-                onChange={handleChange}
-                disabled={loadingMicroorganisms}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg disabled:opacity-50"
-              >
-                <option value="">
-                  {loadingMicroorganisms ? 'Cargando microorganismos...' : 'Seleccionar microorganismo'}
-                </option>
-                {microorganisms.map((organism) => (
-                  <option key={organism.id} value={organism.nombre}>
-                    {organism.nombre}
-                  </option>
-                ))}
-              </select>
-              {microorganisms.length > 0 && !loadingMicroorganisms && (
-                <p className="text-sm text-green-600 mt-1">
-                  ✅ {microorganisms.length} microorganismos cargados desde Airtable
-                </p>
-              )}
-            </div>
-
-            {/* Fecha de Inoculación */}
-            <div className="space-y-2">
-              <label htmlFor="inoculationDate" className="block text-sm font-semibold text-gray-800">
-                Fecha de Inoculación *
-              </label>
-              <input
-                type="date"
-                id="inoculationDate"
-                name="inoculationDate"
-                required
-                value={formData.inoculationDate}
-                onChange={handleChange}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg"
-              />
-            </div>
-
-            {/* Investigador */}
-            <div className="space-y-2">
-              <label htmlFor="researcher" className="block text-sm font-semibold text-gray-800">
-                Investigador Responsable *
-              </label>
-              <input
-                type="text"
-                id="researcher"
-                name="researcher"
-                required
-                value={formData.researcher}
-                onChange={handleChange}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg"
-                placeholder="Nombre completo del investigador"
-              />
-            </div>
-
-            {/* Sustrato */}
-            <div className="space-y-2">
-              <label htmlFor="substrate" className="block text-sm font-semibold text-gray-800">
-                Tipo de Sustrato *
-              </label>
-              <select
-                id="substrate"
-                name="substrate"
-                required
-                value={formData.substrate}
-                onChange={handleChange}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg"
-              >
-                <option value="">Seleccionar sustrato</option>
-                {substrates.map((substrate) => (
-                  <option key={substrate} value={substrate}>
-                    {substrate}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Temperatura */}
-            <div className="space-y-2">
-              <label htmlFor="temperature" className="block text-sm font-semibold text-gray-800">
-                Temperatura (°C) *
-              </label>
-              <input
-                type="number"
-                id="temperature"
-                name="temperature"
-                required
-                min="15"
-                max="35"
-                step="0.1"
-                value={formData.temperature || ''}
-                onChange={handleChange}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg"
-                placeholder="Ejemplo: 24.5"
-              />
-            </div>
-
-            {/* Humedad */}
-            <div className="space-y-2">
-              <label htmlFor="humidity" className="block text-sm font-semibold text-gray-800">
-                Humedad Relativa (%) *
-              </label>
-              <input
-                type="number"
-                id="humidity"
-                name="humidity"
-                required
-                min="60"
-                max="95"
-                step="0.1"
-                value={formData.humidity || ''}
-                onChange={handleChange}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg"
-                placeholder="Ejemplo: 85.0"
-              />
-            </div>
+        {submitStatus === 'error' && (
+          <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-center">
+            ❌ {errorMessage || 'Error al registrar la inoculación'}
           </div>
-
-          {/* Notas - Full Width */}
-          <div className="mt-8 space-y-2">
-            <label htmlFor="notes" className="block text-sm font-semibold text-gray-800">
-              Observaciones y Notas Adicionales
-            </label>
-            <textarea
-              id="notes"
-              name="notes"
-              rows={4}
-              value={formData.notes}
-              onChange={handleChange}
-              className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg resize-none"
-              placeholder="Observaciones adicionales, condiciones especiales, protocolos utilizados, etc..."
-            />
-          </div>
-
-          {/* Botones de Acción */}
-          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-end">
-            <button
-              type="button"
-              className="px-8 py-4 border-2 border-gray-300 rounded-xl text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 bg-white/80 backdrop-blur-sm"
-              onClick={() => {
-                setFormData({
-                  bagQuantity: 0,
-                  microorganism: '',
-                  inoculationDate: '',
-                  researcher: '',
-                  notes: '',
-                  substrate: '',
-                  temperature: 0,
-                  humidity: 0,
-                });
-              }}
-            >
-              🗑️ Limpiar Formulario
-            </button>
-            
-            <button
-              type="submit"
-              disabled={isSubmitting || loadingMicroorganisms}
-              className={`px-10 py-4 rounded-xl font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 ${
-                isSubmitting || loadingMicroorganisms
-                  ? 'bg-gray-400 cursor-not-allowed text-white'
-                  : 'bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-800 text-white'
-              }`}
-            >
-              {isSubmitting ? (
-                <div className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Registrando en Airtable...
-                </div>
-              ) : (
-                '🧬 Registrar Inoculación'
-              )}
-            </button>
-          </div>
-        </form>
-
-        {/* Footer Info Profesional */}
-        <div className="mt-8 bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
-          <div className="text-center">
-            <div className="flex items-center justify-center space-x-8 mb-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-700">Airtable Conectado</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-700">Sistema Operativo</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-700">Telegram Seguro</span>
-              </div>
-            </div>
-            
-            <p className="text-gray-600 mb-2">
-              📊 Los datos se almacenan automáticamente con trazabilidad completa y códigos de lote únicos
-            </p>
-            <p className="text-sm text-gray-500">
-              🔗 Integración DataLab ↔ Airtable | 
-              Sistema CIR | 
-              Timestamp: {isClient ? currentTimestamp : 'Sincronizando...'}
-            </p>
-          </div>
-        </div>
-      </div>
+        )}
+      </form>
     </div>
   );
-};
-
-export default MushroomInoculationForm;
+              >
