@@ -1,8 +1,6 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
-
 
 interface InoculationData {
   bagQuantity: number;
@@ -10,7 +8,6 @@ interface InoculationData {
   inoculationDate: string;
   responsables: string[];
 }
-
 
 interface Microorganism {
   id: string;
@@ -23,7 +20,6 @@ interface Responsable {
 }
 
 const MushroomInoculationForm = () => {
-
   const [formData, setFormData] = useState<InoculationData>({
     bagQuantity: 0,
     microorganism: '',
@@ -41,12 +37,23 @@ const MushroomInoculationForm = () => {
   const [responsables, setResponsables] = useState<Responsable[]>([]);
   const [loadingResponsables, setLoadingResponsables] = useState(true);
 
-  // Efecto para hidratación segura
+  // Variables que faltaban
+  const [isClient, setIsClient] = useState(false);
+  const [currentBatchCode, setCurrentBatchCode] = useState<string>('');
 
   useEffect(() => {
+    // Marcar como cliente para hidratación segura
+    setIsClient(true);
+    
+    // Generar código de lote inicial
+    const initialBatchCode = generateBatchCode();
+    setCurrentBatchCode(initialBatchCode);
+    setBatchCode(initialBatchCode);
+
     fetchMicroorganisms();
     fetchResponsables();
   }, []);
+
   const fetchResponsables = async () => {
     try {
       const response = await fetch('/api/equipo-laboratorio');
@@ -92,7 +99,6 @@ const MushroomInoculationForm = () => {
     }
   };
 
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     if (e.target instanceof HTMLSelectElement && e.target.multiple) {
@@ -105,7 +111,6 @@ const MushroomInoculationForm = () => {
       }));
     }
   };
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,13 +125,21 @@ const MushroomInoculationForm = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          batchCode: currentBatchCode
+        }),
       });
 
       const result = await response.json();
 
       if (response.ok && result.success) {
         setSubmitStatus('success');
+        // Generar nuevo código de lote para próximo uso
+        const newBatchCode = generateBatchCode();
+        setCurrentBatchCode(newBatchCode);
+        setBatchCode(currentBatchCode); // Mostrar el código del registro actual
+        
         setFormData({
           bagQuantity: 0,
           microorganism: '',
@@ -223,124 +236,136 @@ const MushroomInoculationForm = () => {
         {submitStatus === 'error' && (
           <div className="bg-red-50/95 backdrop-blur-sm border border-red-200 rounded-2xl p-6 mb-8 shadow-lg">
             <div className="flex items-start">
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-200 py-8">
-      <form onSubmit={handleSubmit} className="w-full max-w-xl bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
-        <h2 className="text-2xl font-bold mb-8 text-center text-gray-800">Registro de Inoculación</h2>
-        {/* Microorganismo */}
-        <div className="mb-6">
-          <label htmlFor="microorganism" className="block text-sm font-semibold text-gray-800 mb-2">
-            Microorganismo *
-          </label>
-          <select
-            id="microorganism"
-            name="microorganism"
-            required
-            value={formData.microorganism}
-            onChange={handleChange}
-            disabled={loadingMicroorganisms}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 disabled:opacity-50"
-          >
-            <option value="">{loadingMicroorganisms ? 'Cargando...' : 'Seleccionar microorganismo'}</option>
-            {microorganisms.map((organism) => (
-              <option key={organism.id} value={organism.nombre}>{organism.nombre}</option>
-            ))}
-          </select>
-        </div>
-        {/* Responsables */}
-        <div className="mb-6">
-          <label htmlFor="responsables" className="block text-sm font-semibold text-gray-800 mb-2">
-            Responsables *
-          </label>
-          <select
-            id="responsables"
-            name="responsables"
-            multiple
-            required
-            value={formData.responsables}
-            onChange={handleChange}
-            disabled={loadingResponsables}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 disabled:opacity-50 h-32"
-          >
-            {loadingResponsables ? (
-              <option>Cargando responsables...</option>
-            ) : responsables.length === 0 ? (
-              <option>No hay responsables disponibles</option>
-            ) : responsables.map((resp) => (
-              <option key={resp.id} value={resp.nombre}>{resp.nombre}</option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">Puedes seleccionar varios responsables (Ctrl/Cmd + click)</p>
-        </div>
-        {/* Cantidad de Bolsas */}
-        <div className="mb-6">
-          <label htmlFor="bagQuantity" className="block text-sm font-semibold text-gray-800 mb-2">
-            Cantidad de Bolsas Inoculadas *
-          </label>
-          <input
-            type="number"
-            id="bagQuantity"
-            name="bagQuantity"
-            required
-            min="1"
-            value={formData.bagQuantity || ''}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 text-lg"
-            placeholder="Ejemplo: 25"
-          />
-        </div>
-        {/* Fecha de Inoculación */}
-        <div className="mb-8">
-          <label htmlFor="inoculationDate" className="block text-sm font-semibold text-gray-800 mb-2">
-            Fecha de Inoculación *
-          </label>
-          <input
-            type="date"
-            id="inoculationDate"
-            name="inoculationDate"
-            required
-            value={formData.inoculationDate}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 text-lg"
-          />
-        </div>
-        {/* Botón */}
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={isSubmitting || loadingMicroorganisms || loadingResponsables}
-            className={`px-10 py-4 rounded-xl font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 ${
-              isSubmitting || loadingMicroorganisms || loadingResponsables
-                ? 'bg-gray-400 cursor-not-allowed text-white'
-                : 'bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-800 text-white'
-            }`}
-          >
-            {isSubmitting ? (
-              <div className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Registrando...
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
               </div>
-            ) : (
-              'Registrar Inoculación'
-            )}
-          </button>
+              <div className="ml-4">
+                <h3 className="text-lg font-semibold text-red-800 mb-2">
+                  ❌ Error al registrar
+                </h3>
+                <p className="text-red-700">{errorMessage}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Formulario */}
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Microorganismo */}
+            <div>
+              <label htmlFor="microorganism" className="block text-sm font-semibold text-gray-800 mb-2">
+                Microorganismo *
+              </label>
+              <select
+                id="microorganism"
+                name="microorganism"
+                required
+                value={formData.microorganism}
+                onChange={handleChange}
+                disabled={loadingMicroorganisms}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 disabled:opacity-50"
+              >
+                <option value="">{loadingMicroorganisms ? 'Cargando...' : 'Seleccionar microorganismo'}</option>
+                {microorganisms.map((organism) => (
+                  <option key={organism.id} value={organism.nombre}>{organism.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Responsables */}
+            <div>
+              <label htmlFor="responsables" className="block text-sm font-semibold text-gray-800 mb-2">
+                Responsables *
+              </label>
+              <select
+                id="responsables"
+                name="responsables"
+                multiple
+                required
+                value={formData.responsables}
+                onChange={handleChange}
+                disabled={loadingResponsables}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 disabled:opacity-50 h-32"
+              >
+                {loadingResponsables ? (
+                  <option>Cargando responsables...</option>
+                ) : responsables.length === 0 ? (
+                  <option>No hay responsables disponibles</option>
+                ) : responsables.map((resp) => (
+                  <option key={resp.id} value={resp.nombre}>{resp.nombre}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Puedes seleccionar varios responsables (Ctrl/Cmd + click)</p>
+            </div>
+
+            {/* Cantidad de Bolsas */}
+            <div>
+              <label htmlFor="bagQuantity" className="block text-sm font-semibold text-gray-800 mb-2">
+                Cantidad de Bolsas Inoculadas *
+              </label>
+              <input
+                type="number"
+                id="bagQuantity"
+                name="bagQuantity"
+                required
+                min="1"
+                value={formData.bagQuantity || ''}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 text-lg"
+                placeholder="Ejemplo: 25"
+              />
+            </div>
+
+            {/* Fecha de Inoculación */}
+            <div>
+              <label htmlFor="inoculationDate" className="block text-sm font-semibold text-gray-800 mb-2">
+                Fecha de Inoculación *
+              </label>
+              <input
+                type="date"
+                id="inoculationDate"
+                name="inoculationDate"
+                required
+                value={formData.inoculationDate}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 text-lg"
+              />
+            </div>
+
+            {/* Botón */}
+            <div className="flex justify-end pt-6">
+              <button
+                type="submit"
+                disabled={isSubmitting || loadingMicroorganisms || loadingResponsables}
+                className={`px-10 py-4 rounded-xl font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 ${
+                  isSubmitting || loadingMicroorganisms || loadingResponsables
+                    ? 'bg-gray-400 cursor-not-allowed text-white'
+                    : 'bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-800 text-white'
+                }`}
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Registrando...
+                  </div>
+                ) : (
+                  'Registrar Inoculación'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
-        {/* Mensaje de éxito o error */}
-        {submitStatus === 'success' && (
-          <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-center">
-            ✅ Inoculación registrada exitosamente
-          </div>
-        )}
-        {submitStatus === 'error' && (
-          <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-center">
-            ❌ {errorMessage || 'Error al registrar la inoculación'}
-          </div>
-        )}
-      </form>
+      </div>
     </div>
   );
-              >
+};
+
+export default MushroomInoculationForm;
