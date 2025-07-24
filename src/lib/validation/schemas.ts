@@ -1,5 +1,32 @@
 import { z } from 'zod';
 
+// Esquema de validación para autenticación
+export const LoginSchema = z.object({
+  cedula: z.string()
+    .min(1, 'La cédula es requerida')
+    .max(20, 'La cédula es demasiado larga')
+    .regex(/^[0-9]+$/, 'La cédula debe contener solo números'),
+  
+  password: z.string()
+    .optional()
+});
+
+export const SetPasswordSchema = z.object({
+  cedula: z.string()
+    .min(1, 'La cédula es requerida')
+    .max(20, 'La cédula es demasiado larga')
+    .regex(/^[0-9]+$/, 'La cédula debe contener solo números'),
+  
+  password: z.string()
+    .min(6, 'La contraseña debe tener al menos 6 caracteres')
+    .max(50, 'La contraseña es demasiado larga'),
+  
+  confirmPassword: z.string()
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmPassword"],
+});
+
 // Esquema de validación para datos de inoculación
 export const InoculationSchema = z.object({
   bagQuantity: z.number()

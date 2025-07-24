@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import LoginModal from './LoginModal';
 
 const Hero = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     if (videoRef.current) {
@@ -12,6 +16,10 @@ const Hero = () => {
       });
     }
   }, []);
+
+  const handleAccessClick = () => {
+    setShowLoginModal(true);
+  };
 
   return (
     <section id="home" className="relative h-screen flex items-center justify-center overflow-hidden">
@@ -51,14 +59,17 @@ const Hero = () => {
           información de producción del laboratorio con trazabilidad completa y analítica avanzada.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <a
-            href="#contact"
-            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 w-full sm:w-auto"
-          >
-            Acceder a la Plataforma
-          </a>
-        </div>
+        {/* Solo mostrar botón si NO está autenticado */}
+        {!isAuthenticated && (
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <button
+              onClick={handleAccessClick}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 w-full sm:w-auto"
+            >
+              Acceder a la Plataforma
+            </button>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-16 pt-8 border-t border-white/20">
@@ -103,6 +114,12 @@ const Hero = () => {
           </svg>
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)} 
+      />
     </section>
   );
 };
