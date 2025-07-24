@@ -15,11 +15,39 @@ const base = new Airtable({
 export async function POST(request: NextRequest) {
   try {
     const rawData = await request.json();
+    const userAgent = request.headers.get('user-agent') || 'Unknown';
+    
+    // Extraer información básica del navegador para logging
+    const getBrowserFromUA = (ua: string) => {
+      if (ua.includes('TelegramBot')) return 'Telegram WebApp';
+      if (ua.includes('Telegram')) return 'Telegram';
+      if (ua.includes('Chrome')) return 'Chrome';
+      if (ua.includes('Firefox')) return 'Firefox';
+      if (ua.includes('Safari')) return 'Safari';
+      if (ua.includes('Edge')) return 'Edge';
+      return 'Unknown';
+    };
+    
+    const browserName = getBrowserFromUA(userAgent);
+    
+    // Log del intento de registro
+    console.log('📝 Inoculación Request:', {
+      browser: browserName,
+      userAgent: userAgent.substring(0, 100),
+      timestamp: new Date().toISOString(),
+      dataFields: Object.keys(rawData)
+    });
     
     // Validar datos de entrada con Zod
     const validation = validateData(InoculationSchema, rawData);
     
     if (!validation.success) {
+      console.error('❌ Validation failed:', {
+        browser: browserName,
+        errors: validation.errors,
+        timestamp: new Date().toISOString()
+      });
+      
       return NextResponse.json({ 
         error: 'Datos de entrada inválidos',
         details: validation.errors 
@@ -55,6 +83,16 @@ export async function POST(request: NextRequest) {
         }
       }
     ]);
+
+    // Log del registro exitoso
+    console.log('✅ Inoculación registrada:', {
+      batchCode,
+      recordId: record[0].id,
+      browser: browserName,
+      microorganism: data.microorganism,
+      bagQuantity: data.bagQuantity,
+      timestamp: new Date().toISOString()
+    });
 
     return NextResponse.json({
       success: true,

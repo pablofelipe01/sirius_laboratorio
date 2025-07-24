@@ -8,6 +8,50 @@ import {
   PROTECTED_ROUTES
 } from './lib/security/config';
 
+// Función para extraer información del navegador del User-Agent
+function extractBrowserInfo(userAgent: string) {
+  let browser = 'Unknown';
+  let version = 'Unknown';
+  let os = 'Unknown';
+  let device = 'Desktop';
+  
+  // Detectar navegador
+  if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) {
+    browser = 'Chrome';
+    const match = userAgent.match(/Chrome\/(\d+)/);
+    version = match ? match[1] : 'Unknown';
+  } else if (userAgent.includes('Firefox')) {
+    browser = 'Firefox';
+    const match = userAgent.match(/Firefox\/(\d+)/);
+    version = match ? match[1] : 'Unknown';
+  } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+    browser = 'Safari';
+    const match = userAgent.match(/Version\/(\d+)/);
+    version = match ? match[1] : 'Unknown';
+  } else if (userAgent.includes('Edg')) {
+    browser = 'Edge';
+    const match = userAgent.match(/Edg\/(\d+)/);
+    version = match ? match[1] : 'Unknown';
+  } else if (userAgent.includes('TelegramBot')) {
+    browser = 'Telegram WebApp';
+  } else if (userAgent.includes('Telegram')) {
+    browser = 'Telegram';
+  }
+  
+  // Detectar OS
+  if (userAgent.includes('Windows')) os = 'Windows';
+  else if (userAgent.includes('Mac')) os = 'macOS';
+  else if (userAgent.includes('Linux')) os = 'Linux';
+  else if (userAgent.includes('Android')) os = 'Android';
+  else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS';
+  
+  // Detectar dispositivo
+  if (userAgent.includes('Mobile')) device = 'Mobile';
+  else if (userAgent.includes('Tablet') || userAgent.includes('iPad')) device = 'Tablet';
+  
+  return { browser, version, os, device };
+}
+
 // Función para crear respuesta de bloqueo con headers de seguridad
 function createBlockedResponse() {
   const blockedHtml = `
@@ -59,6 +103,7 @@ function createBlockedResponse() {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const userAgent = request.headers.get('user-agent') || '';
+  const browserInfo = extractBrowserInfo(userAgent);
   
   // Verificar si la ruta está protegida
   const isProtectedRoute = PROTECTED_ROUTES.some(route => 
@@ -68,20 +113,27 @@ export function middleware(request: NextRequest) {
   if (isProtectedRoute) {
     // Verificar User Agent de Telegram
     if (!isValidTelegramUserAgent(userAgent)) {
-      // Log del intento de acceso no autorizado
+      // Log del intento de acceso no autorizado con información detallada
       logSecurityEvent('unauthorized_access_attempt', {
         path: pathname,
-        userAgent,
+        userAgent: userAgent.substring(0, 200), // Limitar longitud
+        browser: `${browserInfo.browser} ${browserInfo.version}`,
+        os: browserInfo.os,
+        device: browserInfo.device,
         xff: request.headers.get('x-forwarded-for') || 'unknown',
+        referer: request.headers.get('referer') || 'direct',
         timestamp: new Date().toISOString()
       }, 'high');
       
       return createBlockedResponse();
     }
     
-    // Log de acceso autorizado
+    // Log de acceso autorizado con información del navegador
     logSecurityEvent('authorized_telegram_access', {
       path: pathname,
+      browser: `${browserInfo.browser} ${browserInfo.version}`,
+      os: browserInfo.os,
+      device: browserInfo.device,
       timestamp: new Date().toISOString()
     }, 'low');
   }

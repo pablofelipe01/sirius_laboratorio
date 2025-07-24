@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import BrowserInfoDisplay from './BrowserInfoDisplay';
 
 interface InoculationData {
   bagQuantity: number;
@@ -203,6 +204,12 @@ const MushroomInoculationForm = () => {
             </div>
           </div>
         </div>
+
+        {/* Información del Navegador */}
+        <BrowserInfoDisplay 
+          showDetails={true} 
+          className="mb-6"
+        />
 
         {/* Status Messages */}
         {submitStatus === 'success' && (
