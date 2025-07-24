@@ -14,24 +14,54 @@ export async function GET() {
   try {
     const records = await base('tblezRGNqdPP56T4x')
       .select({
-        fields: ['ID', 'Nombre'],
+        fields: ['ID', 'Nombre', 'Contraseña', 'Hash', 'Salt', 'ID_Chat', 'Estados Sistemas'],
         sort: [{ field: 'Nombre', direction: 'asc' }]
       })
       .all();
 
-    const responsables = records.map(record => ({
+    const usuarios = records.map(record => ({
       id: record.id,
       nombre: record.fields['Nombre'] as string,
+      contraseña: record.fields['Contraseña'] as string,
+      hash: record.fields['Hash'] as string,
+      salt: record.fields['Salt'] as string,
+      idChat: record.fields['ID_Chat'] as string, // Usaremos esto para la cédula
+      estadoSistemas: record.fields['Estados Sistemas'] as string,
     })).filter(item => item.nombre); // Filtrar los que no tienen nombre
 
     return NextResponse.json({
       success: true,
-      responsables
+      usuarios
     });
   } catch (error) {
-    console.error('Error fetching responsables:', error);
+    console.error('Error fetching usuarios:', error);
     return NextResponse.json(
-      { success: false, error: 'Error al obtener responsables' },
+      { success: false, error: 'Error al obtener usuarios' },
+      { status: 500 }
+    );
+  }
+}
+
+// Función para actualizar contraseña y hash
+export async function PATCH(request: Request) {
+  try {
+    const { recordId, contraseña, hash, salt } = await request.json();
+    
+    const updateFields: any = {};
+    if (contraseña) updateFields['Contraseña'] = contraseña;
+    if (hash) updateFields['Hash'] = hash;
+    if (salt) updateFields['Salt'] = salt;
+    
+    const updatedRecord = await base('tblezRGNqdPP56T4x').update(recordId, updateFields);
+
+    return NextResponse.json({
+      success: true,
+      record: updatedRecord
+    });
+  } catch (error) {
+    console.error('Error updating user credentials:', error);
+    return NextResponse.json(
+      { success: false, error: 'Error al actualizar credenciales' },
       { status: 500 }
     );
   }

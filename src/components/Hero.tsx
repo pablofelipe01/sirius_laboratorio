@@ -44,9 +44,6 @@ const Hero = () => {
       <div className="relative z-10 text-center text-white px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
           DataLab
-          <span className="block bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            Sirius Regenerative Solutions S.A.S ZOMAC
-          </span>
         </h1>
         
         <p className="text-lg sm:text-xl md:text-2xl mb-8 text-gray-200 max-w-3xl mx-auto leading-relaxed">
@@ -60,13 +57,6 @@ const Hero = () => {
             className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 w-full sm:w-auto"
           >
             Acceder a la Plataforma
-          </a>
-          
-          <a
-            href="#services"
-            className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-gray-900 transition-all duration-300 backdrop-blur-sm w-full sm:w-auto"
-          >
-            Ver Capacidades
           </a>
         </div>
 

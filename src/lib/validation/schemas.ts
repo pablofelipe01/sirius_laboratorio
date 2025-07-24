@@ -39,20 +39,6 @@ export const InoculationSchema = z.object({
     .optional()
 });
 
-// Esquema para datos de Telegram WebApp
-export const TelegramWebAppSchema = z.object({
-  query_id: z.string().optional(),
-  user: z.object({
-    id: z.number(),
-    first_name: z.string(),
-    last_name: z.string().optional(),
-    username: z.string().optional(),
-    language_code: z.string().optional(),
-  }).optional(),
-  auth_date: z.number(),
-  hash: z.string().min(1, 'Hash es requerido'),
-});
-
 // Esquema para validar parámetros de consulta de APIs
 export const ApiQuerySchema = z.object({
   limit: z.number().min(1).max(100).optional().default(50),
@@ -62,7 +48,6 @@ export const ApiQuerySchema = z.object({
 
 // Tipos TypeScript generados a partir de los esquemas
 export type InoculationData = z.infer<typeof InoculationSchema>;
-export type TelegramWebAppData = z.infer<typeof TelegramWebAppSchema>;
 export type ApiQuery = z.infer<typeof ApiQuerySchema>;
 
 // Función helper para validar datos con manejo de errores
