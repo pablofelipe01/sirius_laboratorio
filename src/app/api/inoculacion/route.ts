@@ -115,20 +115,22 @@ export async function GET() {
       throw new Error('Missing AIRTABLE_TABLE_INOCULACION environment variable');
     }
 
-    // Obtener registros de Airtable usando nombres de campos
+    // Obtener registros de Airtable usando nombres de campos exactos
     const records = await base(tableId)
       .select({
         maxRecords: 50,
-        sort: [{ field: 'Status', direction: 'desc' }]
+        sort: [{ field: 'Fecha Creacion', direction: 'desc' }]
       })
       .firstPage();
 
     const formattedRecords = records.map(record => ({
       id: record.id,
-      responsable: record.get('Responsable'),
-      cantidadBolsas: record.get('Cantidad_Bolsas'),
-      status: record.get('Status'),
-      microorganismos: record.get('Microorganismos')
+      responsables: record.get('Responsables'),
+      cantidadBolsas: record.get('Cantidad Bolsas'),
+      tipoBolsas: record.get('Tipo Bolsas'),
+      microorganismos: record.get('Microorganismos'),
+      fechaInoculacion: record.get('Fecha Inoculacion'),
+      fechaCreacion: record.get('Fecha Creacion')
     }));
 
     return NextResponse.json({
