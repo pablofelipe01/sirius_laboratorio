@@ -12,7 +12,13 @@ const base = Airtable.base(process.env.AIRTABLE_BASE_ID!);
 
 export async function GET() {
   try {
-    const records = await base('tblezRGNqdPP56T4x')
+    const tableId = process.env.AIRTABLE_TABLE_EQUIPO_LABORATORIO;
+    
+    if (!tableId) {
+      throw new Error('Missing AIRTABLE_TABLE_EQUIPO_LABORATORIO environment variable');
+    }
+
+    const records = await base(tableId)
       .select({
         fields: ['ID', 'Nombre', 'Contraseña', 'Hash', 'Salt', 'ID_Chat', 'Estados Sistemas'],
         sort: [{ field: 'Nombre', direction: 'asc' }]
@@ -47,12 +53,18 @@ export async function PATCH(request: Request) {
   try {
     const { recordId, contraseña, hash, salt } = await request.json();
     
-    const updateFields: any = {};
+    const tableId = process.env.AIRTABLE_TABLE_EQUIPO_LABORATORIO;
+    
+    if (!tableId) {
+      throw new Error('Missing AIRTABLE_TABLE_EQUIPO_LABORATORIO environment variable');
+    }
+    
+    const updateFields: Record<string, string> = {};
     if (contraseña) updateFields['Contraseña'] = contraseña;
     if (hash) updateFields['Hash'] = hash;
     if (salt) updateFields['Salt'] = salt;
     
-    const updatedRecord = await base('tblezRGNqdPP56T4x').update(recordId, updateFields);
+    const updatedRecord = await base(tableId).update(recordId, updateFields);
 
     return NextResponse.json({
       success: true,

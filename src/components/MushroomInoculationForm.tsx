@@ -5,8 +5,11 @@ import { useState, useEffect } from 'react';
 interface InoculationData {
   bagQuantity: number;
   microorganism: string;
+  microorganismId: string;
   inoculationDate: string;
   responsables: string[];
+  responsablesIds: string[];
+  tipoInoculacion: string;
 }
 
 interface Microorganism {
@@ -23,13 +26,15 @@ const MushroomInoculationForm = () => {
   const [formData, setFormData] = useState<InoculationData>({
     bagQuantity: 0,
     microorganism: '',
+    microorganismId: '',
     inoculationDate: '',
     responsables: [],
+    responsablesIds: [],
+    tipoInoculacion: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [batchCode, setBatchCode] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const [microorganisms, setMicroorganisms] = useState<Microorganism[]>([]);
@@ -37,26 +42,14 @@ const MushroomInoculationForm = () => {
   const [responsables, setResponsables] = useState<Responsable[]>([]);
   const [loadingResponsables, setLoadingResponsables] = useState(true);
 
-  // Variables que faltaban
-  const [isClient, setIsClient] = useState(false);
-  const [currentBatchCode, setCurrentBatchCode] = useState<string>('');
-
   useEffect(() => {
-    // Marcar como cliente para hidratación segura
-    setIsClient(true);
-    
-    // Generar código de lote inicial
-    const initialBatchCode = generateBatchCode();
-    setCurrentBatchCode(initialBatchCode);
-    setBatchCode(initialBatchCode);
-
     fetchMicroorganisms();
     fetchResponsables();
   }, []);
 
   const fetchResponsables = async () => {
     try {
-      const response = await fetch('/api/equipo-laboratorio');
+      const response = await fetch('/api/equipo');
       const data = await response.json();
       if (data.success) {
         setResponsables(data.responsables);
@@ -102,8 +95,22 @@ const MushroomInoculationForm = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     if (e.target instanceof HTMLSelectElement && e.target.multiple) {
-      const selected = Array.from(e.target.selectedOptions).map(option => option.value);
-      setFormData(prev => ({ ...prev, [name]: selected }));
+      const selected = Array.from(e.target.selectedOptions);
+      const selectedValues = selected.map(option => option.value);
+      const selectedIds = selected.map(option => option.getAttribute('data-id') || '');
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: selectedValues,
+        [`${name}Ids`]: selectedIds
+      }));
+    } else if (name === 'microorganism' && e.target instanceof HTMLSelectElement) {
+      const selectedOption = e.target.options[e.target.selectedIndex];
+      const microorganismId = selectedOption.getAttribute('data-id') || '';
+      setFormData(prev => ({
+        ...prev,
+        microorganism: value,
+        microorganismId: microorganismId,
+      }));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -125,26 +132,22 @@ const MushroomInoculationForm = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...formData,
-          batchCode: currentBatchCode
-        }),
+        body: JSON.stringify(formData),
       });
 
       const result = await response.json();
 
       if (response.ok && result.success) {
         setSubmitStatus('success');
-        // Generar nuevo código de lote para próximo uso
-        const newBatchCode = generateBatchCode();
-        setCurrentBatchCode(newBatchCode);
-        setBatchCode(currentBatchCode); // Mostrar el código del registro actual
         
         setFormData({
           bagQuantity: 0,
           microorganism: '',
+          microorganismId: '',
           inoculationDate: '',
           responsables: [],
+          responsablesIds: [],
+          tipoInoculacion: '',
         });
       } else {
         setSubmitStatus('error');
@@ -158,15 +161,9 @@ const MushroomInoculationForm = () => {
     }
   };
 
-  const generateBatchCode = () => {
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `INO-${date}-${random}`;
-  };
-
   return (
     <div 
-      className="min-h-screen relative"
+      className="min-h-screen relative pt-20"
       style={{
         backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4)), url('https://res.cloudinary.com/dvnuttrox/image/upload/v1752168289/Lab_banner_xhhlfe.jpg')`,
         backgroundSize: 'cover',
@@ -180,26 +177,15 @@ const MushroomInoculationForm = () => {
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Profesional */}
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 mb-8 border border-white/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6">
-              <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 text-white p-4 rounded-xl shadow-lg">
-                <div className="text-3xl font-bold">🧬</div>
-              </div>
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                  Formulario de Inoculación de Microorganismos
-                </h1>
-                <p className="text-lg text-gray-600 flex items-center">
-                  <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                  Sistema DataLab - Sirius Regenerative Solutions S.A.S ZOMAC
-                </p>
-              </div>
-            </div>
-            <div className="text-right bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-200">
-              <div className="text-sm text-gray-500 mb-1">Código de Lote</div>
-              <div className="text-xl font-mono font-bold text-blue-700 bg-white px-3 py-1 rounded-lg shadow-sm">
-                {isClient ? currentBatchCode : 'Generando...'}
-              </div>
+          <div className="flex items-center justify-center">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center">
+                Inoculación de Microorganismos
+              </h1>
+              <p className="text-lg text-gray-600 flex items-center justify-center">
+                <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                Sistema DataLab - Sirius Regenerative Solutions S.A.S ZOMAC
+              </p>
             </div>
           </div>
         </div>
@@ -222,12 +208,6 @@ const MushroomInoculationForm = () => {
                 <p className="text-green-700">
                   Los datos han sido guardados correctamente en Airtable con trazabilidad completa.
                 </p>
-                {batchCode && (
-                  <div className="mt-3 bg-white/80 rounded-lg px-4 py-2 inline-block">
-                    <span className="text-sm text-green-600">Código de lote generado: </span>
-                    <strong className="font-mono text-green-800">{batchCode}</strong>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -256,9 +236,25 @@ const MushroomInoculationForm = () => {
         {/* Formulario */}
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Fecha de Inoculación */}
+            <div>
+              <label htmlFor="inoculationDate" className="block text-sm font-semibold text-gray-900 mb-2">
+                Fecha de Inoculación *
+              </label>
+              <input
+                type="date"
+                id="inoculationDate"
+                name="inoculationDate"
+                required
+                value={formData.inoculationDate}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/90 text-lg text-gray-900"
+              />
+            </div>
+
             {/* Microorganismo */}
             <div>
-              <label htmlFor="microorganism" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label htmlFor="microorganism" className="block text-sm font-semibold text-gray-900 mb-2">
                 Microorganismo *
               </label>
               <select
@@ -268,18 +264,18 @@ const MushroomInoculationForm = () => {
                 value={formData.microorganism}
                 onChange={handleChange}
                 disabled={loadingMicroorganisms}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 disabled:opacity-50"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/90 disabled:opacity-50 text-gray-900"
               >
                 <option value="">{loadingMicroorganisms ? 'Cargando...' : 'Seleccionar microorganismo'}</option>
-                {microorganisms.map((organism) => (
-                  <option key={organism.id} value={organism.nombre}>{organism.nombre}</option>
+                {!loadingMicroorganisms && microorganisms && microorganisms.map((organism) => (
+                  <option key={organism.id} value={organism.nombre} data-id={organism.id}>{organism.nombre}</option>
                 ))}
               </select>
             </div>
 
             {/* Responsables */}
             <div>
-              <label htmlFor="responsables" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label htmlFor="responsables" className="block text-sm font-semibold text-gray-900 mb-2">
                 Responsables *
               </label>
               <select
@@ -290,22 +286,41 @@ const MushroomInoculationForm = () => {
                 value={formData.responsables}
                 onChange={handleChange}
                 disabled={loadingResponsables}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 disabled:opacity-50 h-32"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/90 disabled:opacity-50 h-32 text-gray-900"
               >
                 {loadingResponsables ? (
                   <option>Cargando responsables...</option>
-                ) : responsables.length === 0 ? (
+                ) : !responsables || responsables.length === 0 ? (
                   <option>No hay responsables disponibles</option>
                 ) : responsables.map((resp) => (
-                  <option key={resp.id} value={resp.nombre}>{resp.nombre}</option>
+                  <option key={resp.id} value={resp.nombre} data-id={resp.id}>{resp.nombre}</option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">Puedes seleccionar varios responsables (Ctrl/Cmd + click)</p>
+              <p className="text-xs text-gray-700 mt-1">Puedes seleccionar varios responsables (Ctrl/Cmd + click)</p>
+            </div>
+
+            {/* Tipo de Inoculación */}
+            <div>
+              <label htmlFor="tipoInoculacion" className="block text-sm font-semibold text-gray-900 mb-2">
+                Tipo de Inoculación *
+              </label>
+              <select
+                id="tipoInoculacion"
+                name="tipoInoculacion"
+                required
+                value={formData.tipoInoculacion}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/90 text-gray-900"
+              >
+                <option value="">Seleccionar tipo de inoculación</option>
+                <option value="Produccion">Producción</option>
+                <option value="Cepas">Cepas</option>
+              </select>
             </div>
 
             {/* Cantidad de Bolsas */}
             <div>
-              <label htmlFor="bagQuantity" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label htmlFor="bagQuantity" className="block text-sm font-semibold text-gray-900 mb-2">
                 Cantidad de Bolsas Inoculadas *
               </label>
               <input
@@ -316,24 +331,8 @@ const MushroomInoculationForm = () => {
                 min="1"
                 value={formData.bagQuantity || ''}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 text-lg"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/90 text-lg text-gray-900"
                 placeholder="Ejemplo: 25"
-              />
-            </div>
-
-            {/* Fecha de Inoculación */}
-            <div>
-              <label htmlFor="inoculationDate" className="block text-sm font-semibold text-gray-800 mb-2">
-                Fecha de Inoculación *
-              </label>
-              <input
-                type="date"
-                id="inoculationDate"
-                name="inoculationDate"
-                required
-                value={formData.inoculationDate}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/80 text-lg"
               />
             </div>
 

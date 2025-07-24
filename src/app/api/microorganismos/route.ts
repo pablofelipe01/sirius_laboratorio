@@ -29,16 +29,23 @@ export async function GET() {
       );
     }
 
-    const records = await base('tblw4EqoP381U887L')
+    const tableId = process.env.AIRTABLE_TABLE_MICROORGANISMOS;
+    const fieldId = process.env.AIRTABLE_FIELD_MICROORGANISMO_NOMBRE;
+    
+    if (!tableId || !fieldId) {
+      throw new Error('Missing required environment variables for Airtable table or field IDs');
+    }
+
+    const records = await base(tableId)
       .select({
-        fields: ['ID', 'Microorganismo'],
-        sort: [{ field: 'Microorganismo', direction: 'asc' }]
+        fields: ['ID', fieldId],
+        sort: [{ field: fieldId, direction: 'asc' }]
       })
       .all();
 
     const microorganismos = records.map(record => ({
       id: record.id,
-      nombre: record.fields['Microorganismo'] as string,
+      nombre: record.fields[fieldId] as string,
     })).filter(item => item.nombre); // Filtrar los que no tienen nombre
 
     return NextResponse.json({

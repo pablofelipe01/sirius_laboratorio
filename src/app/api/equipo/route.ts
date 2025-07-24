@@ -2,21 +2,33 @@ import { NextResponse } from 'next/server';
 import Airtable from 'airtable';
 
 // Configurar Airtable
+if (process.env.AIRTABLE_API_KEY) {
+  Airtable.configure({ apiKey: process.env.AIRTABLE_API_KEY });
+} else if (process.env.AIRTABLE_PAT) {
+  Airtable.configure({ apiKey: process.env.AIRTABLE_PAT });
+}
+
 const base = Airtable.base(process.env.AIRTABLE_BASE_ID!);
 
 export async function GET() {
   try {
-    const records = await base('tblezRGNqdPP56T4x') // Tabla Equipo Laboratorio
+    const tableId = process.env.AIRTABLE_TABLE_EQUIPO_LABORATORIO;
+    
+    if (!tableId) {
+      throw new Error('Missing AIRTABLE_TABLE_EQUIPO_LABORATORIO environment variable');
+    }
+    
+    const records = await base(tableId)
       .select({
-        fields: ['fldMBrpppAM5X6G2t'], // Campo Nombre
-        sort: [{ field: 'fldMBrpppAM5X6G2t', direction: 'asc' }]
+        fields: ['Nombre'], // Usar el nombre del campo
+        sort: [{ field: 'Nombre', direction: 'asc' }]
       })
       .all();
 
     const responsables = records.map(record => ({
       id: record.id,
-      nombre: record.fields['fldMBrpppAM5X6G2t'] as string,
-    }));
+      nombre: record.fields['Nombre'] as string, // Usar el nombre del campo en lugar del field ID
+    })).filter(item => item.nombre); // Filtrar los que no tienen nombre
 
     return NextResponse.json({
       success: true,

@@ -5,20 +5,31 @@ export const InoculationSchema = z.object({
   bagQuantity: z.number()
     .int('La cantidad de bolsas debe ser un número entero')
     .min(1, 'La cantidad mínima es 1 bolsa')
-    .max(1000, 'La cantidad máxima es 1000 bolsas'),
+    .max(10000, 'La cantidad máxima es 10,000 bolsas'),
   
   microorganism: z.string()
     .min(1, 'El microorganismo es requerido')
     .max(100, 'El nombre del microorganismo es demasiado largo')
-    .regex(/^[a-zA-Z0-9\s\-_.]+$/, 'Caracteres no válidos en el microorganismo'),
+    .regex(/^[a-zA-Z0-9\s\-_.()]+$/, 'Caracteres no válidos en el microorganismo'),
+  
+  microorganismId: z.string()
+    .min(1, 'ID del microorganismo es requerido'),
   
   inoculationDate: z.string()
     .min(1, 'La fecha de inoculación es requerida')
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD)'),
   
-  researcher: z.array(z.string().min(1, 'Nombre de investigador no puede estar vacío'))
-    .min(1, 'Debe asignar al menos un investigador')
-    .max(5, 'Máximo 5 investigadores por inoculación'),
+  responsables: z.array(z.string().min(1, 'Nombre de responsable no puede estar vacío'))
+    .min(1, 'Debe asignar al menos un responsable')
+    .max(5, 'Máximo 5 responsables por inoculación'),
+  
+  responsablesIds: z.array(z.string().min(1, 'ID de responsable no puede estar vacío'))
+    .min(1, 'Debe asignar al menos un responsable')
+    .max(5, 'Máximo 5 responsables por inoculación'),
+  
+  tipoInoculacion: z.string()
+    .min(1, 'El tipo de inoculación es requerido')
+    .refine((val) => ['Produccion', 'Cepas'].includes(val), 'Tipo de inoculación debe ser Produccion o Cepas'),
   
   substrate: z.string()
     .max(100, 'Nombre del sustrato demasiado largo')

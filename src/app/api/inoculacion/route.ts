@@ -56,48 +56,42 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data!;
 
-    // Generar código de lote único
-    const generateBatchCode = () => {
-      const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-      return `INO-${date}-${random}`;
-    };
-
-    const batchCode = generateBatchCode();
-
-    // Crear registro en Airtable
-    const record = await base(process.env.AIRTABLE_TABLE_NAME || 'Inoculaciones').create([
+    // Usar la tabla de Inoculación con nombres de campos
+    const tableId = process.env.AIRTABLE_TABLE_INOCULACION;
+    
+    if (!tableId) {
+      throw new Error('Missing AIRTABLE_TABLE_INOCULACION environment variable');
+    }
+    
+    // Crear registro en Airtable usando nombres de campos exactos de la documentación
+    const record = await base(tableId).create([
       {
         fields: {
-          'Codigo_Lote': batchCode,
-          'Cantidad_Bolsas': data.bagQuantity,
-          'Microorganismo': data.microorganism,
-          'Fecha_Inoculacion': data.inoculationDate,
-          'Investigador': data.researcher,
-          'Sustrato': data.substrate || '',
-          'Temperatura': data.temperature || 0,
-          'Humedad': data.humidity || 0,
-          'Notas': data.notes || '',
-          'Fecha_Registro': new Date().toISOString(),
-          'Estado': 'Activo'
+          'Responsables': data.responsablesIds, // Array de IDs, no string
+          'Cantidad Bolsas': data.bagQuantity,
+          'Tipo Bolsas': data.tipoInoculacion, // Mapear tipoInoculacion a Tipo Bolsas
+          'Microorganismos': [data.microorganismId], // Array de IDs
+          'Fecha Inoculacion': data.inoculationDate // Fecha en formato ISO
         }
       }
     ]);
 
     // Log del registro exitoso
     console.log('✅ Inoculación registrada:', {
-      batchCode,
       recordId: record[0].id,
       browser: browserName,
-      microorganism: data.microorganism,
+      microorganismo: data.microorganism,
+      microorganismoId: data.microorganismId,
       bagQuantity: data.bagQuantity,
+      tipoInoculacion: data.tipoInoculacion,
+      responsables: data.responsables,
+      responsablesIds: data.responsablesIds,
       timestamp: new Date().toISOString()
     });
 
     return NextResponse.json({
       success: true,
       message: 'Inoculación registrada exitosamente',
-      batchCode: batchCode,
       recordId: record[0].id
     });
 
@@ -114,27 +108,27 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    // Obtener registros de Airtable (útil para consultas)
-    const records = await base(process.env.AIRTABLE_TABLE_NAME || 'Inoculaciones')
+    // Usar la tabla de Inoculación desde variables de entorno
+    const tableId = process.env.AIRTABLE_TABLE_INOCULACION;
+    
+    if (!tableId) {
+      throw new Error('Missing AIRTABLE_TABLE_INOCULACION environment variable');
+    }
+
+    // Obtener registros de Airtable usando nombres de campos
+    const records = await base(tableId)
       .select({
         maxRecords: 50,
-        sort: [{ field: 'Fecha_Registro', direction: 'desc' }]
+        sort: [{ field: 'Status', direction: 'desc' }]
       })
       .firstPage();
 
     const formattedRecords = records.map(record => ({
       id: record.id,
-      codigoLote: record.get('Codigo_Lote'),
+      responsable: record.get('Responsable'),
       cantidadBolsas: record.get('Cantidad_Bolsas'),
-      microorganismo: record.get('Microorganismo'),
-      fechaInoculacion: record.get('Fecha_Inoculacion'),
-      investigador: record.get('Investigador'),
-      sustrato: record.get('Sustrato'),
-      temperatura: record.get('Temperatura'),
-      humedad: record.get('Humedad'),
-      notas: record.get('Notas'),
-      fechaRegistro: record.get('Fecha_Registro'),
-      estado: record.get('Estado')
+      status: record.get('Status'),
+      microorganismos: record.get('Microorganismos')
     }));
 
     return NextResponse.json({
