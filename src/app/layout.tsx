@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DataLab - Plataforma de IA para Centro de Investigación Regenerativa",
-  description: "Plataforma de IA y automatización para el Centro de Investigación Regenerativa (CIR). Captura, estructura y analiza datos de producción con trazabilidad completa y analítica avanzada.",
-  keywords: ["investigación regenerativa", "inteligencia artificial", "automatización de laboratorio", "trazabilidad", "analítica científica", "CIR"],
-  authors: [{ name: "DataLab - Centro CIR" }],
+  title: "DataLab - Sistema de Producción de Microorganismos | Sirius Regenerative Solutions",
+  description: "Sistema de gestión y control de procesos de producción de microorganismos para Sirius Regenerative Solutions S.A.S ZOMAC. Plataforma especializada con IA y trazabilidad completa.",
+  keywords: ["microorganismos", "producción", "laboratorio", "biotecnología", "Sirius Regenerative Solutions", "DataLab"],
+  authors: [{ name: "Sirius Regenerative Solutions S.A.S ZOMAC" }],
   openGraph: {
-    title: "DataLab - Plataforma de IA para Centro de Investigación Regenerativa",
-    description: "Plataforma especializada en IA y automatización para investigación regenerativa con trazabilidad completa.",
+    title: "DataLab - Sistema de Producción de Microorganismos | Sirius Regenerative Solutions",
+    description: "Sistema especializado para la producción y gestión de microorganismos con IA y trazabilidad completa.",
     type: "website",
     locale: "es_MX",
   },

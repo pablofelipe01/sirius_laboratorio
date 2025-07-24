@@ -75,7 +75,7 @@ const Services = () => {
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             DataLab integra tecnologías avanzadas de IA y automatización para transformar 
-            la manera en que el Centro de Investigación Regenerativa maneja sus datos y procesos.
+            la manera en que Sirius Regenerative Solutions S.A.S ZOMAC maneja sus procesos de producción de microorganismos.
           </p>
         </div>
 

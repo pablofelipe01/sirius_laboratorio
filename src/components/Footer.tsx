@@ -81,7 +81,7 @@ const Footer = () => {
               </div>
             </div>
             <p className="text-gray-400 mb-4 max-w-md">
-              Plataforma de IA y automatización para el Centro de Investigación Regenerativa. 
+              Sistema de gestión y control de procesos de producción de microorganismos para Sirius Regenerative Solutions S.A.S ZOMAC. 
               Capturamos, estructuramos y analizamos datos con precisión científica y escalabilidad global.
             </p>
             <div className="flex space-x-4">

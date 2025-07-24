@@ -71,7 +71,7 @@ const Contact = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Solicita acceso a la plataforma DataLab para el Centro de Investigación Regenerativa. 
+            Solicita acceso a la plataforma DataLab para Sirius Regenerative Solutions S.A.S ZOMAC. 
             Nuestro equipo técnico te ayudará con la configuración y capacitación.
           </p>
         </div>

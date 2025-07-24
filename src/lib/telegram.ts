@@ -1,17 +1,7 @@
 import crypto from 'crypto';
+import { TelegramWebAppSchema, validateData, type TelegramWebAppData } from './validation/schemas';
 
-export interface TelegramWebAppData {
-  query_id?: string;
-  user?: {
-    id: number;
-    first_name: string;
-    last_name?: string;
-    username?: string;
-    language_code?: string;
-  };
-  auth_date: number;
-  hash: string;
-}
+export type { TelegramWebAppData };
 
 export function validateTelegramWebAppData(initData: string, botToken: string): boolean {
   try {
@@ -53,12 +43,22 @@ export function parseTelegramWebAppData(initData: string): TelegramWebAppData | 
       return null;
     }
     
-    return {
+    const parsedData = {
       query_id: queryId || undefined,
       user: userData ? JSON.parse(userData) : undefined,
       auth_date: parseInt(authDate),
       hash,
     };
+
+    // Validar con Zod
+    const validation = validateData(TelegramWebAppSchema, parsedData);
+    
+    if (!validation.success || !validation.data) {
+      console.error('Validación de datos de Telegram falló:', validation.errors);
+      return null;
+    }
+
+    return validation.data;
   } catch (error) {
     console.error('Error parsing Telegram data:', error);
     return null;

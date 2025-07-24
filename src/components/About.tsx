@@ -57,9 +57,9 @@ const About = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
-            El Centro de Investigación Regenerativa (CIR) es un laboratorio líder en medicina regenerativa 
-            y biotecnología, donde DataLab opera como el sistema nervioso digital que conecta, 
-            analiza y optimiza todos nuestros procesos de investigación.
+            Sirius Regenerative Solutions S.A.S ZOMAC es una empresa líder en biotecnología especializada 
+            en la producción de microorganismos, donde DataLab opera como el sistema de control y gestión 
+            digital que conecta, analiza y optimiza todos nuestros procesos de producción.
           </p>
         </div>
 

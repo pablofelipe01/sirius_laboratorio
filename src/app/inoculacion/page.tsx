@@ -58,7 +58,7 @@ export default function InoculacionPage() {
           <footer className="bg-white border-t border-gray-200 py-4">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="text-center text-sm text-gray-500">
-                DataLab v2.1 - Centro de Investigación Regenerativa | 
+                DataLab v2.1 - Sirius Regenerative Solutions S.A.S ZOMAC | 
                 <span className="ml-2">Datos sincronizados con Airtable</span>
               </div>
             </div>

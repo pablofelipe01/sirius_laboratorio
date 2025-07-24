@@ -1,74 +1,112 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { 
+  SECURITY_HEADERS, 
+  PRODUCTION_HEADERS, 
+  isValidTelegramUserAgent,
+  logSecurityEvent,
+  PROTECTED_ROUTES
+} from './lib/security/config';
 
-export function middleware(request: NextRequest) {
-  // Solo aplicar a la ruta de inoculación
-  if (request.nextUrl.pathname === '/inoculacion') {
-    const userAgent = request.headers.get('user-agent') || '';
-    
-    // Verificar si viene de Telegram
-    const isTelegramUA = userAgent.includes('TelegramBot') || 
-                        userAgent.includes('Telegram') ||
-                        userAgent.includes('tdesktop') ||
-                        userAgent.includes('Telegram Desktop');
-    
-    console.log('🔍 Middleware Check:', {
-      path: request.nextUrl.pathname,
-      userAgent: userAgent.substring(0, 100),
-      isTelegramUA
-    });
-    
-    // Si NO viene de Telegram, redirigir a página de bloqueo
-    if (!isTelegramUA) {
-      console.log('🚫 BLOCKED by middleware: Not Telegram user agent');
-      
-      // Crear respuesta HTML de bloqueo directamente
-      const blockedHtml = `
+// Función para crear respuesta de bloqueo con headers de seguridad
+function createBlockedResponse() {
+  const blockedHtml = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Página no encontrada | DataLab CIR</title>
+    <title>Acceso Restringido | DataLab</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+<body class="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
     <div class="max-w-lg w-full text-center">
         <div class="mb-8">
-            <h1 class="text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-4 select-none">404</h1>
-            <div class="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto rounded-full"></div>
+            <h1 class="text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-800 mb-4 select-none">403</h1>
+            <div class="w-24 h-1 bg-gradient-to-r from-red-600 to-red-800 mx-auto rounded-full"></div>
         </div>
-        <div class="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-            <div class="text-4xl mb-4">🔍</div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Página no encontrada</h2>
+        <div class="bg-white rounded-2xl shadow-lg p-8 border border-red-200">
+            <div class="text-4xl mb-4">🔒</div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">Acceso Restringido</h2>
             <p class="text-gray-600 mb-8 leading-relaxed">
-                Lo sentimos, la página que buscas no está disponible o no existe.
+                Esta aplicación está disponible únicamente a través del bot de Telegram autorizado LABI para la gestión de procesos de producción de microorganismos en el laboratorio de Sirius Regenerative Solutions S.A.S ZOMAC.
             </p>
-            <div class="space-y-3">
-                <button
-                    onclick="window.location.href='/'"
-                    class="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:-translate-y-0.5 shadow-md hover:shadow-lg"
-                >
-                    🏠 Volver al inicio
-                </button>
+            <div class="text-xs text-gray-500 border-t pt-4 mt-6">
+                <p class="font-semibold">DataLab - Sirius Regenerative Solutions S.A.S ZOMAC</p>
+                <p class="mt-1">© 2025 Todos los derechos reservados</p>
+                <p class="mt-1 text-red-600">⚠️ Acceso no autorizado prohibido</p>
             </div>
         </div>
     </div>
 </body>
 </html>`;
+  
+  return new NextResponse(blockedHtml, {
+    status: 403,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      // Headers de seguridad
+      'X-Frame-Options': 'DENY',
+      'X-Content-Type-Options': 'nosniff', 
+      'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+      'Content-Security-Policy': "default-src 'self'; script-src 'unsafe-inline' cdn.tailwindcss.com; style-src 'unsafe-inline' cdn.tailwindcss.com; img-src 'self' data:",
+    },
+  });
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const userAgent = request.headers.get('user-agent') || '';
+  
+  // Verificar si la ruta está protegida
+  const isProtectedRoute = PROTECTED_ROUTES.some(route => 
+    pathname.startsWith(route)
+  );
+  
+  if (isProtectedRoute) {
+    // Verificar User Agent de Telegram
+    if (!isValidTelegramUserAgent(userAgent)) {
+      // Log del intento de acceso no autorizado
+      logSecurityEvent('unauthorized_access_attempt', {
+        path: pathname,
+        userAgent,
+        xff: request.headers.get('x-forwarded-for') || 'unknown',
+        timestamp: new Date().toISOString()
+      }, 'high');
       
-      return new NextResponse(blockedHtml, {
-        status: 403,
-        headers: {
-          'Content-Type': 'text/html',
-        },
-      });
+      return createBlockedResponse();
     }
+    
+    // Log de acceso autorizado
+    logSecurityEvent('authorized_telegram_access', {
+      path: pathname,
+      timestamp: new Date().toISOString()
+    }, 'low');
   }
   
-  return NextResponse.next();
+  // Para todas las rutas, agregar headers de seguridad
+  const response = NextResponse.next();
+  
+  // Aplicar headers de seguridad básicos
+  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  
+  // Headers adicionales en producción
+  if (process.env.NODE_ENV === 'production') {
+    Object.entries(PRODUCTION_HEADERS).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+  }
+  
+  return response;
 }
 
 export const config = {
-  matcher: '/inoculacion/:path*'
+  matcher: [
+    '/inoculacion/:path*',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ]
 };

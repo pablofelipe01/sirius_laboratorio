@@ -191,7 +191,7 @@ const MushroomInoculationForm = () => {
                 </h1>
                 <p className="text-lg text-gray-600 flex items-center">
                   <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                  Sistema DataLab - Centro de Investigación Regenerativa (CIR)
+                  Sistema DataLab - Sirius Regenerative Solutions S.A.S ZOMAC
                 </p>
               </div>
             </div>

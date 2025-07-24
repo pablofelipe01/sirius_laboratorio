@@ -1,22 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Airtable from 'airtable';
+import { InoculationSchema, validateData } from '@/lib/validation/schemas';
 
-// Configurar Airtable
+// Validar configuración requerida
+if (!process.env.AIRTABLE_API_KEY || !process.env.AIRTABLE_BASE_ID) {
+  throw new Error('Variables de entorno AIRTABLE_API_KEY y AIRTABLE_BASE_ID son requeridas');
+}
+
+// Configurar Airtable de forma segura
 const base = new Airtable({
-  apiKey: process.env.AIRTABLE_API_KEY || 'patXXXXXXXXXXXXXX.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' // Reemplazar con tu API key
-}).base(process.env.AIRTABLE_BASE_ID || 'appXXXXXXXXXXXXXX'); // Reemplazar con tu Base ID
+  apiKey: process.env.AIRTABLE_API_KEY
+}).base(process.env.AIRTABLE_BASE_ID);
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json();
-
-    // Validar datos requeridos
-    if (!data.bagQuantity || !data.microorganism || !data.inoculationDate || !data.researcher) {
-      return NextResponse.json(
-        { error: 'Faltan campos requeridos' },
-        { status: 400 }
-      );
+    const rawData = await request.json();
+    
+    // Validar datos de entrada con Zod
+    const validation = validateData(InoculationSchema, rawData);
+    
+    if (!validation.success) {
+      return NextResponse.json({ 
+        error: 'Datos de entrada inválidos',
+        details: validation.errors 
+      }, { status: 400 });
     }
+
+    const data = validation.data!;
 
     // Generar código de lote único
     const generateBatchCode = () => {
@@ -32,13 +42,13 @@ export async function POST(request: NextRequest) {
       {
         fields: {
           'Codigo_Lote': batchCode,
-          'Cantidad_Bolsas': parseInt(data.bagQuantity),
+          'Cantidad_Bolsas': data.bagQuantity,
           'Microorganismo': data.microorganism,
           'Fecha_Inoculacion': data.inoculationDate,
           'Investigador': data.researcher,
           'Sustrato': data.substrate || '',
-          'Temperatura': parseFloat(data.temperature) || 0,
-          'Humedad': parseFloat(data.humidity) || 0,
+          'Temperatura': data.temperature || 0,
+          'Humedad': data.humidity || 0,
           'Notas': data.notes || '',
           'Fecha_Registro': new Date().toISOString(),
           'Estado': 'Activo'
@@ -54,11 +64,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error al crear registro en Airtable:', error);
+    console.error('Error en API de inoculación:', error);
     return NextResponse.json(
       { 
-        error: 'Error interno del servidor',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        error: 'Error interno del servidor'
       },
       { status: 500 }
     );
