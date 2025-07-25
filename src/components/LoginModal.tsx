@@ -159,7 +159,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           <h2 className="text-2xl font-bold text-gray-900">
             {loginStep.step === 'cedula' && 'Iniciar Sesión'}
             {loginStep.step === 'password' && 'Ingresar Contraseña'}
-            {loginStep.step === 'setPassword' && 'Configurar Contraseña'}
+            {loginStep.step === 'setPassword' && 'Guardar Contraseña'}
           </h2>
           <button
             onClick={handleClose}
@@ -247,7 +247,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         {loginStep.step === 'setPassword' && (
           <div>
             <p className="mb-4 text-gray-600">
-              Hola <strong>{loginStep.user?.nombre}</strong>, configura tu contraseña para acceder al sistema:
+              Hola <strong>{loginStep.user?.nombre}</strong>, ingresa tu nueva contraseña para acceder al sistema:
             </p>
             <form onSubmit={handleSetPasswordSubmit}>
               <div className="mb-4">
@@ -295,7 +295,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   disabled={isLoading}
                   className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 font-medium shadow-md"
                 >
-                  {isLoading ? 'Configurando...' : 'Configurar Contraseña'}
+                  {isLoading ? 'Configurando...' : 'Guardar Contraseña'}
                 </button>
               </div>
             </form>
