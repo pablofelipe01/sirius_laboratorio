@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginModal from './LoginModal';
 
@@ -10,6 +11,7 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { user, isAuthenticated, logout, isLoading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,8 +24,8 @@ const Navbar = () => {
 
   const handleAccessClick = () => {
     if (isAuthenticated) {
-      // Si está autenticado, ir a inoculación
-      window.location.href = '/inoculacion';
+      // Si está autenticado, ir a inoculación usando Next.js router
+      router.push('/inoculacion');
     } else {
       // Si no está autenticado, mostrar modal de login
       setShowLoginModal(true);
@@ -32,7 +34,7 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/';
+    router.push('/');
   };
 
   if (isLoading) {
@@ -87,6 +89,7 @@ const Navbar = () => {
             <div className="flex items-center gap-4">
               {isAuthenticated ? (
                 <>
+                  {/* Probando con Link directo */}
                   <Link
                     href="/inoculacion"
                     className={`px-6 py-2 rounded-full transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 font-medium ${
@@ -97,6 +100,21 @@ const Navbar = () => {
                   >
                     📊 Inoculación
                   </Link>
+                  
+                  {/* Botón alternativo para debugging */}
+                  <button
+                    onClick={() => {
+                      console.log('🚀 Alternative button clicked!');
+                      window.location.href = '/inoculacion';
+                    }}
+                    className={`px-4 py-2 rounded-full text-sm transition-all duration-200 ${
+                      isScrolled 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                        : 'bg-green-500/20 backdrop-blur-sm border border-green-400/20 text-white hover:bg-green-500/30'
+                    }`}
+                  >
+                    � Test
+                  </button>
                   <div className="flex items-center gap-2 text-sm">
                     <span className={`${isScrolled ? 'text-gray-700' : 'text-white'}`}>
                       Hola, {user?.nombre}

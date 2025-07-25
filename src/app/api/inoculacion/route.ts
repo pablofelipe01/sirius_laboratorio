@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
         fields: {
           'Responsables': data.responsablesIds, // Array de IDs, no string
           'Cantidad Bolsas': data.bagQuantity,
-          'Tipo Bolsas': data.tipoInoculacion, // Mapear tipoInoculacion a Tipo Bolsas
           'Microorganismos': [data.microorganismId], // Array de IDs
           'Fecha Inoculacion': data.inoculationDate // Fecha en formato ISO
         }
@@ -83,7 +82,6 @@ export async function POST(request: NextRequest) {
       microorganismo: data.microorganism,
       microorganismoId: data.microorganismId,
       bagQuantity: data.bagQuantity,
-      tipoInoculacion: data.tipoInoculacion,
       responsables: data.responsables,
       responsablesIds: data.responsablesIds,
       timestamp: new Date().toISOString()

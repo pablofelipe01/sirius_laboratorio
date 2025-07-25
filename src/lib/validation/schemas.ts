@@ -54,10 +54,6 @@ export const InoculationSchema = z.object({
     .min(1, 'Debe asignar al menos un responsable')
     .max(5, 'Máximo 5 responsables por inoculación'),
   
-  tipoInoculacion: z.string()
-    .min(1, 'El tipo de inoculación es requerido')
-    .refine((val) => ['Produccion', 'Cepas'].includes(val), 'Tipo de inoculación debe ser Produccion o Cepas'),
-  
   substrate: z.string()
     .max(100, 'Nombre del sustrato demasiado largo')
     .optional(),

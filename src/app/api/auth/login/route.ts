@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       ]);
 
       // Generar JWT token
-      const token = signToken({
+      const token = await signToken({
         userId: userRecord.id,
         cedula: data.cedula,
         nombre: userName
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Generar JWT token
-      const token = signToken({
+      const token = await signToken({
         userId: userRecord.id,
         cedula: data.cedula,
         nombre: userName

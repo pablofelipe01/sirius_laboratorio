@@ -2,36 +2,42 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from '@/lib/auth/jwt';
 
-export function middleware(request: NextRequest) {
-  // Solo aplicar middleware a rutas protegidas
-  if (request.nextUrl.pathname.startsWith('/inoculacion')) {
-    const token = request.cookies.get('auth_token')?.value
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  
+  // Solo proteger /inoculacion específicamente para debugging
+  if (pathname === '/inoculacion') {
+    console.log('🔍 Checking /inoculacion access');
+    
+    const token = request.cookies.get('auth_token')?.value;
+    console.log('Token exists:', !!token);
 
     if (!token) {
-      // No hay token, redirigir al home
-      return NextResponse.redirect(new URL('/', request.url))
+      console.log('❌ No token for /inoculacion, redirecting');
+      return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Verificar si el token es válido
-    const payload = verifyToken(token)
+    // Verificar si el token es válido (ahora es asíncrono)
+    const payload = await verifyToken(token);
+    console.log('Token verification result:', !!payload);
+    
     if (!payload) {
-      // Token inválido, redirigir al home
-      const response = NextResponse.redirect(new URL('/', request.url))
-      response.cookies.delete('auth_token')
-      return response
+      console.log('❌ Invalid token for /inoculacion, clearing cookie and redirecting');
+      const response = NextResponse.redirect(new URL('/', request.url));
+      response.cookies.delete('auth_token');
+      return response;
     }
 
-    // Token válido, permitir acceso
-    return NextResponse.next()
+    console.log('✅ Valid token, allowing access to /inoculacion for user:', payload.nombre);
+    return NextResponse.next();
   }
 
-  // Para otras rutas, simplemente permitir el paso
+  // Para todas las demás rutas, permitir acceso temporalmente
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    '/inoculacion/:path*',
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.).*)',
   ]
 };

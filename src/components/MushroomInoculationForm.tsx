@@ -9,7 +9,6 @@ interface InoculationData {
   inoculationDate: string;
   responsables: string[];
   responsablesIds: string[];
-  tipoInoculacion: string;
 }
 
 interface Microorganism {
@@ -30,7 +29,6 @@ const MushroomInoculationForm = () => {
     inoculationDate: '',
     responsables: [],
     responsablesIds: [],
-    tipoInoculacion: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,7 +145,6 @@ const MushroomInoculationForm = () => {
           inoculationDate: '',
           responsables: [],
           responsablesIds: [],
-          tipoInoculacion: '',
         });
       } else {
         setSubmitStatus('error');
@@ -297,25 +294,6 @@ const MushroomInoculationForm = () => {
                 ))}
               </select>
               <p className="text-xs text-gray-700 mt-1">Puedes seleccionar varios responsables (Ctrl/Cmd + click)</p>
-            </div>
-
-            {/* Tipo de Inoculación */}
-            <div>
-              <label htmlFor="tipoInoculacion" className="block text-sm font-semibold text-gray-900 mb-2">
-                Tipo de Inoculación *
-              </label>
-              <select
-                id="tipoInoculacion"
-                name="tipoInoculacion"
-                required
-                value={formData.tipoInoculacion}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/90 text-gray-900"
-              >
-                <option value="">Seleccionar tipo de inoculación</option>
-                <option value="Produccion">Producción</option>
-                <option value="Cepas">Cepas</option>
-              </select>
             </div>
 
             {/* Cantidad de Bolsas */}

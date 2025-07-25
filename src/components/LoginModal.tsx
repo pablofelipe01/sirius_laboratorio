@@ -195,7 +195,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 font-medium shadow-md"
             >
               {isLoading ? 'Verificando...' : 'Continuar'}
             </button>
@@ -227,7 +227,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <button
                   type="button"
                   onClick={() => setLoginStep({ step: 'cedula' })}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+                  className="flex-1 bg-gray-300 text-black py-2 px-4 rounded-md hover:bg-gray-400 font-medium"
                   disabled={isLoading}
                 >
                   Atrás
@@ -235,7 +235,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 font-medium shadow-md"
                 >
                   {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}
                 </button>
@@ -285,7 +285,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <button
                   type="button"
                   onClick={() => setLoginStep({ step: 'cedula' })}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+                  className="flex-1 bg-gray-300 text-black py-2 px-4 rounded-md hover:bg-gray-400 font-medium"
                   disabled={isLoading}
                 >
                   Atrás
@@ -293,7 +293,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 font-medium shadow-md"
                 >
                   {isLoading ? 'Configurando...' : 'Configurar Contraseña'}
                 </button>
