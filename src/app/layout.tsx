@@ -20,10 +20,11 @@ export const metadata: Metadata = {
   authors: [{ name: "Sirius Regenerative Solutions S.A.S ZOMAC" }],
   icons: {
     icon: [
-      { url: "/LABI, el robot científico.png", type: "image/png" },
+      { url: "/LABI, el robot científico.png", type: "image/png", sizes: "any" },
+      { url: "/favicon.ico", type: "image/x-icon" },
       { url: "/favicon.png", type: "image/png" }
     ],
-    shortcut: "/favicon.png",
+    shortcut: "/LABI, el robot científico.png",
     apple: "/LABI, el robot científico.png",
   },
   openGraph: {
@@ -42,8 +43,8 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.png" type="image/png" />
-        <link rel="shortcut icon" href="/favicon.png" type="image/png" />
+        <link rel="icon" href="/LABI, el robot científico.png" type="image/png" />
+        <link rel="shortcut icon" href="/LABI, el robot científico.png" type="image/png" />
         <link rel="apple-touch-icon" href="/LABI, el robot científico.png" />
         <meta name="theme-color" content="#1e40af" />
       </head>
