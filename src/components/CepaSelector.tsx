@@ -39,7 +39,7 @@ const CepaSelector = ({
   const [cepasDisponibles, setCepasDisponibles] = useState<Cepa[]>([]);
   const [loadingCepas, setLoadingCepas] = useState(false);
   const [cepaSeleccionada, setCepaSeleccionada] = useState<string>('');
-  const [cantidadSeleccionada, setCantidadSeleccionada] = useState<number>(1);
+  const [cantidadSeleccionada, setCantidadSeleccionada] = useState<number | string>('');
   const [showDropdown, setShowDropdown] = useState(false);
 
   // Cargar cepas cuando cambie el microorganismo
@@ -110,17 +110,18 @@ const CepaSelector = ({
 
   const handleCepaChange = (cepaId: string) => {
     setCepaSeleccionada(cepaId);
-    const maxDisponible = getCantidadMaximaDisponible(cepaId);
-    setCantidadSeleccionada(Math.min(1, maxDisponible));
+    setCantidadSeleccionada(''); // Comenzar con campo vacío
   };
 
   const handleAgregarCepa = () => {
     const cepa = getCepaById(cepaSeleccionada);
-    if (!cepa || cantidadSeleccionada <= 0) return;
+    const cantidad = typeof cantidadSeleccionada === 'string' ? parseInt(cantidadSeleccionada) : cantidadSeleccionada;
+    
+    if (!cepa || !cantidad || cantidad <= 0) return;
 
     const cepaData: CepaSeleccionada = {
       cepaId: cepa.id,
-      cantidad: cantidadSeleccionada,
+      cantidad: cantidad,
       microorganismo: Array.isArray(cepa.microorganismo) ? cepa.microorganismo[0] : cepa.microorganismo,
       abreviatura: Array.isArray(cepa.abreviatura) ? cepa.abreviatura[0] : cepa.abreviatura,
       codigoCepa: cepa.codigoCepa,
@@ -131,7 +132,7 @@ const CepaSelector = ({
     
     // Reset selección pero mantener dropdown abierto para agregar más cepas
     setCepaSeleccionada('');
-    setCantidadSeleccionada(1);
+    setCantidadSeleccionada('');
     
     // Recargar cepas para actualizar disponibilidad
     fetchCepasDisponibles();
@@ -196,10 +197,27 @@ const CepaSelector = ({
                 min="1"
                 max={maxDisponible}
                 value={cantidadSeleccionada}
-                onChange={(e) => setCantidadSeleccionada(Math.min(parseInt(e.target.value) || 1, maxDisponible))}
+                onChange={(e) => {
+                  setCantidadSeleccionada(e.target.value);
+                }}
+                onBlur={(e) => {
+                  // Solo aplicar límites cuando el usuario termine de escribir
+                  const value = parseInt(e.target.value) || 1;
+                  setCantidadSeleccionada(Math.min(Math.max(value, 1), maxDisponible));
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 placeholder-gray-500"
-                placeholder="Cantidad..."
+                placeholder="Escribe la cantidad..."
               />
+              {typeof cantidadSeleccionada === 'number' && cantidadSeleccionada > maxDisponible && (
+                <p className="text-red-500 text-xs mt-1">
+                  La cantidad no puede ser mayor a {maxDisponible} bolsas disponibles
+                </p>
+              )}
+              {typeof cantidadSeleccionada === 'string' && cantidadSeleccionada !== '' && parseInt(cantidadSeleccionada) > maxDisponible && (
+                <p className="text-red-500 text-xs mt-1">
+                  La cantidad no puede ser mayor a {maxDisponible} bolsas disponibles
+                </p>
+              )}
             </div>
           )}
 
@@ -208,7 +226,13 @@ const CepaSelector = ({
             <button
               type="button"
               onClick={handleAgregarCepa}
-              disabled={!cepaSeleccionada || cantidadSeleccionada <= 0 || cantidadSeleccionada > maxDisponible}
+              disabled={
+                !cepaSeleccionada || 
+                cantidadSeleccionada === '' || 
+                cantidadSeleccionada === '0' ||
+                (typeof cantidadSeleccionada === 'number' && (cantidadSeleccionada <= 0 || cantidadSeleccionada > maxDisponible)) ||
+                (typeof cantidadSeleccionada === 'string' && (parseInt(cantidadSeleccionada) <= 0 || parseInt(cantidadSeleccionada) > maxDisponible))
+              }
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium transition-all duration-200"
             >
               ✓ Agregar Cepa

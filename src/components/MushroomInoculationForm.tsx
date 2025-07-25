@@ -177,6 +177,39 @@ const MushroomInoculationForm = () => {
       const result = await response.json();
 
       if (response.ok && result.success) {
+        // Si la inoculación se creó exitosamente, crear registros de Salida Cepas
+        if (formData.cepasSeleccionadas.length > 0 && result.recordId) {
+          try {
+            const salidaCepasData = formData.cepasSeleccionadas.map(cepa => ({
+              fechaEvento: formData.inoculationDate,
+              cantidadBolsasUsadas: cepa.cantidad,
+              cepaId: cepa.cepaId,
+              inoculacionId: result.recordId
+            }));
+
+            const salidaResponse = await fetch('/api/salida-cepas', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ registros: salidaCepasData }),
+            });
+
+            const salidaResult = await salidaResponse.json();
+            
+            if (salidaResponse.ok && salidaResult.success) {
+              console.log('✅ Registros de Salida Cepas creados:', salidaResult.total);
+            } else {
+              console.error('❌ Error al crear registros de Salida Cepas:', salidaResult.error);
+              // No fallar el proceso principal, solo mostrar advertencia
+              setErrorMessage(`Inoculación creada exitosamente, pero hubo un problema al registrar la salida de cepas: ${salidaResult.error}`);
+            }
+          } catch (error) {
+            console.error('❌ Error de conexión al crear Salida Cepas:', error);
+            setErrorMessage('Inoculación creada exitosamente, pero hubo un problema de conexión al registrar la salida de cepas.');
+          }
+        }
+
         setSubmitStatus('success');
         
         setFormData({
