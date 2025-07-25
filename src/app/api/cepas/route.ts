@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
           'Fecha Creacion': data.fechaCreacion, // Fecha en formato ISO
           'Cantidad Bolsas': data.cantidadBolsas,
           'Microorganismos': [data.microorganismoId], // Array de IDs
-          'Responsables': data.responsablesIds // Array de IDs
+          'Responsables': data.responsablesIds, // Array de IDs
+          'Realiza Registro': data.registradoPor // Nombre del usuario que registra
         }
       }
     ]);
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
       cantidadBolsas: data.cantidadBolsas,
       responsables: data.responsables,
       responsablesIds: data.responsablesIds,
+      realizaRegistro: data.registradoPor,
       timestamp: new Date().toISOString()
     });
 

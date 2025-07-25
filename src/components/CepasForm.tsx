@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CepasData {
   cantidadBolsas: number;
@@ -9,6 +10,7 @@ interface CepasData {
   fechaCreacion: string;
   responsables: string[];
   responsablesIds: string[];
+  registradoPor: string;
 }
 
 interface Microorganism {
@@ -22,6 +24,8 @@ interface Responsable {
 }
 
 const CepasForm = () => {
+  const { user } = useAuth();
+  
   const [formData, setFormData] = useState<CepasData>({
     cantidadBolsas: 0,
     microorganismo: '',
@@ -29,6 +33,7 @@ const CepasForm = () => {
     fechaCreacion: '',
     responsables: [],
     responsablesIds: [],
+    registradoPor: user?.nombre || '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,6 +49,16 @@ const CepasForm = () => {
     fetchMicroorganisms();
     fetchResponsables();
   }, []);
+
+  // Actualizar el campo registradoPor cuando cambie el usuario
+  useEffect(() => {
+    if (user?.nombre) {
+      setFormData(prev => ({
+        ...prev,
+        registradoPor: user.nombre
+      }));
+    }
+  }, [user]);
 
   const fetchResponsables = async () => {
     try {
@@ -147,6 +162,7 @@ const CepasForm = () => {
           fechaCreacion: '',
           responsables: [],
           responsablesIds: [],
+          registradoPor: user?.nombre || '',
         });
       } else {
         setSubmitStatus('error');

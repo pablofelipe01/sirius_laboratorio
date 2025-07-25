@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface InoculationData {
   bagQuantity: number;
@@ -9,6 +10,7 @@ interface InoculationData {
   inoculationDate: string;
   responsables: string[];
   responsablesIds: string[];
+  registradoPor: string;
 }
 
 interface Microorganism {
@@ -22,6 +24,8 @@ interface Responsable {
 }
 
 const MushroomInoculationForm = () => {
+  const { user } = useAuth();
+  
   const [formData, setFormData] = useState<InoculationData>({
     bagQuantity: 0,
     microorganism: '',
@@ -29,6 +33,7 @@ const MushroomInoculationForm = () => {
     inoculationDate: '',
     responsables: [],
     responsablesIds: [],
+    registradoPor: user?.nombre || '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,6 +49,16 @@ const MushroomInoculationForm = () => {
     fetchMicroorganisms();
     fetchResponsables();
   }, []);
+
+  // Actualizar el campo registradoPor cuando cambie el usuario
+  useEffect(() => {
+    if (user?.nombre) {
+      setFormData(prev => ({
+        ...prev,
+        registradoPor: user.nombre
+      }));
+    }
+  }, [user]);
 
   const fetchResponsables = async () => {
     try {
@@ -145,6 +160,7 @@ const MushroomInoculationForm = () => {
           inoculationDate: '',
           responsables: [],
           responsablesIds: [],
+          registradoPor: user?.nombre || '',
         });
       } else {
         setSubmitStatus('error');

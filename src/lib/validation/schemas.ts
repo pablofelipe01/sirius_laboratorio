@@ -54,6 +54,10 @@ export const InoculationSchema = z.object({
     .min(1, 'Debe asignar al menos un responsable')
     .max(5, 'Máximo 5 responsables por inoculación'),
   
+  registradoPor: z.string()
+    .min(1, 'El nombre del usuario que registra es requerido')
+    .max(100, 'El nombre del usuario es demasiado largo'),
+  
   substrate: z.string()
     .max(100, 'Nombre del sustrato demasiado largo')
     .optional(),
@@ -104,7 +108,11 @@ export const CepasSchema = z.object({
   
   responsablesIds: z.array(z.string().min(1, 'ID de responsable no puede estar vacío'))
     .min(1, 'Debe asignar al menos un responsable')
-    .max(5, 'Máximo 5 responsables por cepa')
+    .max(5, 'Máximo 5 responsables por cepa'),
+  
+  registradoPor: z.string()
+    .min(1, 'El nombre del usuario que registra es requerido')
+    .max(100, 'El nombre del usuario es demasiado largo')
 });
 
 // Tipos TypeScript generados a partir de los esquemas

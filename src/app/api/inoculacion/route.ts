@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
           'Responsables': data.responsablesIds, // Array de IDs, no string
           'Cantidad Bolsas': data.bagQuantity,
           'Microorganismos': [data.microorganismId], // Array de IDs
-          'Fecha Inoculacion': data.inoculationDate // Fecha en formato ISO
+          'Fecha Inoculacion': data.inoculationDate, // Fecha en formato ISO
+          'Realiza Registro': data.registradoPor // Nombre del usuario que registra
         }
       }
     ]);
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
       bagQuantity: data.bagQuantity,
       responsables: data.responsables,
       responsablesIds: data.responsablesIds,
+      realizaRegistro: data.registradoPor,
       timestamp: new Date().toISOString()
     });
 
