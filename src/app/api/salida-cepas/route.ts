@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const recordsToCreate = registros.map(registro => ({
       fields: {
         'Fecha Evento': registro.fechaEvento,
-        'Cantidad Bolsas Usadas': registro.cantidadBolsasUsadas,
+        'Cantidad Bolsas': registro.cantidadBolsasUsadas,
         'Cepas': [registro.cepaId],
         'Inoculacion': [registro.inoculacionId]
       }
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       registros: createdRecords.map(record => ({
         id: record.id,
         fechaEvento: record.get('Fecha Evento'),
-        cantidadBolsasUsadas: record.get('Cantidad Bolsas Usadas'),
+        cantidadBolsasUsadas: record.get('Cantidad Bolsas'),
         cepas: record.get('Cepas'),
         inoculacion: record.get('Inoculacion')
       })),
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
           'ID',
           'Fecha Creacion',
           'Fecha Evento',
-          'Cantidad Bolsas Usadas',
+          'Cantidad Bolsas',
           'Cepas',
           'Inoculacion'
         ]
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
       id: record.get('ID'),
       fechaCreacion: record.get('Fecha Creacion'),
       fechaEvento: record.get('Fecha Evento'),
-      cantidadBolsasUsadas: record.get('Cantidad Bolsas Usadas'),
+      cantidadBolsasUsadas: record.get('Cantidad Bolsas'),
       cepas: record.get('Cepas'),
       inoculacion: record.get('Inoculacion')
     }));
