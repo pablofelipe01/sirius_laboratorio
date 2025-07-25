@@ -5,15 +5,17 @@ import { verifyToken } from '@/lib/auth/jwt';
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
-  // Solo proteger /inoculacion específicamente para debugging
-  if (pathname === '/inoculacion') {
-    console.log('🔍 Checking /inoculacion access');
+  // Proteger rutas que requieren autenticación
+  const protectedRoutes = ['/inoculacion', '/cepas'];
+  
+  if (protectedRoutes.includes(pathname)) {
+    console.log(`🔍 Checking ${pathname} access`);
     
     const token = request.cookies.get('auth_token')?.value;
     console.log('Token exists:', !!token);
 
     if (!token) {
-      console.log('❌ No token for /inoculacion, redirecting');
+      console.log(`❌ No token for ${pathname}, redirecting`);
       return NextResponse.redirect(new URL('/', request.url));
     }
 
@@ -22,13 +24,13 @@ export async function middleware(request: NextRequest) {
     console.log('Token verification result:', !!payload);
     
     if (!payload) {
-      console.log('❌ Invalid token for /inoculacion, clearing cookie and redirecting');
+      console.log(`❌ Invalid token for ${pathname}, clearing cookie and redirecting`);
       const response = NextResponse.redirect(new URL('/', request.url));
       response.cookies.delete('auth_token');
       return response;
     }
 
-    console.log('✅ Valid token, allowing access to /inoculacion for user:', payload.nombre);
+    console.log(`✅ Valid token, allowing access to ${pathname} for user:`, payload.nombre);
     return NextResponse.next();
   }
 

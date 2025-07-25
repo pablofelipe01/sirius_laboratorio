@@ -80,8 +80,36 @@ export const ApiQuerySchema = z.object({
   search: z.string().max(100).optional(),
 });
 
+// Esquema de validación para datos de Cepas
+export const CepasSchema = z.object({
+  fechaCreacion: z.string()
+    .min(1, 'La fecha de creación es requerida')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD)'),
+  
+  cantidadBolsas: z.number()
+    .int('La cantidad de bolsas debe ser un número entero')
+    .min(1, 'La cantidad mínima es 1 bolsa')
+    .max(10000, 'La cantidad máxima es 10,000 bolsas'),
+  
+  microorganismo: z.string()
+    .min(1, 'El microorganismo es requerido')
+    .max(100, 'El nombre del microorganismo es demasiado largo'),
+  
+  microorganismoId: z.string()
+    .min(1, 'ID del microorganismo es requerido'),
+  
+  responsables: z.array(z.string().min(1, 'Nombre de responsable no puede estar vacío'))
+    .min(1, 'Debe asignar al menos un responsable')
+    .max(5, 'Máximo 5 responsables por cepa'),
+  
+  responsablesIds: z.array(z.string().min(1, 'ID de responsable no puede estar vacío'))
+    .min(1, 'Debe asignar al menos un responsable')
+    .max(5, 'Máximo 5 responsables por cepa')
+});
+
 // Tipos TypeScript generados a partir de los esquemas
 export type InoculationData = z.infer<typeof InoculationSchema>;
+export type CepasData = z.infer<typeof CepasSchema>;
 export type ApiQuery = z.infer<typeof ApiQuerySchema>;
 
 // Función helper para validar datos con manejo de errores

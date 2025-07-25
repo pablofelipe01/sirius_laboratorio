@@ -100,6 +100,17 @@ const Navbar = () => {
                     📊 Inoculación
                   </Link>
                   
+                  <Link
+                    href="/cepas"
+                    className={`px-6 py-2 rounded-full transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 font-medium ${
+                      isScrolled 
+                        ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                        : 'bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:border-white/30'
+                    }`}
+                  >
+                    🧬 Cepas
+                  </Link>
+                  
                   <div className="flex items-center gap-2 text-sm">
                     <span className={`${isScrolled ? 'text-gray-700' : 'text-white'}`}>
                       Hola, {user?.nombre}
