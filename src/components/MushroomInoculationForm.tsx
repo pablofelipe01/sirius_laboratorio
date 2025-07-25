@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import CepaSelector from './CepaSelector';
+
+interface CepaSeleccionada {
+  cepaId: string;
+  cantidad: number;
+  microorganismo: string;
+  abreviatura: string;
+  codigoCepa: string;
+  totalDisponible: number;
+}
 
 interface InoculationData {
   bagQuantity: number;
@@ -11,6 +21,7 @@ interface InoculationData {
   responsables: string[];
   responsablesIds: string[];
   registradoPor: string;
+  cepasSeleccionadas: CepaSeleccionada[];
 }
 
 interface Microorganism {
@@ -34,6 +45,7 @@ const MushroomInoculationForm = () => {
     responsables: [],
     responsablesIds: [],
     registradoPor: user?.nombre || '',
+    cepasSeleccionadas: [],
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -132,6 +144,20 @@ const MushroomInoculationForm = () => {
     }
   };
 
+  const handleCepaAgregada = (cepa: CepaSeleccionada) => {
+    setFormData(prev => ({
+      ...prev,
+      cepasSeleccionadas: [...prev.cepasSeleccionadas, cepa]
+    }));
+  };
+
+  const handleRemoverCepa = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      cepasSeleccionadas: prev.cepasSeleccionadas.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -161,6 +187,7 @@ const MushroomInoculationForm = () => {
           responsables: [],
           responsablesIds: [],
           registradoPor: user?.nombre || '',
+          cepasSeleccionadas: [],
         });
       } else {
         setSubmitStatus('error');
@@ -284,6 +311,39 @@ const MushroomInoculationForm = () => {
                   <option key={organism.id} value={organism.nombre} data-id={organism.id}>{organism.nombre}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Selector de Cepas */}
+            <div>
+              <CepaSelector
+                microorganismoSeleccionado={formData.microorganism}
+                onCepaAgregada={handleCepaAgregada}
+                onCepaRemovida={handleRemoverCepa}
+                cepasAgregadas={formData.cepasSeleccionadas}
+              />
+              {formData.cepasSeleccionadas.length > 0 && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <h5 className="font-medium text-blue-800 mb-2">Cepas para Inoculación:</h5>
+                  <div className="space-y-2">
+                    {formData.cepasSeleccionadas.map((cepa, index) => (
+                      <div key={index} className="flex items-center justify-between bg-white p-3 rounded border">
+                        <div>
+                          <span className="font-medium">{cepa.abreviatura}</span>
+                          <span className="text-gray-600 ml-2">- {cepa.cantidad} bolsas</span>
+                          <div className="text-xs text-gray-500">{cepa.microorganismo}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoverCepa(index)}
+                          className="text-red-500 hover:text-red-700 px-2 py-1 rounded text-sm"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Responsables */}

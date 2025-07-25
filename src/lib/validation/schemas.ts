@@ -58,6 +58,14 @@ export const InoculationSchema = z.object({
     .min(1, 'El nombre del usuario que registra es requerido')
     .max(100, 'El nombre del usuario es demasiado largo'),
   
+  cepasSeleccionadas: z.array(z.object({
+    cepaId: z.string().min(1, 'ID de cepa requerido'),
+    cantidad: z.number().min(1, 'Cantidad debe ser mayor a 0'),
+    microorganismo: z.string().min(1, 'Microorganismo requerido'),
+    abreviatura: z.string().min(1, 'Abreviatura requerida'),
+    totalDisponible: z.number().min(1, 'Total disponible debe ser mayor a 0')
+  })).optional().default([]),
+  
   substrate: z.string()
     .max(100, 'Nombre del sustrato demasiado largo')
     .optional(),

@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       responsables: data.responsables,
       responsablesIds: data.responsablesIds,
       realizaRegistro: data.registradoPor,
+      cepasSeleccionadas: data.cepasSeleccionadas,
       timestamp: new Date().toISOString()
     });
 
