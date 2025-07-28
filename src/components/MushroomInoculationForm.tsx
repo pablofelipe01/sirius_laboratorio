@@ -236,7 +236,7 @@ const MushroomInoculationForm = () => {
 
   return (
     <div 
-      className="min-h-screen relative pt-20"
+      className="min-h-screen relative pt-16 sm:pt-20"
       style={{
         backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4)), url('https://res.cloudinary.com/dvnuttrox/image/upload/v1752168289/Lab_banner_xhhlfe.jpg')`,
         backgroundSize: 'cover',
@@ -247,17 +247,18 @@ const MushroomInoculationForm = () => {
       {/* Overlay para mejor legibilidad */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60"></div>
       
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header Profesional */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 mb-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-4 sm:p-8 mb-4 sm:mb-8 border border-white/20">
           <div className="flex items-center justify-center">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center">
                 Inoculación de Microorganismos
               </h1>
-              <p className="text-lg text-gray-600 flex items-center justify-center">
+              <p className="text-sm sm:text-lg text-gray-600 flex items-center justify-center">
                 <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                Sistema DataLab - Sirius Regenerative Solutions S.A.S ZOMAC
+                <span className="hidden sm:inline">Sistema DataLab - Sirius Regenerative Solutions S.A.S ZOMAC</span>
+                <span className="sm:hidden">Sistema DataLab - Sirius</span>
               </p>
             </div>
           </div>
@@ -265,20 +266,20 @@ const MushroomInoculationForm = () => {
 
         {/* Status Messages */}
         {submitStatus === 'success' && (
-          <div className="bg-green-50/95 backdrop-blur-sm border border-green-200 rounded-2xl p-6 mb-8 shadow-lg">
+          <div className="bg-green-50/95 backdrop-blur-sm border border-green-200 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-8 shadow-lg">
             <div className="flex items-start">
               <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-4 h-4 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-green-800 mb-2">
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-green-800 mb-1 sm:mb-2">
                   ✅ Inoculación registrada exitosamente
                 </h3>
-                <p className="text-green-700">
+                <p className="text-sm sm:text-base text-green-700">
                   Los datos han sido guardados correctamente en Airtable con trazabilidad completa.
                 </p>
               </div>
@@ -287,17 +288,17 @@ const MushroomInoculationForm = () => {
         )}
 
         {submitStatus === 'error' && (
-          <div className="bg-red-50/95 backdrop-blur-sm border border-red-200 rounded-2xl p-6 mb-8 shadow-lg">
+          <div className="bg-red-50/95 backdrop-blur-sm border border-red-200 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-8 shadow-lg">
             <div className="flex items-start">
               <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <div className="w-8 h-8 sm:w-12 sm:h-12 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-4 h-4 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
                 </div>
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-red-800 mb-2">
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-red-800 mb-1 sm:mb-2">
                   ❌ Error al registrar
                 </h3>
                 <p className="text-red-700">{errorMessage}</p>

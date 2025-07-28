@@ -520,7 +520,7 @@ export default function BitacoraLaboratorioPage() {
                 <div className="bg-gray-50 rounded-lg p-6 border-l-4 border-purple-500">
                   <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-3">
                     <span className="bg-purple-500 text-white p-2 rounded text-sm">👥</span>
-                    Equipo de Laboratorio
+                    Participantes Bitacora
                   </h3>
                   
                   <div className="space-y-4">
