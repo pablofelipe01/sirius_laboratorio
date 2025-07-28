@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import Airtable from 'airtable';
 
 // Configurar Airtable
@@ -8,7 +8,7 @@ const base = new Airtable({
 
 const SALIDA_CEPAS_TABLE_ID = process.env.AIRTABLE_TABLE_SALIDA_CEPAS;
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     if (!SALIDA_CEPAS_TABLE_ID) {
       throw new Error('Missing AIRTABLE_TABLE_SALIDA_CEPAS environment variable');

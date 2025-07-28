@@ -11,7 +11,7 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY
 }).base(process.env.AIRTABLE_BASE_ID);
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('🏢 Obteniendo clientes de laboratorio:', {
       timestamp: new Date().toISOString()

@@ -77,12 +77,12 @@ export async function POST(request: NextRequest) {
     const horaFinISO = body.horaFin ? convertirHoraColombiaAUTC(body.horaFin) : null;
 
     // Procesar lotes
-    const lotesTexto = body.lotes?.map((lote: any) => lote.lote).join(',') || '';
-    const bolsasLotesTexto = body.lotes?.map((lote: any) => lote.bolsas).join(',') || '';
-    const totalBolsas = body.lotes?.reduce((total: number, lote: any) => total + (parseInt(lote.bolsas) || 0), 0) || 0;
+    const lotesTexto = body.lotes?.map((lote: { lote: string; bolsas: string }) => lote.lote).join(',') || '';
+    const bolsasLotesTexto = body.lotes?.map((lote: { lote: string; bolsas: string }) => lote.bolsas).join(',') || '';
+    const totalBolsas = body.lotes?.reduce((total: number, lote: { lote: string; bolsas: string }) => total + (parseInt(lote.bolsas) || 0), 0) || 0;
 
     // Preparar los datos con Field IDs específicos
-    const fields: any = {};
+    const fields: Record<string, unknown> = {};
 
     // Campos obligatorios con Field IDs
     if (horaInicioISO) fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_INICIO!] = horaInicioISO;
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     });
 
     // PASO ADICIONAL: Crear registros en Salida Inoculacion para cada lote usado
-    let salidaInoculacionIds: string[] = [];
+    const salidaInoculacionIds: string[] = [];
     
     // Extraer lotes seleccionados del formulario
     const lotesSeleccionados = body.lotesSeleccionados || [];
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
     }
 
     // PASO ADICIONAL: Crear registros en Salida Cepas para cada cepa usada
-    let salidaCepasIds: string[] = [];
+    const salidaCepasIds: string[] = [];
     
     // Extraer cepas seleccionadas del formulario
     const cepasSeleccionadas = body.cepasSeleccionadas || [];
@@ -305,20 +305,30 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
 
-    const formattedRecords = data.records.map((record: any) => ({
-      id: record.id,
-      horaInicio: record.fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_INICIO!],
-      horaFin: record.fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_FIN!],
-      cliente: record.fields['Nombre (from Cliente)']?.[0] || 'Cliente no especificado',
-      hongo: record.fields['Microorganismo (from Microorganismos)']?.[0] || 'Microorganismo no especificado',
-      litros: record.fields[process.env.AIRTABLE_FIELD_COSECHA_LITROS!],
-      bidones: record.fields[process.env.AIRTABLE_FIELD_COSECHA_BIDONES!],
-      lotes: record.fields[process.env.AIRTABLE_FIELD_COSECHA_LOTES!],
-      bolsasLotes: record.fields[process.env.AIRTABLE_FIELD_COSECHA_BOLSAS_LOTES!],
-      totalBolsas: record.fields[process.env.AIRTABLE_FIELD_COSECHA_TOTAL_BOLSAS!],
-      registradoPor: record.fields[process.env.AIRTABLE_FIELD_COSECHA_REALIZA_REGISTRO!],
-      fechaCreacion: record.fields[process.env.AIRTABLE_FIELD_COSECHA_FECHA_CREACION!]
-    }));
+    interface AirtableRecord {
+      id: string;
+      fields: Record<string, unknown>;
+    }
+
+    const formattedRecords = data.records.map((record: AirtableRecord) => {
+      const clienteField = record.fields['Nombre (from Cliente)'] as string[] | undefined;
+      const hongoField = record.fields['Microorganismo (from Microorganismos)'] as string[] | undefined;
+      
+      return {
+        id: record.id,
+        horaInicio: record.fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_INICIO!],
+        horaFin: record.fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_FIN!],
+        cliente: clienteField?.[0] || 'Cliente no especificado',
+        hongo: hongoField?.[0] || 'Microorganismo no especificado',
+        litros: record.fields[process.env.AIRTABLE_FIELD_COSECHA_LITROS!],
+        bidones: record.fields[process.env.AIRTABLE_FIELD_COSECHA_BIDONES!],
+        lotes: record.fields[process.env.AIRTABLE_FIELD_COSECHA_LOTES!],
+        bolsasLotes: record.fields[process.env.AIRTABLE_FIELD_COSECHA_BOLSAS_LOTES!],
+        totalBolsas: record.fields[process.env.AIRTABLE_FIELD_COSECHA_TOTAL_BOLSAS!],
+        registradoPor: record.fields[process.env.AIRTABLE_FIELD_COSECHA_REALIZA_REGISTRO!],
+        fechaCreacion: record.fields[process.env.AIRTABLE_FIELD_COSECHA_FECHA_CREACION!]
+      };
+    });
 
     console.log('✅ Cosechas obtenidas:', {
       cantidad: formattedRecords.length,
