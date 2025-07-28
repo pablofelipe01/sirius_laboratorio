@@ -884,7 +884,7 @@ export default function CosechaPage() {
                 <div className="bg-gray-50 rounded-lg p-6 border-l-4 border-blue-500">
                   <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-3">
                     <span className="bg-blue-500 text-white p-2 rounded text-sm">✍️</span>
-                    Responsable de Entrega
+                    Responsable de Cosecha
                   </h3>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
