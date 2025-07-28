@@ -18,16 +18,6 @@ interface BitacoraData {
   equipoLaboratorioId: string[];
 }
 
-interface RegistroBitacora {
-  id: string;
-  realizaRegistro: string;
-  transcripcionAudio: string;
-  informeEjecutivo: string;
-  responsables: string[];
-  equipoLaboratorio: string[];
-  fechaCreacion: string;
-}
-
 export default function BitacoraLaboratorioPage() {
   const { user } = useAuth();
   const [responsables, setResponsables] = useState<Responsable[]>([]);
@@ -35,8 +25,6 @@ export default function BitacoraLaboratorioPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [registros, setRegistros] = useState<RegistroBitacora[]>([]);
-  const [loadingRegistros, setLoadingRegistros] = useState(false);
 
   // Form states
   const [transcripcionAudio, setTranscripcionAudio] = useState('');
@@ -60,7 +48,6 @@ export default function BitacoraLaboratorioPage() {
 
   useEffect(() => {
     fetchResponsables();
-    fetchRegistros();
   }, []);
 
   // Cleanup on unmount
@@ -93,26 +80,11 @@ export default function BitacoraLaboratorioPage() {
     }
   };
 
-  const fetchRegistros = async () => {
-    setLoadingRegistros(true);
-    try {
-      const response = await fetch('/api/bitacora-laboratorio');
-      const data = await response.json();
-      
-      if (data.success) {
-        setRegistros(data.registros);
-      } else {
-        console.error('Error loading registros:', data.error);
-      }
-    } catch (error) {
-      console.error('Error fetching registros:', error);
-    } finally {
-      setLoadingRegistros(false);
-    }
-  };
-
   const startRecording = async () => {
     try {
+      // Limpiar chunks anteriores
+      chunksRef.current = [];
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -124,8 +96,16 @@ export default function BitacoraLaboratorioPage() {
       streamRef.current = stream;
       chunksRef.current = [];
 
+      // Detectar formato compatible
+      let mimeType = 'audio/wav';
+      if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
+      }
+
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType: mimeType
       });
       
       mediaRecorderRef.current = mediaRecorder;
@@ -137,9 +117,17 @@ export default function BitacoraLaboratorioPage() {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         stream.getTracks().forEach(track => track.stop());
+        
+        // Limpiar chunks para próxima grabación
+        chunksRef.current = [];
+        
+        // Transcribir automáticamente cuando el audio esté listo
+        setTimeout(() => {
+          transcribeAudioWithBlob(blob);
+        }, 100);
       };
 
       mediaRecorder.start(1000); // Collect data every second
@@ -191,22 +179,26 @@ export default function BitacoraLaboratorioPage() {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      // La transcripción se activará automáticamente desde mediaRecorder.onstop
     }
   };
 
-  const transcribeAudio = async () => {
-    if (!audioBlob) {
-      setErrorMessage('No hay audio grabado para transcribir');
-      setSubmitStatus('error');
-      return;
-    }
-
+  const transcribeAudioWithBlob = async (blob: Blob) => {
     setIsTranscribing(true);
     setSubmitStatus('idle');
 
     try {
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
+      
+      // Determinar la extensión del archivo basada en el tipo de blob
+      let fileName = 'recording.wav';
+      if (blob.type.includes('mp4')) {
+        fileName = 'recording.mp4';
+      } else if (blob.type.includes('webm')) {
+        fileName = 'recording.webm';
+      }
+      
+      formData.append('audio', blob, fileName);
 
       const response = await fetch('/api/transcripcion', {
         method: 'POST',
@@ -216,7 +208,9 @@ export default function BitacoraLaboratorioPage() {
       const result = await response.json();
 
       if (response.ok && result.success) {
+        // Establecer tanto la transcripción como el informe ejecutivo automáticamente
         setTranscripcionAudio(result.transcription);
+        setInformeEjecutivo(result.informeEjecutivo || '');
         setSubmitStatus('success');
         setTimeout(() => setSubmitStatus('idle'), 3000);
       } else {
@@ -340,9 +334,6 @@ export default function BitacoraLaboratorioPage() {
         setAudioBlob(null);
         setRecordingTime(0);
         
-        // Refresh registros
-        await fetchRegistros();
-        
         // Auto-hide success message
         setTimeout(() => {
           setSubmitStatus('idle');
@@ -445,28 +436,17 @@ export default function BitacoraLaboratorioPage() {
                       )}
                     </div>
 
-                    {/* Botón de transcripción */}
+                    {/* Estado del audio */}
                     {audioBlob && !isRecording && (
-                      <div className="space-y-3">
-                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <p className="text-green-800 font-semibold">✅ Audio grabado exitosamente</p>
-                          <p className="text-sm text-green-600">Duración: {formatTime(recordingTime)}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={transcribeAudio}
-                          disabled={isTranscribing}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isTranscribing ? (
-                            <span className="flex items-center gap-2">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Transcribiendo...
-                            </span>
-                          ) : (
-                            '📝 Transcribir Audio'
-                          )}
-                        </button>
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-green-800 font-semibold">✅ Audio grabado y procesado exitosamente</p>
+                        <p className="text-sm text-green-600">Duración: {formatTime(recordingTime)}</p>
+                        {isTranscribing && (
+                          <p className="text-sm text-blue-600 flex items-center gap-2 mt-2">
+                            <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 inline-block"></span>
+                            Generando transcripción e informe...
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -621,61 +601,6 @@ export default function BitacoraLaboratorioPage() {
                   </button>
                 </div>
               </form>
-
-              {/* Sección de Registros Anteriores */}
-              <div className="mt-12 border-t border-gray-200 pt-8">
-                <h3 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center gap-3">
-                  <span className="bg-gray-500 text-white p-2 rounded text-sm">📚</span>
-                  Registros Anteriores
-                </h3>
-                
-                {loadingRegistros ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Cargando registros...</p>
-                  </div>
-                ) : registros.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <div className="text-4xl mb-4">📝</div>
-                    <p className="text-lg">No hay registros de bitácora disponibles</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {registros.map((registro) => (
-                      <div key={registro.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Información General</h4>
-                            <p className="text-sm text-gray-600 mb-1">
-                              <strong>Registrado por:</strong> {registro.realizaRegistro}
-                            </p>
-                            <p className="text-sm text-gray-600 mb-1">
-                              <strong>Fecha:</strong> {new Date(registro.fechaCreacion).toLocaleDateString('es-CO')}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              <strong>Equipo:</strong> {registro.responsables.join(', ') || 'No especificado'}
-                            </p>
-                          </div>
-                          
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Transcripción</h4>
-                            <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded border max-h-32 overflow-y-auto">
-                              {registro.transcripcionAudio || 'Sin transcripción'}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-4 border-t border-gray-100 pt-4">
-                          <h4 className="font-semibold text-gray-900 mb-2">Informe Ejecutivo</h4>
-                          <div className="text-sm text-gray-700 bg-blue-50 p-4 rounded border max-h-40 overflow-y-auto whitespace-pre-wrap">
-                            {registro.informeEjecutivo || 'Sin informe ejecutivo'}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </div>

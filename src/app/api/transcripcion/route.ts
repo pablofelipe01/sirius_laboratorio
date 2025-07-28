@@ -50,10 +50,51 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Transcripción completada exitosamente');
 
+      // Generar informe ejecutivo automáticamente
+      console.log('📄 Generando informe ejecutivo automáticamente...');
+      
+      let informeEjecutivo = '';
+      try {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4',
+          messages: [
+            {
+              role: 'system',
+              content: `Eres un asistente especializado en laboratorios de biotecnología. 
+              Genera un informe ejecutivo CONCISO y CORPORATIVO para la transcripción de bitácora de laboratorio.
+              
+              FORMATO REQUERIDO (máximo 3-4 párrafos cortos):
+              • RESUMEN: Actividades principales en 1-2 líneas
+              • OBSERVACIONES: Puntos clave técnicos
+              • ESTADO: Resultados o avances importantes
+              • ACCIONES: Próximos pasos (si aplica)
+              
+              ESTILO: Profesional, técnico, directo. NO usar listas extensas ni explicaciones largas.
+              EXTENSIÓN: Máximo 200 palabras total.`
+            },
+            {
+              role: 'user',
+              content: `Genera un informe ejecutivo BREVE basado en esta transcripción de laboratorio:
+
+${transcription}`
+            }
+          ],
+          max_tokens: 300,
+          temperature: 0.7
+        });
+
+        informeEjecutivo = completion.choices[0]?.message?.content || '';
+        console.log('✅ Informe ejecutivo generado exitosamente');
+      } catch (informeError) {
+        console.warn('⚠️ Error generando informe ejecutivo, continuando solo con transcripción:', informeError);
+        informeEjecutivo = 'Error al generar informe ejecutivo automáticamente.';
+      }
+
       return NextResponse.json({
         success: true,
         transcription: transcription,
-        message: 'Audio transcrito exitosamente'
+        informeEjecutivo: informeEjecutivo,
+        message: 'Audio transcrito e informe generado exitosamente'
       });
 
     } catch (openaiError: unknown) {
@@ -112,27 +153,26 @@ export async function PUT(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: `Eres un asistente especializado en laboratorios de biotecnología y producción de hongos. 
-            Tu tarea es crear un informe ejecutivo profesional basado en la transcripción de audio de una bitácora de laboratorio.
+            content: `Eres un asistente especializado en laboratorios de biotecnología. 
+            Genera un informe ejecutivo CONCISO y CORPORATIVO para la transcripción de bitácora de laboratorio.
             
-            El informe debe incluir:
-            1. Resumen ejecutivo
-            2. Actividades principales realizadas
-            3. Observaciones importantes
-            4. Resultados o hallazgos
-            5. Próximos pasos o recomendaciones
+            FORMATO REQUERIDO (máximo 3-4 párrafos cortos):
+            • RESUMEN: Actividades principales en 1-2 líneas
+            • OBSERVACIONES: Puntos clave técnicos
+            • ESTADO: Resultados o avances importantes
+            • ACCIONES: Próximos pasos (si aplica)
             
-            Mantén un tono profesional y técnico apropiado para un laboratorio de biotecnología.
-            Estructura la información de manera clara y organizada.`
+            ESTILO: Profesional, técnico, directo. NO usar listas extensas ni explicaciones largas.
+            EXTENSIÓN: Máximo 200 palabras total.`
           },
           {
             role: 'user',
-            content: `Por favor, genera un informe ejecutivo basado en la siguiente transcripción de bitácora de laboratorio:
+            content: `Genera un informe ejecutivo BREVE basado en esta transcripción de laboratorio:
 
 ${transcription}`
           }
         ],
-        max_tokens: 1500,
+        max_tokens: 300,
         temperature: 0.7
       });
 

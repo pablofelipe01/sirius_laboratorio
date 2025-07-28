@@ -29,8 +29,23 @@ const AudioRecorder = ({ onTranscriptionComplete, currentText, onTextChange }: A
       });
       
       streamRef.current = stream;
+      
+      // Priorizar formatos compatibles con OpenAI Whisper
+      let mimeType = 'audio/webm'; // Fallback más compatible
+      
+      // Probar formatos en orden de preferencia para OpenAI (evitar codecs problemáticos)
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
+      } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+        mimeType = 'audio/ogg;codecs=opus';
+      }
+      
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType: mimeType
       });
       
       mediaRecorderRef.current = mediaRecorder;
@@ -43,9 +58,9 @@ const AudioRecorder = ({ onTranscriptionComplete, currentText, onTextChange }: A
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm;codecs=opus' });
+        const blob = new Blob(chunks, { type: mimeType });
         setAudioBlob(blob);
-        transcribeAudio(blob);
+        transcribeAudio(blob, mimeType);
       };
 
       mediaRecorder.start();
@@ -80,11 +95,13 @@ const AudioRecorder = ({ onTranscriptionComplete, currentText, onTextChange }: A
     setRecordingTime(0);
   };
 
-  const transcribeAudio = async (audioBlob: Blob) => {
+  const transcribeAudio = async (audioBlob: Blob, mimeType: string) => {
     setIsTranscribing(true);
     
     try {
       const formData = new FormData();
+      
+      // Usar siempre webm como extensión ya que es lo más compatible con OpenAI
       formData.append('audio', audioBlob, 'recording.webm');
 
       // Obtener token de autorización del localStorage

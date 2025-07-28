@@ -52,11 +52,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Lista estricta de tipos de archivo permitidos
-    const allowedTypes = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/m4a', 'audio/ogg'];
-    if (!allowedTypes.includes(audioFile.type)) {
+    // Extraer tipo de archivo base (sin codecs como ;codecs=opus)
+    const audioType = audioFile.type.split(';')[0];
+
+    // Lista de tipos de archivo base permitidos (sin codecs)
+    const allowedTypes = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/m4a', 'audio/ogg', 'audio/mp4'];
+    
+    if (!allowedTypes.includes(audioType)) {
       return NextResponse.json(
         { success: false, error: `Tipo de archivo no soportado: ${audioFile.type}` },
+        { status: 400 }
+      );
+    }
+
+    // Validación adicional: rechazar codecs de WebM problemáticos
+    if (audioFile.type.includes('audio/webm') && audioFile.type.includes('codecs=pcm')) {
+      return NextResponse.json(
+        { success: false, error: 'El formato WebM con codec PCM no es compatible. Por favor, usa otro formato.' },
         { status: 400 }
       );
     }
@@ -87,7 +99,16 @@ export async function POST(request: NextRequest) {
     }
     
     // Crear un objeto File-like que OpenAI pueda procesar
-    const file = new File([buffer], 'audio.webm', { type: audioFile.type });
+    let fileName = 'audio.webm'; // Por defecto
+    
+    // Ajustar el nombre del archivo según el tipo
+    if (audioType === 'audio/mp4') fileName = 'audio.mp4';
+    else if (audioType === 'audio/wav') fileName = 'audio.wav';
+    else if (audioType === 'audio/mp3') fileName = 'audio.mp3';
+    else if (audioType === 'audio/m4a') fileName = 'audio.m4a';
+    else if (audioType === 'audio/ogg') fileName = 'audio.ogg';
+    
+    const file = new File([buffer], fileName, { type: audioType });
 
     console.log('Transcribiendo audio con OpenAI Whisper...');
     console.log('Tamaño del archivo:', audioFile.size, 'bytes');
