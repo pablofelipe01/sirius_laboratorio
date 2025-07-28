@@ -35,9 +35,16 @@ export async function GET() {
       estadoSistemas: record.fields['Estados Sistemas'] as string,
     })).filter(item => item.nombre); // Filtrar los que no tienen nombre
 
+    // Para la respuesta de cosecha, solo necesitamos id y nombre
+    const responsables = usuarios.map(usuario => ({
+      id: usuario.id,
+      nombre: usuario.nombre
+    }));
+
     return NextResponse.json({
       success: true,
-      usuarios
+      usuarios,
+      responsables // Añadir esta línea para compatibilidad con cosecha
     });
   } catch (error) {
     console.error('Error fetching usuarios:', error);
