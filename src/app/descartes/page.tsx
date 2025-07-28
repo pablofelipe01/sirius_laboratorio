@@ -182,7 +182,8 @@ const DescartesPage = () => {
         setSubmitStatus('error');
         setErrorMessage(result.error || 'Error al registrar el descarte');
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('Error al registrar descarte:', error);
       setSubmitStatus('error');
       setErrorMessage('Error de conexión. Por favor, intente nuevamente.');
     } finally {

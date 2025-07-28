@@ -60,7 +60,7 @@ const AudioRecorder = ({ onTranscriptionComplete, currentText, onTextChange }: A
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunks, { type: mimeType });
         setAudioBlob(blob);
-        transcribeAudio(blob, mimeType);
+        transcribeAudio(blob);
       };
 
       mediaRecorder.start();
@@ -95,7 +95,7 @@ const AudioRecorder = ({ onTranscriptionComplete, currentText, onTextChange }: A
     setRecordingTime(0);
   };
 
-  const transcribeAudio = async (audioBlob: Blob, mimeType: string) => {
+  const transcribeAudio = async (audioBlob: Blob) => {
     setIsTranscribing(true);
     
     try {

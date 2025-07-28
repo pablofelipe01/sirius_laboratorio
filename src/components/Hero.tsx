@@ -7,7 +7,7 @@ import LoginModal from './LoginModal';
 const Hero = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     if (videoRef.current) {

@@ -211,7 +211,11 @@ export async function POST(request: NextRequest) {
     
     // Manejo específico de errores de Airtable
     if (error && typeof error === 'object' && 'error' in error) {
-      const airtableError = error as any;
+      const airtableError = error as {
+        error?: { type?: string; message?: string };
+        statusCode?: number;
+        message?: string;
+      };
       console.error('❌ Error específico de Airtable:', {
         type: airtableError.error?.type,
         message: airtableError.error?.message,
