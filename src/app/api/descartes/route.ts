@@ -29,6 +29,33 @@ interface DescarteData {
 
 export async function POST(request: NextRequest) {
   try {
+    // Validar variables de entorno primero
+    console.log('🔧 Validando configuración de entorno...');
+    
+    const requiredEnvVars = {
+      AIRTABLE_API_KEY: process.env.AIRTABLE_API_KEY,
+      AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID,
+      AIRTABLE_TABLE_DESCARTES: DESCARTES_TABLE_ID,
+      AIRTABLE_TABLE_SALIDA_CEPAS: SALIDA_CEPAS_TABLE_ID,
+      AIRTABLE_TABLE_SALIDA_INOCULACION: SALIDA_INOCULACION_TABLE_ID
+    };
+
+    for (const [key, value] of Object.entries(requiredEnvVars)) {
+      if (!value) {
+        console.error(`❌ Variable de entorno faltante: ${key}`);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Variable de entorno requerida faltante: ${key}`,
+            missingVar: key
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    console.log('✅ Todas las variables de entorno están configuradas');
+
     const data: DescarteData = await request.json();
     
     console.log('🗑️ Iniciando proceso de descarte:', {
@@ -42,21 +69,23 @@ export async function POST(request: NextRequest) {
 
     // Validar datos requeridos
     if (!data.tipoDescarte || !data.loteId || !data.cantidad || !data.motivo || !data.registradoPor) {
+      console.error('❌ Faltan campos requeridos:', {
+        tipoDescarte: !!data.tipoDescarte,
+        loteId: !!data.loteId,
+        cantidad: !!data.cantidad,
+        motivo: !!data.motivo,
+        registradoPor: !!data.registradoPor
+      });
       return NextResponse.json(
         { success: false, error: 'Faltan campos requeridos: tipoDescarte, loteId, cantidad, motivo, registradoPor' },
         { status: 400 }
       );
     }
 
-    // Validar variables de entorno
-    if (!DESCARTES_TABLE_ID) {
-      throw new Error('Missing AIRTABLE_TABLE_DESCARTES environment variable');
-    }
-
     // PASO 1: Crear registro en tabla Descartes usando Field IDs de la documentación
     console.log('📝 Paso 1: Creando registro en tabla Descartes...');
     
-    const descarteRecord = await base(DESCARTES_TABLE_ID).create([
+    const descarteRecord = await base(DESCARTES_TABLE_ID!).create([
       {
         fields: {
           // Usar Field IDs de la documentación
@@ -78,12 +107,8 @@ export async function POST(request: NextRequest) {
     if (data.tipoDescarte === 'cepas') {
       // Crear registro en Salida Cepas con Field IDs correctos de la documentación
       console.log('📝 Paso 2: Creando registro en Salida Cepas...');
-      
-      if (!SALIDA_CEPAS_TABLE_ID) {
-        throw new Error('Missing AIRTABLE_TABLE_SALIDA_CEPAS environment variable');
-      }
 
-      const salidaCepasRecord = await base(SALIDA_CEPAS_TABLE_ID).create([
+      const salidaCepasRecord = await base(SALIDA_CEPAS_TABLE_ID!).create([
         {
           fields: {
             'fldG3F5RAJ9U8LjeV': data.fechaDescarte, // Fecha Evento
@@ -99,7 +124,7 @@ export async function POST(request: NextRequest) {
       
       // PASO 3: Actualizar el registro de Descarte para vincular con Salida Cepas
       console.log('📝 Paso 3: Vinculando Descarte con Salida Cepas...');
-      await base(DESCARTES_TABLE_ID).update([
+      await base(DESCARTES_TABLE_ID!).update([
         {
           id: descarteRecordId,
           fields: {
@@ -110,7 +135,7 @@ export async function POST(request: NextRequest) {
 
       // PASO 4: Actualizar el registro de Salida Cepas para vincular con Descarte
       console.log('📝 Paso 4: Vinculando Salida Cepas con Descarte...');
-      await base(SALIDA_CEPAS_TABLE_ID).update([
+      await base(SALIDA_CEPAS_TABLE_ID!).update([
         {
           id: salidaRecordId,
           fields: {
@@ -121,13 +146,9 @@ export async function POST(request: NextRequest) {
       
     } else {
       console.log('📝 Paso 2: Creando registro en Salida Inoculacion...');
-      
-      if (!SALIDA_INOCULACION_TABLE_ID) {
-        throw new Error('Missing AIRTABLE_TABLE_SALIDA_INOCULACION environment variable');
-      }
 
       // Crear registro en Salida Inoculacion usando Field IDs de la documentación
-      const salidaInoculacionRecord = await base(SALIDA_INOCULACION_TABLE_ID).create([
+      const salidaInoculacionRecord = await base(SALIDA_INOCULACION_TABLE_ID!).create([
         {
           fields: {
             'fld1SHaeWH4MA3ZAt': data.fechaDescarte, // Fecha Evento
@@ -143,7 +164,7 @@ export async function POST(request: NextRequest) {
       
       // PASO 3: Actualizar el registro de Descarte para vincular con Salida Inoculacion
       console.log('📝 Paso 3: Vinculando Descarte con Salida Inoculacion...');
-      await base(DESCARTES_TABLE_ID).update([
+      await base(DESCARTES_TABLE_ID!).update([
         {
           id: descarteRecordId,
           fields: {
@@ -154,7 +175,7 @@ export async function POST(request: NextRequest) {
 
       // PASO 4: Actualizar el registro de Salida Inoculacion para vincular con Descarte
       console.log('📝 Paso 4: Vinculando Salida Inoculacion con Descarte...');
-      await base(SALIDA_INOCULACION_TABLE_ID).update([
+      await base(SALIDA_INOCULACION_TABLE_ID!).update([
         {
           id: salidaRecordId,
           fields: {
@@ -187,11 +208,36 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error en proceso de descarte:', error);
+    
+    // Manejo específico de errores de Airtable
+    if (error && typeof error === 'object' && 'error' in error) {
+      const airtableError = error as any;
+      console.error('❌ Error específico de Airtable:', {
+        type: airtableError.error?.type,
+        message: airtableError.error?.message,
+        statusCode: airtableError.statusCode,
+        details: airtableError
+      });
+
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Error de Airtable al registrar descarte',
+          details: airtableError.error?.message || airtableError.message || 'Error desconocido de Airtable',
+          statusCode: airtableError.statusCode,
+          type: airtableError.error?.type
+        },
+        { status: 500 }
+      );
+    }
+
+    // Error genérico
     return NextResponse.json(
       { 
         success: false,
         error: 'Error al registrar descarte',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        details: error instanceof Error ? error.message : 'Error desconocido',
+        stack: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );
