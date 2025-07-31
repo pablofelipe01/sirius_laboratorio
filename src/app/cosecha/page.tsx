@@ -456,9 +456,9 @@ export default function CosechaPage() {
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-400 to-blue-700 p-8 text-white relative overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-400 to-blue-700 p-3 sm:p-4 text-white relative overflow-hidden">
               <div className="relative z-10 text-center">
-                <h1 className="text-3xl font-bold mb-2">FORMATO DE COSECHA</h1>
+                <h1 className="text-3xl font-bold mb-1">FORMATO DE COSECHA</h1>
                 <p className="text-xl opacity-90">Sirius Regenerative Solutions S.A.S ZOMAC</p>
               </div>
             </div>

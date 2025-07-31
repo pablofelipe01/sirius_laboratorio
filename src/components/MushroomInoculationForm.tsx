@@ -4,6 +4,173 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CepaSelector from './CepaSelector';
 
+// Componente de Calendario
+interface CalendarioSelectorProps {
+  fechaSeleccionada: string;
+  onFechaSeleccionada: (fecha: string) => void;
+}
+
+const CalendarioSelector = ({ fechaSeleccionada, onFechaSeleccionada }: CalendarioSelectorProps) => {
+  const [mesActual, setMesActual] = useState(new Date());
+  
+  const meses = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  
+  const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  
+  const obtenerDiasDelMes = () => {
+    const año = mesActual.getFullYear();
+    const mes = mesActual.getMonth();
+    
+    const primerDia = new Date(año, mes, 1);
+    const ultimoDia = new Date(año, mes + 1, 0);
+    const diasEnMes = ultimoDia.getDate();
+    const diaSemanaInicio = primerDia.getDay();
+    
+    const dias = [];
+    
+    // Días del mes anterior (para rellenar)
+    for (let i = diaSemanaInicio - 1; i >= 0; i--) {
+      const diaAnterior = new Date(año, mes, -i);
+      dias.push({
+        dia: diaAnterior.getDate(),
+        esOtroMes: true,
+        fecha: diaAnterior
+      });
+    }
+    
+    // Días del mes actual
+    for (let dia = 1; dia <= diasEnMes; dia++) {
+      const fecha = new Date(año, mes, dia);
+      dias.push({
+        dia,
+        esOtroMes: false,
+        fecha
+      });
+    }
+    
+    // Días del mes siguiente (para completar la grilla)
+    const diasRestantes = 42 - dias.length; // 6 filas x 7 días
+    for (let dia = 1; dia <= diasRestantes; dia++) {
+      const fechaSiguiente = new Date(año, mes + 1, dia);
+      dias.push({
+        dia,
+        esOtroMes: true,
+        fecha: fechaSiguiente
+      });
+    }
+    
+    return dias;
+  };
+  
+  const formatearFecha = (fecha: Date) => {
+    return fecha.toISOString().split('T')[0];
+  };
+  
+  const esFechaSeleccionada = (fecha: Date) => {
+    return formatearFecha(fecha) === fechaSeleccionada;
+  };
+  
+  const esHoy = (fecha: Date) => {
+    const hoy = new Date();
+    return fecha.toDateString() === hoy.toDateString();
+  };
+  
+  const cambiarMes = (direccion: number) => {
+    setMesActual(new Date(mesActual.getFullYear(), mesActual.getMonth() + direccion, 1));
+  };
+  
+  const seleccionarFecha = (fecha: Date) => {
+    onFechaSeleccionada(formatearFecha(fecha));
+  };
+  
+  const dias = obtenerDiasDelMes();
+  
+  return (
+    <div className="w-full max-w-xs mx-auto">
+      {/* Header del calendario */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          type="button"
+          onClick={() => cambiarMes(-1)}
+          className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors bg-gray-700 hover:bg-gray-800"
+        >
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        
+        <h3 className="text-base font-semibold text-gray-900">
+          {meses[mesActual.getMonth()]} {mesActual.getFullYear()}
+        </h3>
+        
+        <button
+          type="button"
+          onClick={() => cambiarMes(1)}
+          className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors bg-gray-700 hover:bg-gray-800"
+        >
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+      
+      {/* Días de la semana */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {diasSemana.map(dia => (
+          <div key={dia} className="text-center text-xs font-medium text-gray-500 py-1">
+            {dia}
+          </div>
+        ))}
+      </div>
+      
+      {/* Grilla de días */}
+      <div className="grid grid-cols-7 gap-1">
+        {dias.map((diaObj, index) => {
+          const esSeleccionada = esFechaSeleccionada(diaObj.fecha);
+          const esHoyDia = esHoy(diaObj.fecha);
+          
+          return (
+            <button
+              key={index}
+              type="button"
+              onClick={() => seleccionarFecha(diaObj.fecha)}
+              className={`
+                p-1.5 text-xs rounded-lg transition-all duration-200 hover:bg-blue-100
+                ${diaObj.esOtroMes ? 'text-gray-300' : 'text-gray-900'}
+                ${esSeleccionada ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
+                ${esHoyDia && !esSeleccionada ? 'bg-blue-100 text-blue-600 font-semibold' : ''}
+                ${!diaObj.esOtroMes && !esSeleccionada && !esHoyDia ? 'hover:bg-gray-100' : ''}
+              `}
+            >
+              {diaObj.dia}
+            </button>
+          );
+        })}
+      </div>
+      
+      {/* Fecha seleccionada */}
+      {fechaSeleccionada && (
+        <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="text-center">
+            <p className="text-xs text-blue-600 font-medium">Fecha seleccionada:</p>
+            <p className="text-sm font-semibold text-blue-800">
+              {new Date(fechaSeleccionada + 'T00:00:00').toLocaleDateString('es-CO', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface CepaSeleccionada {
   cepaId: string;
   cantidad: number;
@@ -247,12 +414,12 @@ const MushroomInoculationForm = () => {
       {/* Overlay para mejor legibilidad */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60"></div>
       
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-15">
         {/* Header Profesional */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-4 sm:p-8 mb-4 sm:mb-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-3 sm:p-4 mb-4 sm:mb-8 border border-white/20">
           <div className="flex items-center justify-center">
             <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1 text-center">
                 Inoculación de Microorganismos
               </h1>
               <p className="text-sm sm:text-lg text-gray-600 flex items-center justify-center">
@@ -266,7 +433,7 @@ const MushroomInoculationForm = () => {
 
         {/* Status Messages */}
         {submitStatus === 'success' && (
-          <div className="bg-green-50/95 backdrop-blur-sm border border-green-200 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-8 shadow-lg">
+          <div className="bg-green-50/95 backdrop-blur-sm border border-green-200 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-8 shadow-lg">
             <div className="flex items-start">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
@@ -288,7 +455,7 @@ const MushroomInoculationForm = () => {
         )}
 
         {submitStatus === 'error' && (
-          <div className="bg-red-50/95 backdrop-blur-sm border border-red-200 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-8 shadow-lg">
+          <div className="bg-red-50/95 backdrop-blur-sm border border-red-200 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-8 shadow-lg">
             <div className="flex items-start">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 sm:w-12 sm:h-12 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
@@ -308,22 +475,24 @@ const MushroomInoculationForm = () => {
         )}
 
         {/* Formulario */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-4 sm:p-6 border border-white/20">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Fecha de Inoculación */}
             <div>
               <label htmlFor="inoculationDate" className="block text-sm font-semibold text-gray-900 mb-2">
-                Fecha de Inoculación *
+                📅 Fecha de Inoculación *
               </label>
-              <input
-                type="date"
-                id="inoculationDate"
-                name="inoculationDate"
-                required
-                value={formData.inoculationDate}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white/90 text-lg text-gray-900"
-              />
+              <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+                <CalendarioSelector 
+                  fechaSeleccionada={formData.inoculationDate}
+                  onFechaSeleccionada={(fecha) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      inoculationDate: fecha
+                    }));
+                  }}
+                />
+              </div>
             </div>
 
             {/* Microorganismo */}
@@ -425,7 +594,7 @@ const MushroomInoculationForm = () => {
             </div>
 
             {/* Botón */}
-            <div className="flex justify-end pt-6">
+            <div className="flex justify-center pt-6">
               <button
                 type="submit"
                 disabled={isSubmitting || loadingMicroorganisms || loadingResponsables}

@@ -189,12 +189,12 @@ const CepasForm = () => {
       {/* Overlay para mejor legibilidad */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60"></div>
       
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Profesional */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 mb-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-3 sm:p-4 mb-8 border border-white/20">
           <div className="flex items-center justify-center">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-1 text-center">
                 Registro de Cepas
               </h1>
               <p className="text-lg text-gray-600 flex items-center justify-center">
@@ -249,7 +249,7 @@ const CepasForm = () => {
         )}
 
         {/* Formulario */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-4 sm:p-6 border border-white/20">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Fecha de Creación */}
             <div>
@@ -333,7 +333,7 @@ const CepasForm = () => {
             </div>
 
             {/* Botón */}
-            <div className="flex justify-end pt-6">
+            <div className="flex justify-center pt-6">
               <button
                 type="submit"
                 disabled={isSubmitting || loadingMicroorganisms || loadingResponsables}

@@ -93,80 +93,106 @@ const Navbar = () => {
             </Link>
             
             {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-6">
               {isAuthenticated ? (
                 <>
-                  <Link
-                    href="/inoculacion"
-                    className={`px-6 py-2 rounded-full transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 font-medium ${
-                      isScrolled 
-                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                        : 'bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:border-white/30'
-                    }`}
-                  >
-                    📊 Inoculación
-                  </Link>
+                  {/* Navigation Links */}
+                  <div className="flex items-center gap-6">
+                    <Link
+                      href="/inoculacion"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-purple-50 hover:text-purple-700' 
+                          : 'text-white hover:bg-white/20 backdrop-blur-sm'
+                      }`}
+                    >
+                      📊 Inoculación
+                    </Link>
+                    
+                    <Link
+                      href="/cepas"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-purple-50 hover:text-purple-700' 
+                          : 'text-white hover:bg-white/20 backdrop-blur-sm'
+                      }`}
+                    >
+                      🧬 Cepas
+                    </Link>
+                    
+                    <Link
+                      href="/descartes"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-red-50 hover:text-red-700' 
+                          : 'text-white hover:bg-white/20 backdrop-blur-sm'
+                      }`}
+                    >
+                      🗑️ Descartes
+                    </Link>
+                    
+                    <Link
+                      href="/cosecha"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-green-50 hover:text-green-700' 
+                          : 'text-white hover:bg-white/20 backdrop-blur-sm'
+                      }`}
+                    >
+                      🧪 Cosecha
+                    </Link>
+                    
+                    <Link
+                      href="/almacenamiento"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-orange-50 hover:text-orange-700' 
+                          : 'text-white hover:bg-white/20 backdrop-blur-sm'
+                      }`}
+                    >
+                      📦 Almacenamiento
+                    </Link>
+                    
+                    <Link
+                      href="/bitacora-laboratorio"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-700' 
+                          : 'text-white hover:bg-white/20 backdrop-blur-sm'
+                      }`}
+                    >
+                      📝 Bitácora
+                    </Link>
+                  </div>
                   
-                  <Link
-                    href="/cepas"
-                    className={`px-6 py-2 rounded-full transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 font-medium ${
-                      isScrolled 
-                        ? 'bg-purple-600 text-white hover:bg-purple-700' 
-                        : 'bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:border-white/30'
-                    }`}
-                  >
-                    🧬 Cepas
-                  </Link>
-                  
-                  <Link
-                    href="/descartes"
-                    className={`px-6 py-2 rounded-full transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 font-medium ${
-                      isScrolled 
-                        ? 'bg-red-600 text-white hover:bg-red-700' 
-                        : 'bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:border-white/30'
-                    }`}
-                  >
-                    🗑️ Descartes
-                  </Link>
-                  
-                  <Link
-                    href="/cosecha"
-                    className={`px-6 py-2 rounded-full transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 font-medium ${
-                      isScrolled 
-                        ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:border-white/30'
-                    }`}
-                  >
-                    🧪 Cosecha
-                  </Link>
-                  
-                  <Link
-                    href="/bitacora-laboratorio"
-                    className={`px-6 py-2 rounded-full transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 font-medium ${
-                      isScrolled 
-                        ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
-                        : 'bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:border-white/30'
-                    }`}
-                  >
-                    📝 Bitácora
-                  </Link>
-                  
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className={`${isScrolled ? 'text-gray-700' : 'text-white'}`}>
-                      Hola, {user?.nombre}
-                    </span>
+                  {/* User Info & Logout */}
+                  <div className="flex items-center gap-3 ml-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                        isScrolled ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                      }`}>
+                        {user?.nombre?.charAt(0).toUpperCase()}
+                      </div>
+                      <span className={`text-sm font-medium ${isScrolled ? 'text-gray-700' : 'text-white'}`}>
+                        {user?.nombre?.split(' ')[0]}
+                      </span>
+                    </div>
                     <button
                       onClick={handleLogout}
-                      className={`${isScrolled ? 'text-gray-500 hover:text-gray-700' : 'text-gray-300 hover:text-white'} text-sm underline`}
+                      className={`text-xs px-3 py-1 rounded-lg transition-all duration-200 ${
+                        isScrolled 
+                          ? 'text-gray-500 hover:bg-red-50 hover:text-red-600' 
+                          : 'text-gray-300 hover:bg-white/20 hover:text-white'
+                      }`}
                     >
-                      Cerrar sesión
+                      Salir
                     </button>
                   </div>
                 </>
               ) : (
                 <button
                   onClick={handleAccessClick}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   Acceder
                 </button>
@@ -209,80 +235,121 @@ const Navbar = () => {
             <div className={`lg:hidden border-t ${
               isScrolled ? 'border-gray-200 bg-white/95' : 'border-white/20 bg-black/20'
             } backdrop-blur-md`}>
-              <div className="px-4 py-4 space-y-2">
+              <div className="px-4 py-4 space-y-1">
                 {isAuthenticated ? (
                   <>
-                    <Link
-                      href="/inoculacion"
-                      onClick={closeMobileMenu}
-                      className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                        isScrolled 
-                          ? 'text-blue-600 hover:bg-blue-50' 
-                          : 'text-white hover:bg-white/10'
-                      }`}
-                    >
-                      📊 Inoculación
-                    </Link>
+                    {/* User Info */}
+                    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-3 ${
+                      isScrolled ? 'bg-gray-50' : 'bg-white/10'
+                    }`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${
+                        isScrolled ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                      }`}>
+                        {user?.nombre?.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className={`font-medium ${isScrolled ? 'text-gray-900' : 'text-white'}`}>
+                          {user?.nombre}
+                        </p>
+                        <p className={`text-xs ${isScrolled ? 'text-gray-500' : 'text-gray-300'}`}>
+                          Usuario activo
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Navigation Links */}
+                    <div className="space-y-1">
+                      <Link
+                        href="/inoculacion"
+                        onClick={closeMobileMenu}
+                        className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                          isScrolled 
+                            ? 'text-blue-600 hover:bg-blue-50' 
+                            : 'text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-lg">📊</span>
+                        <span className="font-medium">Inoculación</span>
+                      </Link>
+                      
+                      <Link
+                        href="/cepas"
+                        onClick={closeMobileMenu}
+                        className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                          isScrolled 
+                            ? 'text-purple-600 hover:bg-purple-50' 
+                            : 'text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-lg">🧬</span>
+                        <span className="font-medium">Cepas</span>
+                      </Link>
+                      
+                      <Link
+                        href="/descartes"
+                        onClick={closeMobileMenu}
+                        className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                          isScrolled 
+                            ? 'text-red-600 hover:bg-red-50' 
+                            : 'text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-lg">🗑️</span>
+                        <span className="font-medium">Descartes</span>
+                      </Link>
+                      
+                      <Link
+                        href="/cosecha"
+                        onClick={closeMobileMenu}
+                        className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                          isScrolled 
+                            ? 'text-green-600 hover:bg-green-50' 
+                            : 'text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-lg">🧪</span>
+                        <span className="font-medium">Cosecha</span>
+                      </Link>
+                      
+                      <Link
+                        href="/almacenamiento"
+                        onClick={closeMobileMenu}
+                        className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                          isScrolled 
+                            ? 'text-orange-600 hover:bg-orange-50' 
+                            : 'text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-lg">📦</span>
+                        <span className="font-medium">Almacenamiento</span>
+                      </Link>
+                      
+                      <Link
+                        href="/bitacora-laboratorio"
+                        onClick={closeMobileMenu}
+                        className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                          isScrolled 
+                            ? 'text-indigo-600 hover:bg-indigo-50' 
+                            : 'text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-lg">📝</span>
+                        <span className="font-medium">Bitácora</span>
+                      </Link>
+                    </div>
                     
-                    <Link
-                      href="/cepas"
-                      onClick={closeMobileMenu}
-                      className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                        isScrolled 
-                          ? 'text-purple-600 hover:bg-purple-50' 
-                          : 'text-white hover:bg-white/10'
-                      }`}
-                    >
-                      🧬 Cepas
-                    </Link>
-                    
-                    <Link
-                      href="/descartes"
-                      onClick={closeMobileMenu}
-                      className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                        isScrolled 
-                          ? 'text-red-600 hover:bg-red-50' 
-                          : 'text-white hover:bg-white/10'
-                      }`}
-                    >
-                      🗑️ Descartes
-                    </Link>
-                    
-                    <Link
-                      href="/cosecha"
-                      onClick={closeMobileMenu}
-                      className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                        isScrolled 
-                          ? 'text-green-600 hover:bg-green-50' 
-                          : 'text-white hover:bg-white/10'
-                      }`}
-                    >
-                      🧪 Cosecha
-                    </Link>
-                    
-                    <Link
-                      href="/bitacora-laboratorio"
-                      onClick={closeMobileMenu}
-                      className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                        isScrolled 
-                          ? 'text-indigo-600 hover:bg-indigo-50' 
-                          : 'text-white hover:bg-white/10'
-                      }`}
-                    >
-                      📝 Bitácora
-                    </Link>
-                    
-                    <hr className={`my-2 ${isScrolled ? 'border-gray-200' : 'border-white/20'}`} />
+                    <hr className={`my-3 ${isScrolled ? 'border-gray-200' : 'border-white/20'}`} />
                     
                     <button
                       onClick={handleLogout}
-                      className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                      className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
                         isScrolled 
                           ? 'text-red-600 hover:bg-red-50' 
                           : 'text-red-300 hover:bg-white/10'
                       }`}
                     >
-                      🚪 Cerrar sesión
+                      <span className="text-lg">🚪</span>
+                      <span className="font-medium">Cerrar sesión</span>
                     </button>
                   </>
                 ) : (

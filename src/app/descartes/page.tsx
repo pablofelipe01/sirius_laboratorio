@@ -215,10 +215,10 @@ const DescartesPage = () => {
       
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 mb-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-3 sm:p-4 mb-8 border border-white/20">
           <div className="flex items-center justify-center">
             <div className="text-center">
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-4xl font-bold text-gray-900 mb-1">
                 🗑️ Registro de Descartes
               </h1>
               <p className="text-gray-600 text-lg">
@@ -229,7 +229,7 @@ const DescartesPage = () => {
         </div>
 
         {/* Formulario Principal */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-4 sm:p-6 border border-white/20">
           <form onSubmit={handleSubmit} className="space-y-6">
             
             {/* Tipo de Descarte */}

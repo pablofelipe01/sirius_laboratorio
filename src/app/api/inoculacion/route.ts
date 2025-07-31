@@ -107,43 +107,146 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function PUT(request: NextRequest) {
   try {
-    // Usar la tabla de Inoculación desde variables de entorno
+    console.log('🔄 API INOCULACION PUT: Iniciando actualización de lote...');
+    
+    const { loteId, nuevoEstado, fechaGuardadoRefrigeracion } = await request.json();
+    
+    console.log('📋 API INOCULACION PUT: Datos recibidos:', {
+      loteId,
+      nuevoEstado,
+      fechaGuardadoRefrigeracion
+    });
+
+    if (!loteId || !nuevoEstado) {
+      console.error('❌ API INOCULACION PUT: Faltan datos requeridos');
+      return NextResponse.json(
+        { success: false, error: 'loteId y nuevoEstado son requeridos' },
+        { status: 400 }
+      );
+    }
+
     const tableId = process.env.AIRTABLE_TABLE_INOCULACION;
     
     if (!tableId) {
+      console.error('❌ API INOCULACION PUT: Missing AIRTABLE_TABLE_INOCULACION environment variable');
       throw new Error('Missing AIRTABLE_TABLE_INOCULACION environment variable');
     }
 
+    console.log('📡 API INOCULACION PUT: Actualizando registro en Airtable...');
+
+    // Preparar los campos a actualizar
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fieldsToUpdate: any = {
+      'Estado Lote': nuevoEstado
+    };
+
+    // Si se está cambiando a Refrigeración, agregar la fecha
+    if ((nuevoEstado === 'Refrigeración' || nuevoEstado === 'Refrigerado') && fechaGuardadoRefrigeracion) {
+      // Usar el nuevo nombre de campo para nuevos registros
+      fieldsToUpdate['Fecha Guardado Refrigeración'] = fechaGuardadoRefrigeracion;
+    }
+
+    console.log('📋 API INOCULACION PUT: Campos a actualizar:', fieldsToUpdate);
+
+    // Actualizar el registro en Airtable
+    const updatedRecords = await base(tableId).update([{
+      id: loteId,
+      fields: fieldsToUpdate
+    }]);
+
+    const updatedRecord = updatedRecords[0];
+
+    console.log('✅ API INOCULACION PUT: Registro actualizado:', {
+      id: updatedRecord.id,
+      fields: updatedRecord.fields
+    });
+
+    return NextResponse.json({
+      success: true,
+      lote: {
+        id: updatedRecord.id,
+        fields: updatedRecord.fields
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ API INOCULACION PUT: Error al actualizar lote:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Error al actualizar lote',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    console.log('🔍 API INOCULACION GET: Iniciando obtención de registros...');
+    
+    // Usar la tabla de Inoculación desde variables de entorno
+    const tableId = process.env.AIRTABLE_TABLE_INOCULACION;
+    
+    console.log('📋 API INOCULACION: Table ID:', tableId);
+    
+    if (!tableId) {
+      console.error('❌ API INOCULACION: Missing AIRTABLE_TABLE_INOCULACION environment variable');
+      throw new Error('Missing AIRTABLE_TABLE_INOCULACION environment variable');
+    }
+
+    console.log('📡 API INOCULACION: Haciendo query a Airtable...');
+    
     // Obtener registros de Airtable usando nombres de campos exactos
     const records = await base(tableId)
       .select({
-        maxRecords: 50,
+        maxRecords: 100,
         sort: [{ field: 'Fecha Creacion', direction: 'desc' }]
       })
       .firstPage();
 
-    const formattedRecords = records.map(record => ({
-      id: record.id,
-      responsables: record.get('Responsables'),
-      cantidadBolsas: record.get('Cantidad Bolsas'),
-      tipoBolsas: record.get('Tipo Bolsas'),
-      microorganismos: record.get('Microorganismos'),
-      fechaInoculacion: record.get('Fecha Inoculacion'),
-      fechaCreacion: record.get('Fecha Creacion')
-    }));
-
-    return NextResponse.json({
-      success: true,
-      records: formattedRecords,
-      total: formattedRecords.length
+    console.log('📊 API INOCULACION: Records obtenidos:', records.length);
+    
+    // Log de cada record para ver su estructura
+    records.forEach((record, index) => {
+      console.log(`📦 API INOCULACION: Record ${index + 1}:`, {
+        id: record.id,
+        fields: record.fields,
+        estadoLote: record.get('Estado Lote'),
+        codigoLote: record.get('Codigo Lote')
+      });
     });
 
+    const formattedRecords = records.map(record => ({
+      id: record.id,
+      fields: record.fields // Devolver todos los fields como están en Airtable
+    }));
+
+    console.log('✅ API INOCULACION: Records formateados:', formattedRecords.length);
+    console.log('📋 API INOCULACION: Primer record ejemplo:', formattedRecords[0]);
+
+    const response = {
+      success: true,
+      inoculaciones: formattedRecords, // Cambiar de 'records' a 'inoculaciones'
+      total: formattedRecords.length
+    };
+    
+    console.log('🚀 API INOCULACION: Enviando response:', {
+      success: response.success,
+      inoculaciones_count: response.inoculaciones.length,
+      total: response.total
+    });
+
+    return NextResponse.json(response);
+
   } catch (error) {
-    console.error('Error al obtener registros de Airtable:', error);
+    console.error('❌ API INOCULACION: Error al obtener registros:', error);
     return NextResponse.json(
       { 
+        success: false,
         error: 'Error al obtener datos',
         details: error instanceof Error ? error.message : 'Error desconocido'
       },
