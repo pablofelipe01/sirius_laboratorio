@@ -331,6 +331,14 @@ const MushroomInoculationForm = () => {
     setSubmitStatus('idle');
     setErrorMessage('');
 
+    // Validación: verificar que se hayan seleccionado cepas
+    if (formData.cepasSeleccionadas.length === 0) {
+      setErrorMessage('❌ Error: Debe seleccionar al menos una cepa para continuar con la inoculación.');
+      setSubmitStatus('error');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       // Enviar datos a la API de Airtable
       const response = await fetch('/api/inoculacion', {
@@ -403,7 +411,7 @@ const MushroomInoculationForm = () => {
 
   return (
     <div 
-      className="min-h-screen relative pt-16 sm:pt-20"
+      className="min-h-screen relative pt-16"
       style={{
         backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4)), url('https://res.cloudinary.com/dvnuttrox/image/upload/v1752168289/Lab_banner_xhhlfe.jpg')`,
         backgroundSize: 'cover',
@@ -518,6 +526,16 @@ const MushroomInoculationForm = () => {
 
             {/* Selector de Cepas */}
             <div>
+              <label className="block text-lg font-semibold text-white mb-3">
+                🧬 Selección de Cepas <span className="text-red-400">*</span>
+              </label>
+              {formData.cepasSeleccionadas.length === 0 && (
+                <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded-lg">
+                  <p className="text-red-700 text-sm font-medium">
+                    ⚠️ Debe seleccionar al menos una cepa para proceder con la inoculación
+                  </p>
+                </div>
+              )}
               <CepaSelector
                 microorganismoSeleccionado={formData.microorganism}
                 onCepaAgregada={handleCepaAgregada}
@@ -597,9 +615,9 @@ const MushroomInoculationForm = () => {
             <div className="flex justify-center pt-6">
               <button
                 type="submit"
-                disabled={isSubmitting || loadingMicroorganisms || loadingResponsables}
+                disabled={isSubmitting || loadingMicroorganisms || loadingResponsables || formData.cepasSeleccionadas.length === 0}
                 className={`px-10 py-4 rounded-xl font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 ${
-                  isSubmitting || loadingMicroorganisms || loadingResponsables
+                  isSubmitting || loadingMicroorganisms || loadingResponsables || formData.cepasSeleccionadas.length === 0
                     ? 'bg-gray-400 cursor-not-allowed text-white'
                     : 'bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-800 text-white'
                 }`}
@@ -612,6 +630,8 @@ const MushroomInoculationForm = () => {
                     </svg>
                     Registrando...
                   </div>
+                ) : formData.cepasSeleccionadas.length === 0 ? (
+                  'Debe seleccionar al menos una cepa'
                 ) : (
                   'Registrar Inoculación'
                 )}

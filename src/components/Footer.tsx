@@ -20,9 +20,6 @@ const Footer = () => {
           {/* Brand Section */}
           <div className="lg:col-span-2">
             <div className="flex items-center mb-4">
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-xl px-3 py-1 rounded-lg">
-                Sirius
-              </div>
             </div>
             <p className="text-white mb-4 max-w-md">
               Sistema de gestión y control de procesos de producción de microorganismos. 

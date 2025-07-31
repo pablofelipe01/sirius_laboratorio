@@ -354,7 +354,7 @@ export default function BitacoraLaboratorioPage() {
     <>
       <Navbar />
       <div 
-        className="min-h-screen relative pt-20"
+        className="min-h-screen relative pt-24"
         style={{
           backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4)), url('https://res.cloudinary.com/dvnuttrox/image/upload/v1752168289/Lab_banner_xhhlfe.jpg')`,
           backgroundSize: 'cover',

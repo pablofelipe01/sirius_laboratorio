@@ -11,7 +11,6 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const router = useRouter();
 
@@ -42,10 +41,6 @@ const Navbar = () => {
     setIsMobileMenuOpen(false);
   };
 
-  const toggleDropdown = (dropdown: string) => {
-    setOpenDropdown(openDropdown === dropdown ? null : dropdown);
-  };
-
   if (isLoading) {
     return (
       <nav
@@ -56,20 +51,14 @@ const Navbar = () => {
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-3">
-            <Link href="/" className="flex items-center">
+          <div className="flex justify-between items-center py-4">
+            <Link href="/" className="flex items-center space-x-2">
               <Image 
                 src="/logo.png" 
                 alt="Sirius Logo" 
-                width={448}
-                height={320}
-                className="w-32 sm:w-40 md:w-48 lg:w-56 h-auto object-contain transition-transform duration-300 hover:scale-105"
-                style={{ 
-                  minWidth: '60px',
-                  imageRendering: 'crisp-edges'
-                }}
-                priority
-                quality={100}
+                width={152}
+                height={104}
+                className="w-32 h-20 sm:w-40 sm:h-24 md:w-48 md:h-32 object-contain"
               />
             </Link>
             <div className="w-20 h-10 bg-gray-200 animate-pulse rounded-full"></div>
@@ -78,44 +67,6 @@ const Navbar = () => {
       </nav>
     );
   }
-
-  const DropdownMenu = ({ title, items, icon }: { title: string; items: Array<{href: string, label: string, emoji: string, color: string}>; icon: string }) => (
-    <div className="relative group">
-      <button
-        className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm flex items-center gap-2 ${
-          isScrolled 
-            ? 'text-gray-700 hover:bg-gray-50' 
-            : 'text-white hover:bg-white/10'
-        }`}
-        onMouseEnter={() => setOpenDropdown(title)}
-        onMouseLeave={() => setOpenDropdown(null)}
-      >
-        {icon} {title}
-        <svg className="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      
-      <div
-        className={`absolute top-full left-0 mt-1 w-56 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-white/20 py-2 z-50 transition-all duration-200 ${
-          openDropdown === title ? 'opacity-100 visible transform translate-y-0' : 'opacity-0 invisible transform -translate-y-2'
-        }`}
-        onMouseEnter={() => setOpenDropdown(title)}
-        onMouseLeave={() => setOpenDropdown(null)}
-      >
-        {items.map((item, index) => (
-          <Link
-            key={index}
-            href={item.href}
-            className={`flex items-center gap-3 px-4 py-3 transition-colors hover:${item.color} text-gray-700 hover:text-gray-900`}
-          >
-            <span className="text-lg">{item.emoji}</span>
-            <span className="font-medium">{item.label}</span>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
 
   return (
     <>
@@ -127,53 +78,123 @@ const Navbar = () => {
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-3">
-            <Link href="/" className="flex items-center" onClick={closeMobileMenu}>
+          <div className="flex justify-between items-center py-4">
+            <Link href="/" className="flex items-center space-x-2" onClick={closeMobileMenu}>
               <Image 
                 src="/logo.png" 
                 alt="Sirius Logo" 
-                width={448}
-                height={320}
-                className="w-32 sm:w-40 md:w-48 lg:w-56 h-auto object-contain transition-transform duration-300 hover:scale-105"
-                style={{ 
-                  minWidth: '60px',
-                  imageRendering: 'crisp-edges'
-                }}
-                priority
-                quality={100}
+                width={152}
+                height={104}
+                className="w-32 h-20 sm:w-40 sm:h-24 md:w-48 md:h-32 object-contain"
               />
             </Link>
             
             {/* Desktop Navigation */}
-            <div className="hidden xl:flex items-center gap-4">
+            <div className="hidden xl:flex items-center gap-6">
               {isAuthenticated ? (
                 <>
-                  {/* Dropdown Menus */}
-                  <DropdownMenu
-                    title="Procesos"
-                    icon="⚗️"
-                    items={[
-                      { href: "/inoculacion", label: "Inoculación", emoji: "📊", color: "bg-blue-50" },
-                      { href: "/cepas", label: "Cepas", emoji: "🧬", color: "bg-purple-50" },
-                      { href: "/cosecha", label: "Cosecha", emoji: "🧪", color: "bg-green-50" },
-                      { href: "/bacterias", label: "Bacterias", emoji: "🦠", color: "bg-yellow-50" },
-                    ]}
-                  />
-                  
-                  <DropdownMenu
-                    title="Gestión"
-                    icon="📋"
-                    items={[
-                      { href: "/almacenamiento", label: "Almacenamiento", emoji: "📦", color: "bg-orange-50" },
-                      { href: "/descartes", label: "Descartes", emoji: "🗑️", color: "bg-red-50" },
-                      { href: "/stock-insumos", label: "Stock Insumos", emoji: "📋", color: "bg-teal-50" },
-                      { href: "/ordenes-compras", label: "Pedidos Laboratorio", emoji: "🛒", color: "bg-emerald-50" },
-                      { href: "/bitacora-laboratorio", label: "Bitácora", emoji: "📝", color: "bg-indigo-50" },
-                    ]}
-                  />
+                  {/* Navigation Links - Clean horizontal layout with subtle separators */}
+                  <div className="flex items-center gap-1">
+                    {/* Core Processes */}
+                    <Link
+                      href="/inoculacion"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-700' 
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      📊 Inoculación
+                    </Link>
+                    
+                    <Link
+                      href="/cepas"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-purple-50 hover:text-purple-700' 
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      🧬 Cepas
+                    </Link>
+                    
+                    <Link
+                      href="/cosecha"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-green-50 hover:text-green-700' 
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      🧪 Cosecha
+                    </Link>
+                    
+                    {/* Subtle separator */}
+                    <div className={`w-px h-6 mx-2 ${isScrolled ? 'bg-gray-300' : 'bg-white/20'}`}></div>
+                    
+                    {/* Management */}
+                    <Link
+                      href="/almacenamiento"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-orange-50 hover:text-orange-700' 
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      📦 Almacenamiento
+                    </Link>
+                    
+                    <Link
+                      href="/descartes"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-red-50 hover:text-red-700' 
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      🗑️ Descartes
+                    </Link>
+                    
+                    <Link
+                      href="/stock-insumos"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-teal-50 hover:text-teal-700' 
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      📋 Stock
+                    </Link>
+                    
+                    {/* Subtle separator */}
+                    <div className={`w-px h-6 mx-2 ${isScrolled ? 'bg-gray-300' : 'bg-white/20'}`}></div>
+                    
+                    {/* Analysis */}
+                    <Link
+                      href="/bacterias"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-yellow-50 hover:text-yellow-700' 
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      🦠 Bacterias
+                    </Link>
+                    
+                    <Link
+                      href="/bitacora-laboratorio"
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium text-sm ${
+                        isScrolled 
+                          ? 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-700' 
+                          : 'text-white hover:bg-white/10'
+                      }`}
+                    >
+                      📝 Bitácora
+                    </Link>
+                  </div>
                   
                   {/* User Info & Logout */}
-                  <div className="flex items-center gap-3 ml-6">
+                  <div className="flex items-center gap-3 ml-4">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                         isScrolled ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
@@ -312,19 +333,6 @@ const Navbar = () => {
                             <span className="text-lg">🧪</span>
                             <span className="font-medium">Cosecha</span>
                           </Link>
-                          
-                          <Link
-                            href="/bacterias"
-                            onClick={closeMobileMenu}
-                            className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                              isScrolled 
-                                ? 'text-yellow-600 hover:bg-yellow-50' 
-                                : 'text-white hover:bg-white/10'
-                            }`}
-                          >
-                            <span className="text-lg">🦠</span>
-                            <span className="font-medium">Bacterias</span>
-                          </Link>
                         </div>
                       </div>
                       
@@ -345,7 +353,7 @@ const Navbar = () => {
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            <span className="text-lg">�</span>
+                            <span className="text-lg">📦</span>
                             <span className="font-medium">Almacenamiento</span>
                           </Link>
                           
@@ -358,7 +366,7 @@ const Navbar = () => {
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            <span className="text-lg">�️</span>
+                            <span className="text-lg">🗑️</span>
                             <span className="font-medium">Descartes</span>
                           </Link>
                           
@@ -371,21 +379,31 @@ const Navbar = () => {
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            <span className="text-lg">�</span>
+                            <span className="text-lg">📋</span>
                             <span className="font-medium">Stock Insumos</span>
                           </Link>
-                          
+                        </div>
+                      </div>
+                      
+                      {/* Análisis y Registro */}
+                      <div>
+                        <h3 className={`text-xs font-semibold uppercase tracking-wider mb-2 px-4 ${
+                          isScrolled ? 'text-gray-500' : 'text-gray-300'
+                        }`}>
+                          Análisis y Registro
+                        </h3>
+                        <div className="space-y-1">
                           <Link
-                            href="/ordenes-compras"
+                            href="/bacterias"
                             onClick={closeMobileMenu}
                             className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
                               isScrolled 
-                                ? 'text-emerald-600 hover:bg-emerald-50' 
+                                ? 'text-yellow-600 hover:bg-yellow-50' 
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            <span className="text-lg">🛒</span>
-                            <span className="font-medium">Pedidos Laboratorio</span>
+                            <span className="text-lg">🦠</span>
+                            <span className="font-medium">Bacterias</span>
                           </Link>
                           
                           <Link

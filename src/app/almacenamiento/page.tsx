@@ -332,7 +332,7 @@ export default function AlmacenamientoPage() {
     <>
       <Navbar />
       <div 
-        className="min-h-screen relative pt-20"
+        className="min-h-screen relative pt-24"
         style={{
           backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4)), url('https://res.cloudinary.com/dvnuttrox/image/upload/v1752168289/Lab_banner_xhhlfe.jpg')`,
           backgroundSize: 'cover',
@@ -688,33 +688,6 @@ export default function AlmacenamientoPage() {
               {/* Información Adicional */}
               <div className="mt-6">
                 <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-4">🔬 Información Técnica</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {loteHistorial.fields['Abreviatura'] && (
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <label className="font-medium text-gray-700">Abreviatura:</label>
-                      <p className="text-gray-900 font-mono text-lg">
-                        {Array.isArray(loteHistorial.fields['Abreviatura']) 
-                          ? loteHistorial.fields['Abreviatura'].join(', ')
-                          : loteHistorial.fields['Abreviatura']
-                        }
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="font-medium text-gray-700">ID del Registro:</label>
-                    <p className="text-gray-900 font-mono text-sm">{loteHistorial.id}</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Debug Info */}
-              <div className="mt-6 p-4 bg-gray-100 rounded-lg">
-                <h4 className="font-medium text-gray-700 mb-2">🔧 Información de Debug:</h4>
-                <pre className="text-xs text-gray-600 overflow-x-auto">
-                  {JSON.stringify(loteHistorial.fields, null, 2)}
-                </pre>
               </div>
             </div>
             

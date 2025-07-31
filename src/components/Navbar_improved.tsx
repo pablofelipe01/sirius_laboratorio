@@ -61,9 +61,9 @@ const Navbar = () => {
               <Image 
                 src="/logo.png" 
                 alt="Sirius Logo" 
-                width={448}
-                height={320}
-                className="w-32 sm:w-40 md:w-48 lg:w-56 h-auto object-contain transition-transform duration-300 hover:scale-105"
+                width={280}
+                height={200}
+                className="w-36 sm:w-44 md:w-52 lg:w-60 h-auto object-contain transition-transform duration-300 hover:scale-105"
                 style={{ 
                   minWidth: '60px',
                   imageRendering: 'crisp-edges'
@@ -132,9 +132,9 @@ const Navbar = () => {
               <Image 
                 src="/logo.png" 
                 alt="Sirius Logo" 
-                width={448}
-                height={320}
-                className="w-32 sm:w-40 md:w-48 lg:w-56 h-auto object-contain transition-transform duration-300 hover:scale-105"
+                width={280}
+                height={200}
+                className="w-36 sm:w-44 md:w-52 lg:w-60 h-auto object-contain transition-transform duration-300 hover:scale-105"
                 style={{ 
                   minWidth: '60px',
                   imageRendering: 'crisp-edges'
@@ -156,7 +156,6 @@ const Navbar = () => {
                       { href: "/inoculacion", label: "Inoculación", emoji: "📊", color: "bg-blue-50" },
                       { href: "/cepas", label: "Cepas", emoji: "🧬", color: "bg-purple-50" },
                       { href: "/cosecha", label: "Cosecha", emoji: "🧪", color: "bg-green-50" },
-                      { href: "/bacterias", label: "Bacterias", emoji: "🦠", color: "bg-yellow-50" },
                     ]}
                   />
                   
@@ -168,6 +167,14 @@ const Navbar = () => {
                       { href: "/descartes", label: "Descartes", emoji: "🗑️", color: "bg-red-50" },
                       { href: "/stock-insumos", label: "Stock Insumos", emoji: "📋", color: "bg-teal-50" },
                       { href: "/ordenes-compras", label: "Pedidos Laboratorio", emoji: "🛒", color: "bg-emerald-50" },
+                    ]}
+                  />
+                  
+                  <DropdownMenu
+                    title="Análisis"
+                    icon="🔬"
+                    items={[
+                      { href: "/bacterias", label: "Bacterias", emoji: "🦠", color: "bg-yellow-50" },
                       { href: "/bitacora-laboratorio", label: "Bitácora", emoji: "📝", color: "bg-indigo-50" },
                     ]}
                   />
@@ -312,19 +319,6 @@ const Navbar = () => {
                             <span className="text-lg">🧪</span>
                             <span className="font-medium">Cosecha</span>
                           </Link>
-                          
-                          <Link
-                            href="/bacterias"
-                            onClick={closeMobileMenu}
-                            className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                              isScrolled 
-                                ? 'text-yellow-600 hover:bg-yellow-50' 
-                                : 'text-white hover:bg-white/10'
-                            }`}
-                          >
-                            <span className="text-lg">🦠</span>
-                            <span className="font-medium">Bacterias</span>
-                          </Link>
                         </div>
                       </div>
                       
@@ -345,7 +339,7 @@ const Navbar = () => {
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            <span className="text-lg">�</span>
+                            <span className="text-lg">📦</span>
                             <span className="font-medium">Almacenamiento</span>
                           </Link>
                           
@@ -358,7 +352,7 @@ const Navbar = () => {
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            <span className="text-lg">�️</span>
+                            <span className="text-lg">🗑️</span>
                             <span className="font-medium">Descartes</span>
                           </Link>
                           
@@ -371,7 +365,7 @@ const Navbar = () => {
                                 : 'text-white hover:bg-white/10'
                             }`}
                           >
-                            <span className="text-lg">�</span>
+                            <span className="text-lg">📋</span>
                             <span className="font-medium">Stock Insumos</span>
                           </Link>
                           
@@ -386,6 +380,29 @@ const Navbar = () => {
                           >
                             <span className="text-lg">🛒</span>
                             <span className="font-medium">Pedidos Laboratorio</span>
+                          </Link>
+                        </div>
+                      </div>
+                      
+                      {/* Análisis y Registro */}
+                      <div>
+                        <h3 className={`text-xs font-semibold uppercase tracking-wider mb-2 px-4 ${
+                          isScrolled ? 'text-gray-500' : 'text-gray-300'
+                        }`}>
+                          Análisis y Registro
+                        </h3>
+                        <div className="space-y-1">
+                          <Link
+                            href="/bacterias"
+                            onClick={closeMobileMenu}
+                            className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                              isScrolled 
+                                ? 'text-yellow-600 hover:bg-yellow-50' 
+                                : 'text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <span className="text-lg">🦠</span>
+                            <span className="font-medium">Bacterias</span>
                           </Link>
                           
                           <Link
