@@ -170,7 +170,7 @@ export default function AlmacenamientoPage() {
     
     try {
       const fechaGuardadoRefrigeracion = nuevoEstado === 'Refrigeración' 
-        ? new Date().toISOString().split('T')[0] // Formato YYYY-MM-DD
+        ? new Date().toISOString() // Fecha y hora completa en formato ISO
         : null;
 
       console.log('📡 CAMBIO ESTADO: Enviando request con datos:', {
@@ -659,12 +659,15 @@ export default function AlmacenamientoPage() {
                     
                     {(loteHistorial.fields['Fecha Guardado Refrigeración'] || loteHistorial.fields['Fecha Guardado Refrigerador']) && (
                       <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400">
-                        <label className="font-medium text-blue-700">Fecha Guardado en Refrigeración:</label>
+                        <label className="font-medium text-blue-700">Fecha y Hora Guardado en Refrigeración:</label>
                         <p className="text-blue-900 font-semibold">
                           {new Date((loteHistorial.fields['Fecha Guardado Refrigeración'] || loteHistorial.fields['Fecha Guardado Refrigerador']) as string).toLocaleDateString('es-CO', {
                             year: 'numeric',
                             month: 'long',
-                            day: 'numeric'
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
                           })}
                         </p>
                       </div>

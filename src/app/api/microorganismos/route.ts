@@ -31,14 +31,21 @@ export async function GET() {
 
     const tableId = process.env.AIRTABLE_TABLE_MICROORGANISMOS;
     const fieldId = process.env.AIRTABLE_FIELD_MICROORGANISMO_NOMBRE;
+    const fieldTipo = process.env.AIRTABLE_FIELD_MICROORGANISMO_TIPO;
     
     if (!tableId || !fieldId) {
       throw new Error('Missing required environment variables for Airtable table or field IDs');
     }
 
+    // Campos a obtener - incluir tipo si está configurado
+    const fields = ['ID', fieldId];
+    if (fieldTipo) {
+      fields.push(fieldTipo);
+    }
+
     const records = await base(tableId)
       .select({
-        fields: ['ID', fieldId],
+        fields,
         sort: [{ field: fieldId, direction: 'asc' }]
       })
       .all();
@@ -46,6 +53,8 @@ export async function GET() {
     const microorganismos = records.map(record => ({
       id: record.id,
       nombre: record.fields[fieldId] as string,
+      'Tipo Microorganismo': fieldTipo ? record.fields[fieldTipo] as string : undefined,
+      tipo: fieldTipo ? record.fields[fieldTipo] as string : undefined, // Alias para compatibilidad
     })).filter(item => item.nombre); // Filtrar los que no tienen nombre
 
     return NextResponse.json({

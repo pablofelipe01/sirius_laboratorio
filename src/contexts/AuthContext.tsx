@@ -97,5 +97,19 @@ export function useAuth(): AuthContextType {
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  
+  // Verificación adicional para evitar el error de objetos con {state, value, isStale}
+  if (typeof context === 'object' && context !== null && 'state' in context && 'value' in context && 'isStale' in context) {
+    console.error('useAuth: El contexto está devolviendo un objeto con propiedades {state, value, isStale}. Devolviendo valores por defecto.');
+    return {
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      login: () => {},
+      logout: () => {},
+      checkAuth: async () => {}
+    };
+  }
+  
   return context;
 }

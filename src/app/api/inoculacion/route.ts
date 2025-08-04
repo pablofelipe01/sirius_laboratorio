@@ -144,6 +144,7 @@ export async function PUT(request: NextRequest) {
 
     // Si se está cambiando a Refrigeración, agregar la fecha
     if ((nuevoEstado === 'Refrigeración' || nuevoEstado === 'Refrigerado') && fechaGuardadoRefrigeracion) {
+      console.log('📅 API INOCULACION PUT: Guardando fecha de refrigeración:', fechaGuardadoRefrigeracion);
       // Usar el nuevo nombre de campo para nuevos registros
       fieldsToUpdate['Fecha Guardado Refrigeración'] = fechaGuardadoRefrigeracion;
     }
@@ -216,7 +217,9 @@ export async function GET() {
         id: record.id,
         fields: record.fields,
         estadoLote: record.get('Estado Lote'),
-        codigoLote: record.get('Codigo Lote')
+        codigoLote: record.get('Codigo Lote'),
+        fechaGuardadoRefrigeracion: record.get('Fecha Guardado Refrigeración'),
+        fechaGuardadoRefrigerador: record.get('Fecha Guardado Refrigerador') // Para compatibilidad
       });
     });
 

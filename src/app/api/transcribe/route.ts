@@ -16,28 +16,29 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    // Verificar que la solicitud tenga autorización válida
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { success: false, error: 'Acceso no autorizado' },
-        { status: 401 }
-      );
-    }
-
+    console.log('🎤 TRANSCRIBE: Recibiendo solicitud de transcripción...');
+    
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File;
 
     if (!audioFile) {
+      console.error('❌ TRANSCRIBE: No se recibió archivo de audio');
       return NextResponse.json(
         { success: false, error: 'No se recibió archivo de audio' },
         { status: 400 }
       );
     }
 
+    console.log('📁 TRANSCRIBE: Archivo recibido:', {
+      name: audioFile.name,
+      size: audioFile.size,
+      type: audioFile.type
+    });
+
     // Límite de tamaño: 25MB (límite de OpenAI)
     const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
     if (audioFile.size > MAX_FILE_SIZE) {
+      console.error('❌ TRANSCRIBE: Archivo demasiado grande:', audioFile.size);
       return NextResponse.json(
         { success: false, error: 'El archivo es demasiado grande. Máximo 25MB.' },
         { status: 400 }
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el archivo no esté vacío
     if (audioFile.size === 0) {
+      console.error('❌ TRANSCRIBE: Archivo vacío');
       return NextResponse.json(
         { success: false, error: 'El archivo de audio está vacío' },
         { status: 400 }

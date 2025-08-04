@@ -23,7 +23,11 @@ interface Responsable {
   nombre: string;
 }
 
-const CepasForm = () => {
+interface CepasFormProps {
+  tipoMicroorganismo?: string | null;
+}
+
+const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
   const { user } = useAuth();
   
   const [formData, setFormData] = useState<CepasData>({
@@ -48,7 +52,7 @@ const CepasForm = () => {
   useEffect(() => {
     fetchMicroorganisms();
     fetchResponsables();
-  }, []);
+  }, [tipoMicroorganismo]);
 
   // Actualizar el campo registradoPor cuando cambie el usuario
   useEffect(() => {
@@ -82,26 +86,48 @@ const CepasForm = () => {
       const data = await response.json();
       
       if (data.success) {
-        setMicroorganisms(data.microorganismos);
+        let microorganismosFiltrados = data.microorganismos;
+        
+        // Filtrar por tipo si se especifica
+        if (tipoMicroorganismo) {
+          microorganismosFiltrados = data.microorganismos.filter((micro: any) => {
+            const tipoMicro = micro['Tipo Microorganismo'] || micro.tipo || '';
+            return tipoMicro.toLowerCase().includes(tipoMicroorganismo.toLowerCase());
+          });
+        }
+        
+        setMicroorganisms(microorganismosFiltrados);
       } else {
         console.error('Error loading microorganisms:', data.error);
-        // Fallback a lista estática
-        setMicroorganisms([
-          { id: 'fallback-1', nombre: 'Pleurotus ostreatus' },
-          { id: 'fallback-2', nombre: 'Shiitake (Lentinula edodes)' },
-          { id: 'fallback-3', nombre: 'Trichoderma harzianum' },
-          { id: 'fallback-4', nombre: 'Otro (especificar en notas)' }
-        ]);
+        // Fallback a lista estática según el tipo
+        const fallbackMicroorganisms = tipoMicroorganismo === 'Hongo' 
+          ? [
+              { id: 'fallback-1', nombre: 'Pleurotus ostreatus' },
+              { id: 'fallback-2', nombre: 'Shiitake (Lentinula edodes)' },
+              { id: 'fallback-3', nombre: 'Trichoderma harzianum' }
+            ]
+          : [
+              { id: 'fallback-1', nombre: 'Bacillus thuringiensis' },
+              { id: 'fallback-2', nombre: 'Bacillus subtilis' },
+              { id: 'fallback-3', nombre: 'Azotobacter chroococcum' }
+            ];
+        setMicroorganisms(fallbackMicroorganisms);
       }
     } catch (error) {
       console.error('Error fetching microorganisms:', error);
-      // Fallback a lista estática
-      setMicroorganisms([
-        { id: 'fallback-1', nombre: 'Pleurotus ostreatus' },
-        { id: 'fallback-2', nombre: 'Shiitake (Lentinula edodes)' },
-        { id: 'fallback-3', nombre: 'Trichoderma harzianum' },
-        { id: 'fallback-4', nombre: 'Otro (especificar en notas)' }
-      ]);
+      // Fallback a lista estática según el tipo
+      const fallbackMicroorganisms = tipoMicroorganismo === 'Hongo' 
+        ? [
+            { id: 'fallback-1', nombre: 'Pleurotus ostreatus' },
+            { id: 'fallback-2', nombre: 'Shiitake (Lentinula edodes)' },
+            { id: 'fallback-3', nombre: 'Trichoderma harzianum' }
+          ]
+        : [
+            { id: 'fallback-1', nombre: 'Bacillus thuringiensis' },
+            { id: 'fallback-2', nombre: 'Bacillus subtilis' },
+            { id: 'fallback-3', nombre: 'Azotobacter chroococcum' }
+          ];
+      setMicroorganisms(fallbackMicroorganisms);
     } finally {
       setLoadingMicroorganisms(false);
     }
@@ -178,32 +204,36 @@ const CepasForm = () => {
 
   return (
     <div 
-      className="min-h-screen relative pt-24"
-      style={{
+      className={tipoMicroorganismo ? "relative" : "min-h-screen relative pt-24"}
+      style={tipoMicroorganismo ? {} : {
         backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4)), url('https://res.cloudinary.com/dvnuttrox/image/upload/v1752168289/Lab_banner_xhhlfe.jpg')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
       }}
     >
-      {/* Overlay para mejor legibilidad */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60"></div>
+      {/* Overlay para mejor legibilidad - solo si no hay tipo especificado */}
+      {!tipoMicroorganismo && (
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60"></div>
+      )}
       
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Profesional */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-3 sm:p-4 mb-8 border border-white/20">
-          <div className="flex items-center justify-center">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-1 text-center">
-                Registro de Cepas
-              </h1>
-              <p className="text-lg text-gray-600 flex items-center justify-center">
-                <span className="inline-block w-2 h-2 bg-purple-500 rounded-full mr-2 animate-pulse"></span>
-                Sistema DataLab - Sirius Regenerative Solutions S.A.S ZOMAC
-              </p>
+        {/* Header Profesional - solo si no hay tipo especificado */}
+        {!tipoMicroorganismo && (
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-3 sm:p-4 mb-8 border border-white/20">
+            <div className="flex items-center justify-center">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-1 text-center">
+                  Registro de Cepas
+                </h1>
+                <p className="text-lg text-gray-600 flex items-center justify-center">
+                  <span className="inline-block w-2 h-2 bg-purple-500 rounded-full mr-2 animate-pulse"></span>
+                  Sistema DataLab - Sirius Regenerative Solutions S.A.S ZOMAC
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Status Messages */}
         {submitStatus === 'success' && (

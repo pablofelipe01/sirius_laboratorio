@@ -171,6 +171,17 @@ const Navbar = () => {
                       { href: "/bitacora-laboratorio", label: "Bitácora", emoji: "📝", color: "bg-indigo-50" },
                     ]}
                   />
+
+                  {/* SIRIUS - Asistente IA */}
+                  <Link 
+                    href="/sirius" 
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-white/10 ${
+                      isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white'
+                    }`}
+                  >
+                    <span className="text-lg">✨</span>
+                    <span>SIRIUS</span>
+                  </Link>
                   
                   {/* User Info & Logout */}
                   <div className="flex items-center gap-3 ml-6">
@@ -402,6 +413,27 @@ const Navbar = () => {
                           </Link>
                         </div>
                       </div>
+                    </div>
+                    
+                    {/* SIRIUS - Asistente IA */}
+                    <div className="mb-4">
+                      <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider ${
+                        isScrolled ? 'text-gray-500' : 'text-white/70'
+                      }`}>
+                        Asistente IA
+                      </div>
+                      <Link
+                        href="/sirius"
+                        onClick={closeMobileMenu}
+                        className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                          isScrolled 
+                            ? 'text-blue-600 hover:bg-blue-50' 
+                            : 'text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-lg">✨</span>
+                        <span className="font-medium">SIRIUS</span>
+                      </Link>
                     </div>
                     
                     <hr className={`my-3 ${isScrolled ? 'border-gray-200' : 'border-white/20'}`} />

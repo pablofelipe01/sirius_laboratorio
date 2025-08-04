@@ -6,7 +6,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
   // Rutas públicas que NO requieren autenticación
-  const publicRoutes = ['/', '/api/auth/login', '/api/auth/verify'];
+  const publicRoutes = ['/', '/api/auth/login', '/api/auth/verify', '/stock-insumos', '/labi', '/api/labi']; // Temporalmente agregado para testing
   
   // Si es una ruta pública, permitir acceso
   if (publicRoutes.includes(pathname)) {

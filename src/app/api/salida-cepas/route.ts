@@ -12,7 +12,7 @@ const base = new Airtable({
 }).base(process.env.AIRTABLE_BASE_ID);
 
 // Usar variable de entorno para la tabla
-const SALIDA_CEPAS_TABLE_ID = process.env.AIRTABLE_TABLE_SALIDA_CEPAS || 'tblk9eKsHNXhT6pnw';
+const SALIDA_CEPAS_TABLE_ID = process.env.AIRTABLE_TABLE_SALIDA_CEPAS;
 
 interface SalidaCepaRecord {
   fechaEvento: string;
@@ -23,6 +23,13 @@ interface SalidaCepaRecord {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!SALIDA_CEPAS_TABLE_ID) {
+      return NextResponse.json(
+        { error: 'Configuración de tabla SALIDA_CEPAS no encontrada' },
+        { status: 500 }
+      );
+    }
+
     const { registros }: { registros: SalidaCepaRecord[] } = await request.json();
     
     console.log('🔄 Creando registros de Salida Cepas:', {
@@ -90,6 +97,13 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    if (!SALIDA_CEPAS_TABLE_ID) {
+      return NextResponse.json(
+        { error: 'Configuración de tabla SALIDA_CEPAS no encontrada' },
+        { status: 500 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const inoculacionId = searchParams.get('inoculacionId');
     
