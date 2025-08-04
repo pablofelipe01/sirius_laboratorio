@@ -16,6 +16,26 @@ const DESCARTES_TABLE_ID = process.env.AIRTABLE_TABLE_DESCARTES;
 const SALIDA_CEPAS_TABLE_ID = process.env.AIRTABLE_TABLE_SALIDA_CEPAS;
 const SALIDA_INOCULACION_TABLE_ID = process.env.AIRTABLE_TABLE_SALIDA_INOCULACION;
 
+// Field IDs para tabla Descartes
+const DESCARTES_FECHA_EVENTO = process.env.AIRTABLE_FIELD_DESCARTES_FECHA_EVENTO;
+const DESCARTES_CANTIDAD_BOLSAS = process.env.AIRTABLE_FIELD_DESCARTES_CANTIDAD_BOLSAS;
+const DESCARTES_MOTIVO = process.env.AIRTABLE_FIELD_DESCARTES_MOTIVO;
+const DESCARTES_REALIZA_REGISTRO = process.env.AIRTABLE_FIELD_DESCARTES_REALIZA_REGISTRO;
+const DESCARTES_SALIDA_CEPAS = process.env.AIRTABLE_FIELD_DESCARTES_SALIDA_CEPAS;
+const DESCARTES_SALIDA_INOCULACION = process.env.AIRTABLE_FIELD_DESCARTES_SALIDA_INOCULACION;
+
+// Field IDs para tabla Salida Cepas
+const SALIDA_CEPAS_FECHA_EVENTO = process.env.AIRTABLE_FIELD_SALIDA_CEPAS_FECHA_EVENTO;
+const SALIDA_CEPAS_CANTIDAD_BOLSAS = process.env.AIRTABLE_FIELD_SALIDA_CEPAS_CANTIDAD_BOLSAS;
+const SALIDA_CEPAS_CEPAS = process.env.AIRTABLE_FIELD_SALIDA_CEPAS_CEPAS;
+const SALIDA_CEPAS_DESCARTES = process.env.AIRTABLE_FIELD_SALIDA_CEPAS_DESCARTES;
+
+// Field IDs para tabla Salida Inoculacion
+const SALIDA_INOCULACION_FECHA_EVENTO = process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_FECHA_EVENTO;
+const SALIDA_INOCULACION_CANTIDAD_BOLSAS = process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_CANTIDAD_BOLSAS;
+const SALIDA_INOCULACION_LOTE_ALTERADO = process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_LOTE_ALTERADO;
+const SALIDA_INOCULACION_DESCARTES = process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_DESCARTES;
+
 interface DescarteData {
   tipoDescarte: 'cepas' | 'inoculacion';
   microorganismo: string;
@@ -88,11 +108,11 @@ export async function POST(request: NextRequest) {
     const descarteRecord = await base(DESCARTES_TABLE_ID!).create([
       {
         fields: {
-          // Usar Field IDs de la documentación
-          'fldWXmSOZKaVFtOrs': data.fechaDescarte, // Fecha Evento
-          'fldLT7eru7YlqbOTP': data.cantidad, // Cantidad Bolsas Descartadas
-          'fldzfJDGjJxl8EHTg': data.motivo, // Motivo (aquí va la transcripción)
-          'flde4tstaKVkiHdkY': data.registradoPor, // Realiza Registro
+          // Usar Field IDs desde variables de entorno
+          [DESCARTES_FECHA_EVENTO!]: data.fechaDescarte, // Fecha Evento
+          [DESCARTES_CANTIDAD_BOLSAS!]: data.cantidad, // Cantidad Bolsas Descartadas
+          [DESCARTES_MOTIVO!]: data.motivo, // Motivo (aquí va la transcripción)
+          [DESCARTES_REALIZA_REGISTRO!]: data.registradoPor, // Realiza Registro
           // Los campos de Salida Inoculacion y Salida Cepas se llenarán después de crear el registro de salida
         }
       }
@@ -111,9 +131,9 @@ export async function POST(request: NextRequest) {
       const salidaCepasRecord = await base(SALIDA_CEPAS_TABLE_ID!).create([
         {
           fields: {
-            'fldG3F5RAJ9U8LjeV': data.fechaDescarte, // Fecha Evento
-            'fldvZqru56XkTtjGi': data.cantidad, // Cantidad Bolsas
-            'fldhF7oOqQhcP5tJr': [data.loteId], // Cepas (vincular con el lote de cepa)
+            [SALIDA_CEPAS_FECHA_EVENTO!]: data.fechaDescarte, // Fecha Evento
+            [SALIDA_CEPAS_CANTIDAD_BOLSAS!]: data.cantidad, // Cantidad Bolsas
+            [SALIDA_CEPAS_CEPAS!]: [data.loteId], // Cepas (vincular con el lote de cepa)
             // El campo Descartes se llenará después cuando vinculemos ambos registros
           }
         }
@@ -128,7 +148,7 @@ export async function POST(request: NextRequest) {
         {
           id: descarteRecordId,
           fields: {
-            'fldIE9yDJmZmniXpW': [salidaRecordId] // Salida Cepas (Field ID)
+            [DESCARTES_SALIDA_CEPAS!]: [salidaRecordId] // Salida Cepas (Field ID)
           }
         }
       ]);
@@ -139,7 +159,7 @@ export async function POST(request: NextRequest) {
         {
           id: salidaRecordId,
           fields: {
-            'fldU2rwYbn3xNMu2B': [descarteRecordId] // Descartes (Field ID correcto)
+            [SALIDA_CEPAS_DESCARTES!]: [descarteRecordId] // Descartes (Field ID correcto)
           }
         }
       ]);
@@ -151,9 +171,9 @@ export async function POST(request: NextRequest) {
       const salidaInoculacionRecord = await base(SALIDA_INOCULACION_TABLE_ID!).create([
         {
           fields: {
-            'fld1SHaeWH4MA3ZAt': data.fechaDescarte, // Fecha Evento
-            'fldQOswRr4SclLZ2Q': data.cantidad, // Cantidad Bolsas
-            'fldNNoQyvPwBG6afF': [data.loteId], // Lote Alterado (vincular con el lote de inoculación)
+            [SALIDA_INOCULACION_FECHA_EVENTO!]: data.fechaDescarte, // Fecha Evento
+            [SALIDA_INOCULACION_CANTIDAD_BOLSAS!]: data.cantidad, // Cantidad Bolsas
+            [SALIDA_INOCULACION_LOTE_ALTERADO!]: [data.loteId], // Lote Alterado (vincular con el lote de inoculación)
             // El campo Descartes se llenará después cuando vinculemos ambos registros
           }
         }
@@ -168,7 +188,7 @@ export async function POST(request: NextRequest) {
         {
           id: descarteRecordId,
           fields: {
-            'fldfPim7YDWZfiKdl': [salidaRecordId] // Salida Inoculacion (Field ID)
+            [DESCARTES_SALIDA_INOCULACION!]: [salidaRecordId] // Salida Inoculacion (Field ID)
           }
         }
       ]);
@@ -179,7 +199,7 @@ export async function POST(request: NextRequest) {
         {
           id: salidaRecordId,
           fields: {
-            'fldAGNotVCvCYcKuQ': [descarteRecordId] // Descartes (Field ID)
+            [SALIDA_INOCULACION_DESCARTES!]: [descarteRecordId] // Descartes (Field ID)
           }
         }
       ]);
