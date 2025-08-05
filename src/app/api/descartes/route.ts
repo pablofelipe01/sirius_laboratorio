@@ -2,14 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import Airtable from 'airtable';
 
 // Validar configuración requerida
-if (!process.env.AIRTABLE_API_KEY || !process.env.AIRTABLE_BASE_ID) {
-  throw new Error('Variables de entorno AIRTABLE_API_KEY y AIRTABLE_BASE_ID son requeridas');
+const requiredEnvVars = [
+  'AIRTABLE_API_KEY',
+  'AIRTABLE_BASE_ID',
+  'AIRTABLE_TABLE_DESCARTES',
+  'AIRTABLE_TABLE_SALIDA_CEPAS',
+  'AIRTABLE_TABLE_SALIDA_INOCULACION',
+  'AIRTABLE_FIELD_DESCARTES_FECHA_EVENTO',
+  'AIRTABLE_FIELD_DESCARTES_CANTIDAD_BOLSAS',
+  'AIRTABLE_FIELD_DESCARTES_MOTIVO',
+  'AIRTABLE_FIELD_DESCARTES_REALIZA_REGISTRO',
+  'AIRTABLE_FIELD_DESCARTES_SALIDA_CEPAS',
+  'AIRTABLE_FIELD_DESCARTES_SALIDA_INOCULACION',
+  'AIRTABLE_FIELD_SALIDA_CEPAS_FECHA_EVENTO',
+  'AIRTABLE_FIELD_SALIDA_CEPAS_CANTIDAD_BOLSAS',
+  'AIRTABLE_FIELD_SALIDA_CEPAS_CEPAS',
+  'AIRTABLE_FIELD_SALIDA_CEPAS_DESCARTES',
+  'AIRTABLE_FIELD_SALIDA_INOCULACION_FECHA_EVENTO',
+  'AIRTABLE_FIELD_SALIDA_INOCULACION_CANTIDAD_BOLSAS',
+  'AIRTABLE_FIELD_SALIDA_INOCULACION_LOTE_ALTERADO',
+  'AIRTABLE_FIELD_SALIDA_INOCULACION_DESCARTES'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+  throw new Error(`Variables de entorno faltantes: ${missingVars.join(', ')}`);
 }
 
 // Configurar Airtable de forma segura
 const base = new Airtable({
-  apiKey: process.env.AIRTABLE_API_KEY
-}).base(process.env.AIRTABLE_BASE_ID);
+  apiKey: process.env.AIRTABLE_API_KEY!
+}).base(process.env.AIRTABLE_BASE_ID!);
 
 // IDs de las tablas
 const DESCARTES_TABLE_ID = process.env.AIRTABLE_TABLE_DESCARTES;
