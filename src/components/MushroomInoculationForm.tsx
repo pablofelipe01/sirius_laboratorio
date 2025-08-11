@@ -424,7 +424,7 @@ const MushroomInoculationForm = () => {
       
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-15">
         {/* Header Profesional */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-3 sm:p-4 mb-4 sm:mb-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-4 sm:p-4 mb-4 sm:mb-8 border border-white/20">
           <div className="flex items-center justify-center">
             <div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1 text-center">

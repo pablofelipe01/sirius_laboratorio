@@ -321,11 +321,45 @@ export default function CosechaPage() {
     return getCantidadRestanteCepa(cepaId) > 0;
   };
 
+  // Función para verificar si hay al menos un lote válido seleccionado
+  const tieneValidacionLotes = (): boolean => {
+    if (hongo) {
+      // Si hay microorganismo seleccionado, verificar lotes dinámicos y cepas
+      const lotesConCantidad = lotesSeleccionados.filter(loteId => {
+        const cantidad = cantidadesLotes[loteId];
+        return cantidad && parseInt(cantidad) > 0;
+      });
+      
+      const cepasConCantidad = cepasSeleccionadas.filter(cepaId => {
+        const cantidad = cantidadesCepas[cepaId];
+        return cantidad && parseInt(cantidad) > 0;
+      });
+      
+      return (lotesConCantidad.length > 0 || cepasConCantidad.length > 0);
+    } else {
+      // Si no hay microorganismo, verificar lotes manuales
+      const lotesValidos = lotes.filter(lote => 
+        lote.lote.trim() !== '' && 
+        lote.bolsas.trim() !== '' && 
+        parseInt(lote.bolsas) > 0
+      );
+      return lotesValidos.length > 0;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitStatus('idle');
     setErrorMessage('');
+
+    // Validación obligatoria: verificar que se haya seleccionado al menos un lote con cantidad
+    if (!tieneValidacionLotes()) {
+      setSubmitStatus('error');
+      setErrorMessage('⚠️ Debe seleccionar al menos un lote de inoculación con una cantidad válida para realizar el registro de cosecha.');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       let clienteNombre = cliente;
@@ -423,7 +457,10 @@ export default function CosechaPage() {
         setLotes([{ lote: '', bolsas: '' }]);
         setLotesSeleccionados([]);
         setCantidadesLotes({});
+        setCepasSeleccionadas([]);
+        setCantidadesCepas({});
         setResponsableEntrega('');
+        setResponsableEntregaId('');
         
         // Auto-hide success message
         setTimeout(() => {
@@ -456,7 +493,7 @@ export default function CosechaPage() {
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-400 to-blue-700 p-3 sm:p-4 text-white relative overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-400 to-blue-700 p-6 text-white relative overflow-hidden">
               <div className="relative z-10 text-center">
                 <h1 className="text-3xl font-bold mb-1">FORMATO DE COSECHA</h1>
                 <p className="text-xl opacity-90">Sirius Regenerative Solutions S.A.S ZOMAC</p>
@@ -932,11 +969,24 @@ export default function CosechaPage() {
 
                   <button
                     type="submit"
-                    disabled={isSubmitting}
-                    className="bg-gradient-to-r from-blue-500 to-blue-700 text-white px-8 py-3 rounded-lg font-semibold text-lg hover:from-blue-600 hover:to-blue-800 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isSubmitting || !tieneValidacionLotes()}
+                    className={`px-8 py-3 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                      !tieneValidacionLotes() 
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-blue-500 to-blue-700 text-white hover:from-blue-600 hover:to-blue-800'
+                    }`}
+                    title={!tieneValidacionLotes() ? 'Debe seleccionar al menos un lote de inoculación con cantidad válida' : ''}
                   >
-                    {isSubmitting ? 'Registrando...' : '📋 Registrar Cosecha'}
+                    {isSubmitting ? 'Registrando...' : 
+                     !tieneValidacionLotes() ? '⚠️ Seleccione Lotes Primero' : 
+                     '📋 Registrar Cosecha'}
                   </button>
+
+                  {!tieneValidacionLotes() && (
+                    <div className="mt-3 text-sm text-orange-600 bg-orange-50 p-3 rounded-lg border border-orange-200">
+                      <span className="font-medium">💡 Recordatorio:</span> Debe seleccionar al menos un lote de inoculación y especificar la cantidad de bolsas antes de registrar la cosecha.
+                    </div>
+                  )}
                 </div>
               </form>
             </div>

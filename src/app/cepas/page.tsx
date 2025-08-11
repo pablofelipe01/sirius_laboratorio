@@ -25,7 +25,7 @@ export default function CepasPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="bg-white rounded-lg shadow-lg p-8 mb-8 text-center">
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8 text-center">
             <h1 className="text-3xl font-bold text-gray-800 mb-4">
               🧬 REGISTRO DE CEPAS
             </h1>

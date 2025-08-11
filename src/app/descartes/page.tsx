@@ -215,7 +215,7 @@ const DescartesPage = () => {
       
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-3 sm:p-4 mb-8 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 mb-8 border border-white/20">
           <div className="flex items-center justify-center">
             <div className="text-center">
               <h1 className="text-4xl font-bold text-gray-900 mb-1">

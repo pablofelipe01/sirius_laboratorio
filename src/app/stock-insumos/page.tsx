@@ -13,10 +13,14 @@ interface Insumo {
     nombre?: string;
     categoria_insumo?: string;
     unidad_medida?: string;
+    'Unidad Ingresa Insumo'?: string;
+    'Cantidad Presentacion Insumo'?: number;
     descripcion?: string;
     'Rango Minimo Stock'?: number;
     estado?: string;
     'Total Cantidad Producto'?: number;
+    'Total Insumo Unidades'?: number;
+    'Total Insumo Granel'?: number;
     'cantidad Entrada Insumos'?: number[];
     'cantidad Salida Insumos'?: number[];
     'ID_Entrada Insumos'?: string[];
@@ -61,13 +65,16 @@ const StockInsumosPage = () => {
   });
 
   const [recibirData, setRecibirData] = useState({
-    insumoId: '',
-    cantidad: 0,
-    proveedor: '',
-    numeroFactura: '',
-    fechaVencimiento: '',
-    observaciones: ''
+    insumos: [{
+      insumoId: '',
+      cantidadIngresaUnidades: '',
+      fechaVencimiento: ''
+    }]
   });
+
+  // Estados para búsqueda en dropdowns
+  const [searchInsumo, setSearchInsumo] = useState<{[key: number]: string}>({});
+  const [dropdownOpen, setDropdownOpen] = useState<{[key: number]: boolean}>({});
 
   // Cantidades específicas por insumo (ya no se usa, eliminar)
   // const [cantidadesPorInsumo, setCantidadesPorInsumo] = useState<{[key: string]: number}>({});
@@ -182,6 +189,15 @@ const StockInsumosPage = () => {
     e.preventDefault();
     if (!descontarData.insumoId || descontarData.cantidad <= 0) return;
 
+    // Solicitar confirmación antes de proceder
+    const confirmacion = window.confirm(
+      `¿Está seguro de descontar ${descontarData.cantidad} unidades del insumo seleccionado?\n\nEsta acción no se puede deshacer.`
+    );
+
+    if (!confirmacion) {
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
@@ -227,27 +243,57 @@ const StockInsumosPage = () => {
 
   const handleRecibirPedido = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recibirData.insumoId || recibirData.cantidad <= 0) return;
+    
+    // Validar que hay al menos un insumo válido
+    const insumosValidos = recibirData.insumos.filter(
+      insumo => insumo.insumoId && insumo.cantidadIngresaUnidades && Number(insumo.cantidadIngresaUnidades) > 0
+    );
+    
+    if (insumosValidos.length === 0) {
+      alert('Debe agregar al menos un insumo con cantidad válida');
+      return;
+    }
+
+    // Validar que todos los insumos seleccionados existen
+    const insumosNoEncontrados = insumosValidos.filter(insumo => 
+      !insumos.find(ins => ins.id === insumo.insumoId)
+    );
+    
+    if (insumosNoEncontrados.length > 0) {
+      alert('Hay insumos seleccionados que no son válidos. Por favor, seleccione insumos de la lista.');
+      return;
+    }
+
+    // Solicitar confirmación antes de proceder
+    const confirmacion = window.confirm(
+      `¿Está seguro de recibir este pedido con ${insumosValidos.length} insumo(s)?\n\nEsta acción no se puede deshacer.`
+    );
+
+    if (!confirmacion) {
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
     try {
       console.log('📥 STOCK-INSUMOS: Recibiendo pedido:', recibirData);
+      console.log('📥 STOCK-INSUMOS: Usuario actual:', user);
       
-      const response = await fetch('/api/stock-insumos', {
-        method: 'PUT',
+      const response = await fetch('/api/entrada-insumos', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: recibirData.insumoId,
-          operacion: 'recibir',
-          cantidad: recibirData.cantidad,
-          proveedor: recibirData.proveedor,
-          numeroFactura: recibirData.numeroFactura,
-          fechaVencimiento: recibirData.fechaVencimiento,
-          observaciones: recibirData.observaciones
+          records: insumosValidos.map(insumo => ({
+            fields: {
+              'Insumos Laboratorio': [insumo.insumoId],
+              'Cantidad Ingresa Unidades': Number(insumo.cantidadIngresaUnidades),
+              'Realiza Registro': user?.nombre || 'Usuario no identificado',
+              ...(insumo.fechaVencimiento && { 'fecha_vencimiento': insumo.fechaVencimiento })
+            }
+          }))
         }),
       });
 
@@ -255,13 +301,14 @@ const StockInsumosPage = () => {
       if (data.success) {
         setSubmitStatus('success');
         setRecibirData({ 
-          insumoId: '',
-          cantidad: 0,
-          proveedor: '', 
-          numeroFactura: '', 
-          fechaVencimiento: '', 
-          observaciones: '' 
+          insumos: [{
+            insumoId: '',
+            cantidadIngresaUnidades: '',
+            fechaVencimiento: ''
+          }]
         });
+        setSearchInsumo({});
+        setDropdownOpen({});
         setShowRecibirPedidoForm(false);
         fetchInsumos(); // Recargar la lista
       } else {
@@ -274,6 +321,56 @@ const StockInsumosPage = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCancelarRecibirPedido = () => {
+    const confirmacion = window.confirm(
+      '¿Está seguro de cancelar el formulario de recibir pedido?\n\nSe perderán todos los datos ingresados.'
+    );
+
+    if (confirmacion) {
+      setRecibirData({ 
+        insumos: [{
+          insumoId: '',
+          cantidadIngresaUnidades: '',
+          fechaVencimiento: ''
+        }]
+      });
+      setSearchInsumo({});
+      setDropdownOpen({});
+      setShowRecibirPedidoForm(false);
+    }
+  };
+
+  const handleCancelarDescontarStock = () => {
+    const confirmacion = window.confirm(
+      '¿Está seguro de cancelar el formulario de descuento?\n\nSe perderán todos los datos ingresados.'
+    );
+
+    if (confirmacion) {
+      setDescontarData({ 
+        insumoId: '',
+        cantidad: 0,
+        motivo: '', 
+        observaciones: '' 
+      });
+      setShowDescontarStockForm(false);
+    }
+  };
+
+  // Función para filtrar insumos en el dropdown
+  const filtrarInsumos = (searchTerm: string) => {
+    if (!searchTerm) return insumos;
+    
+    return insumos.filter(insumo => {
+      const hasName = insumo.fields.nombre && insumo.fields.nombre.trim();
+      const nombre = hasName ? insumo.fields.nombre : `Sin nombre - ${insumo.id.slice(-6)}`;
+      const unidad = insumo.fields['Unidad Ingresa Insumo'] || insumo.fields.unidad_medida || 'unidad';
+      
+      return (nombre && nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
+             unidad.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             (insumo.fields.categoria_insumo && insumo.fields.categoria_insumo.toLowerCase().includes(searchTerm.toLowerCase()));
+    });
   };
 
   const categoriasUnicas = Array.from(
@@ -337,28 +434,10 @@ const StockInsumosPage = () => {
             
             {/* Header */}
             <div className="bg-white rounded-xl shadow-2xl overflow-hidden mb-8">
-              <div className="bg-gradient-to-r from-orange-600 to-red-600 p-8 text-white relative overflow-hidden">
+              <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6 text-white relative overflow-hidden">
                 <div className="relative z-10 text-center">
                   <h1 className="text-3xl font-bold mb-2">📦 STOCK DE INSUMOS</h1>
                   <p className="text-xl opacity-90">Gestión y Control de Inventario de Laboratorio</p>
-                </div>
-              </div>
-              
-              {/* Stats */}
-              <div className="p-6 bg-gray-50">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-lg p-4 border-l-4 border-orange-500">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Total Insumos</p>
-                        <p className="text-2xl font-bold text-orange-600">{stats.total}</p>
-                      </div>
-                      <div className="bg-orange-100 p-3 rounded-full">
-                        <span className="text-2xl">📋</span>
-                      </div>
-                    </div>
-                  </div>
-                  
                 </div>
               </div>
             </div>
@@ -474,7 +553,6 @@ const StockInsumosPage = () => {
                     </button>
                   </div>
                 </div>
-                </div>
               </div>
             </div>
 
@@ -500,20 +578,21 @@ const StockInsumosPage = () => {
             )}
 
             {/* Lista de Insumos */}
-            <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 p-6 text-white">
-                <div className="flex items-center gap-3">
-                  <span className="bg-white/20 p-2 rounded-lg text-2xl">📦</span>
-                  <div>
-                    <h2 className="text-2xl font-bold">Inventario de Insumos ({insumosFiltrados.length})</h2>
-                    <p className="opacity-90">
-                      {filtroCategoria === 'todos' ? 'Insumos básicos de laboratorio' : 
-                       filtroCategoria === 'ver-todas' ? 'Todos los insumos' : 
-                       `Categoría: ${filtroCategoria}`}
-                    </p>
+            <div className="max-w-7xl mx-auto">
+              <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 p-6 text-white">
+                  <div className="flex items-center gap-3">
+                    <span className="bg-white/20 p-2 rounded-lg text-2xl">📦</span>
+                    <div>
+                      <h2 className="text-2xl font-bold">Inventario de Insumos ({insumosFiltrados.length})</h2>
+                      <p className="opacity-90">
+                        {filtroCategoria === 'todos' ? 'Insumos básicos de laboratorio' : 
+                         filtroCategoria === 'ver-todas' ? 'Todos los insumos' : 
+                         `Categoría: ${filtroCategoria}`}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
               
               <div className="p-6">
                 {/* Información de resultados */}
@@ -561,8 +640,10 @@ const StockInsumosPage = () => {
                         <tr className="bg-gray-50 border-b border-gray-200">
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Insumo</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Categoría</th>
-                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Unidad</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Stock Actual</th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Unidad Presentación</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Cantidad Presentación</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Unidades</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Granel</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Stock Mínimo</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Estado</th>
                         </tr>
@@ -571,16 +652,19 @@ const StockInsumosPage = () => {
                         {insumosFiltrados.map((insumo, index) => {
                           const hasName = insumo.fields.nombre && insumo.fields.nombre.trim();
                           const totalCantidad = insumo.fields['Total Cantidad Producto'] || 0;
+                          const totalUnidades = insumo.fields['Total Insumo Unidades'] || 0;
+                          const totalGranel = insumo.fields['Total Insumo Granel'] || 0;
+                          const cantidadPresentacion = insumo.fields['Cantidad Presentacion Insumo'] || 0;
                           const rangoMinimo = insumo.fields['Rango Minimo Stock'] || 0;
                           const estado = insumo.fields.estado || 'Disponible';
                           
-                          // Lógica corregida de estados:
-                          // - Agotado: stock = 0
-                          // - Poco Stock: 0 < stock < mínimo
-                          // - Disponible: stock >= mínimo
-                          const esAgotado = totalCantidad === 0;
-                          const esPocoStock = totalCantidad > 0 && totalCantidad < rangoMinimo;
-                          const esDisponible = totalCantidad >= rangoMinimo;
+                          // Lógica corregida de estados basada en Total Insumo Unidades:
+                          // - Agotado: totalUnidades = 0
+                          // - Poco Stock: 0 < totalUnidades < mínimo
+                          // - Disponible: totalUnidades >= mínimo
+                          const esAgotado = totalUnidades === 0;
+                          const esPocoStock = totalUnidades > 0 && totalUnidades < rangoMinimo;
+                          const esDisponible = totalUnidades >= rangoMinimo;
                           
                           return (
                             <tr 
@@ -614,19 +698,36 @@ const StockInsumosPage = () => {
                                 </span>
                               </td>
                               
-                              {/* Unidad */}
+                              {/* Unidad Presentación */}
                               <td className="py-3 px-4 text-gray-700">
-                                {insumo.fields.unidad_medida || 'Sin unidad'}
+                                <span className="text-sm">
+                                  {insumo.fields['Unidad Ingresa Insumo'] || insumo.fields.unidad_medida || 'Sin unidad'}
+                                </span>
                               </td>
                               
-                              {/* Stock Actual */}
+                              {/* Cantidad Presentación */}
+                              <td className="py-3 px-4 text-center">
+                                <span className="font-medium text-gray-800">
+                                  {cantidadPresentacion}
+                                </span>
+                              </td>
+                              
+                              {/* Total Unidades */}
                               <td className="py-3 px-4 text-center">
                                 <span className={`font-bold text-lg ${
                                   esAgotado ? 'text-red-600' :
                                   esPocoStock ? 'text-orange-600' : 'text-green-600'
                                 }`}>
-                                  {totalCantidad}
+                                  {totalUnidades}
                                 </span>
+                              </td>
+                              
+                              {/* Total Granel */}
+                              <td className="py-3 px-4 text-center">
+                                <span className="font-medium text-gray-700">
+                                  {totalGranel}
+                                </span>
+                                <div className="text-xs text-gray-500">gr/ml</div>
                               </td>
                               
                               {/* Stock Mínimo */}
@@ -656,7 +757,7 @@ const StockInsumosPage = () => {
             </div>
 
             {/* Botón de recarga */}
-            <div className="text-center mt-8">
+            <div className="max-w-7xl mx-auto text-center mt-8">
               <button
                 onClick={fetchInsumos}
                 disabled={loading}
@@ -667,6 +768,7 @@ const StockInsumosPage = () => {
             </div>
           </div>
         </div>
+      </div>
 
       {/* Modal para crear nuevo insumo */}
       {showNewInsumoForm && (
@@ -860,106 +962,147 @@ const StockInsumosPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="bg-gradient-to-r from-orange-600 to-orange-700 text-white p-6 rounded-t-xl">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center">
                 <h2 className="text-xl font-bold">📤 Descontar de Inventario</h2>
-                <button
-                  onClick={() => setShowDescontarStockForm(false)}
-                  className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition-all"
-                >
-                  <span className="text-xl">✕</span>
-                </button>
               </div>
             </div>
             
-            <form onSubmit={handleDescontarStock} className="p-6 space-y-4">
-              {/* Selector de insumo */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Insumo *
-                </label>
-                <select
-                  value={descontarData.insumoId}
-                  onChange={(e) => setDescontarData({...descontarData, insumoId: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  required
-                >
-                  <option value="">Seleccionar insumo</option>
-                  {insumos.map(insumo => {
-                    const hasName = insumo.fields.nombre && insumo.fields.nombre.trim();
-                    const stock = insumo.fields['Total Cantidad Producto'] || 0;
-                    return (
-                      <option key={insumo.id} value={insumo.id}>
-                        {hasName ? insumo.fields.nombre : `Sin nombre - ${insumo.id.slice(-6)}`} 
-                        (Stock: {stock} {insumo.fields.unidad_medida || 'unidad'})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+            <form onSubmit={handleDescontarStock} className="p-6 space-y-6">
+              {/* Información del descuento */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+                    <span>📤</span>
+                    <span>Información del Descuento</span>
+                  </h3>
+                </div>
 
-              {/* Cantidad a descontar */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cantidad a descontar *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={descontarData.cantidad}
-                  onChange={(e) => setDescontarData({...descontarData, cantidad: Number(e.target.value)})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="Cantidad a descontar"
-                  required
-                />
-              </div>
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Selector de insumo */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
+                        Insumo *
+                      </label>
+                      <select
+                        value={descontarData.insumoId}
+                        onChange={(e) => setDescontarData({...descontarData, insumoId: e.target.value})}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
+                        required
+                      >
+                        <option value="">Seleccionar insumo</option>
+                        {insumos.map(insumo => {
+                          const hasName = insumo.fields.nombre && insumo.fields.nombre.trim();
+                          const totalUnidades = insumo.fields['Total Insumo Unidades'] || 0;
+                          const unidadPresentacion = insumo.fields['Unidad Ingresa Insumo'] || insumo.fields.unidad_medida || 'unidad';
+                          return (
+                            <option key={insumo.id} value={insumo.id}>
+                              {hasName ? insumo.fields.nombre : `Sin nombre - ${insumo.id.slice(-6)}`} 
+                              (Stock: {totalUnidades} {unidadPresentacion})
+                            </option>
+                          );
+                        })}
+                      </select>
+                      
+                      {/* Mostrar información del insumo seleccionado */}
+                      {descontarData.insumoId && (
+                        <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                          <p className="text-sm text-orange-800 flex items-center space-x-2">
+                            <span>📏</span>
+                            <span>
+                              <strong>Unidad:</strong> {
+                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields['Unidad Ingresa Insumo'] ||
+                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields.unidad_medida || 
+                                'Sin unidad'
+                              }
+                            </span>
+                          </p>
+                          <p className="text-sm text-orange-800 flex items-center space-x-2 mt-1">
+                            <span>📊</span>
+                            <span>
+                              <strong>Stock Actual:</strong> {
+                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields['Total Insumo Unidades'] || 0
+                              } unidades
+                            </span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
 
-              {/* Motivo */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Motivo *
-                </label>
-                <select
-                  value={descontarData.motivo}
-                  onChange={(e) => setDescontarData({...descontarData, motivo: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  required
-                >
-                  <option value="">Seleccionar motivo</option>
-                  <option value="Uso en laboratorio">Uso en laboratorio</option>
-                  <option value="Vencimiento">Vencimiento</option>
-                  <option value="Daño/Pérdida">Daño/Pérdida</option>
-                  <option value="Transferencia">Transferencia</option>
-                  <option value="Otro">Otro</option>
-                </select>
-              </div>
+                    {/* Cantidad a descontar */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
+                        Cantidad a descontar *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={descontarData.cantidad}
+                        onChange={(e) => setDescontarData({...descontarData, cantidad: Number(e.target.value)})}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
+                        placeholder={
+                          descontarData.insumoId 
+                            ? `Cantidad en ${
+                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields['Unidad Ingresa Insumo'] ||
+                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields.unidad_medida || 
+                                'unidades'
+                              }`
+                            : "Cantidad a descontar"
+                        }
+                        required
+                      />
+                    </div>
 
-              {/* Observaciones */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Observaciones
-                </label>
-                <textarea
-                  value={descontarData.observaciones}
-                  onChange={(e) => setDescontarData({...descontarData, observaciones: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  rows={3}
-                  placeholder="Detalles adicionales..."
-                />
+                    {/* Motivo */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
+                        Motivo *
+                      </label>
+                      <select
+                        value={descontarData.motivo}
+                        onChange={(e) => setDescontarData({...descontarData, motivo: e.target.value})}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
+                        required
+                      >
+                        <option value="">Seleccionar motivo</option>
+                        <option value="Uso en laboratorio">Uso en laboratorio</option>
+                        <option value="Vencimiento">Vencimiento</option>
+                        <option value="Daño/Pérdida">Daño/Pérdida</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Otro">Otro</option>
+                      </select>
+                    </div>
+
+                    {/* Observaciones */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
+                        Observaciones
+                      </label>
+                      <textarea
+                        value={descontarData.observaciones}
+                        onChange={(e) => setDescontarData({...descontarData, observaciones: e.target.value})}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
+                        rows={3}
+                        placeholder="Detalles adicionales sobre el descuento..."
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Botones */}
-              <div className="flex space-x-3 pt-4">
+              <div className="flex space-x-3">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50"
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50 transition-colors"
                 >
                   {isSubmitting ? 'Descontando...' : 'Descontar Stock'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowDescontarStockForm(false)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  onClick={handleCancelarDescontarStock}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -974,128 +1117,231 @@ const StockInsumosPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-6 rounded-t-xl">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center">
                 <h2 className="text-xl font-bold">📥 Recibir Pedido</h2>
-                <button
-                  onClick={() => setShowRecibirPedidoForm(false)}
-                  className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition-all"
-                >
-                  <span className="text-xl">✕</span>
-                </button>
               </div>
             </div>
             
-            <form onSubmit={handleRecibirPedido} className="p-6 space-y-4">
-              {/* Selector de insumo */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Insumo *
-                </label>
-                <select
-                  value={recibirData.insumoId}
-                  onChange={(e) => setRecibirData({...recibirData, insumoId: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  required
-                >
-                  <option value="">Seleccionar insumo</option>
-                  {insumos.map(insumo => {
-                    const hasName = insumo.fields.nombre && insumo.fields.nombre.trim();
-                    const stock = insumo.fields['Total Cantidad Producto'] || 0;
-                    return (
-                      <option key={insumo.id} value={insumo.id}>
-                        {hasName ? insumo.fields.nombre : `Sin nombre - ${insumo.id.slice(-6)}`} 
-                        (Stock: {stock} {insumo.fields.unidad_medida || 'unidad'})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+            <form onSubmit={handleRecibirPedido} className="p-6 space-y-6">
+              {/* Lista de Insumos */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+                    <span>📦</span>
+                    <span>Insumos a Recibir ({recibirData.insumos.length})</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newIndex = recibirData.insumos.length;
+                      setRecibirData({
+                        ...recibirData,
+                        insumos: [
+                          ...recibirData.insumos,
+                          {
+                            insumoId: '',
+                            cantidadIngresaUnidades: '',
+                            fechaVencimiento: ''
+                          }
+                        ]
+                      });
+                      // Inicializar estados de búsqueda para el nuevo insumo
+                      setSearchInsumo({...searchInsumo, [newIndex]: ''});
+                      setDropdownOpen({...dropdownOpen, [newIndex]: false});
+                    }}
+                    className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    <span>➕</span>
+                    <span>Agregar Insumo</span>
+                  </button>
+                </div>
 
-              {/* Cantidad recibida */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cantidad recibida *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={recibirData.cantidad}
-                  onChange={(e) => setRecibirData({...recibirData, cantidad: Number(e.target.value)})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  placeholder="Cantidad recibida"
-                  required
-                />
-              </div>
+                {recibirData.insumos.map((insumo, index) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-gray-800">Insumo #{index + 1}</h4>
+                      {recibirData.insumos.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nuevosInsumos = recibirData.insumos.filter((_, i) => i !== index);
+                            setRecibirData({ ...recibirData, insumos: nuevosInsumos });
+                            
+                            // Limpiar estados de búsqueda para este índice
+                            const newSearchInsumo = {...searchInsumo};
+                            const newDropdownOpen = {...dropdownOpen};
+                            delete newSearchInsumo[index];
+                            delete newDropdownOpen[index];
+                            
+                            // Reindexar los estados restantes
+                            const reindexedSearchInsumo: {[key: number]: string} = {};
+                            const reindexedDropdownOpen: {[key: number]: boolean} = {};
+                            Object.keys(newSearchInsumo).forEach((key) => {
+                              const numKey = Number(key);
+                              if (numKey > index) {
+                                reindexedSearchInsumo[numKey - 1] = newSearchInsumo[numKey];
+                                reindexedDropdownOpen[numKey - 1] = newDropdownOpen[numKey];
+                              } else if (numKey < index) {
+                                reindexedSearchInsumo[numKey] = newSearchInsumo[numKey];
+                                reindexedDropdownOpen[numKey] = newDropdownOpen[numKey];
+                              }
+                            });
+                            
+                            setSearchInsumo(reindexedSearchInsumo);
+                            setDropdownOpen(reindexedDropdownOpen);
+                          }}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                        >
+                          <span className="text-lg">🗑️</span>
+                        </button>
+                      )}
+                    </div>
 
-              {/* Proveedor */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Proveedor *
-                </label>
-                <input
-                  type="text"
-                  value={recibirData.proveedor}
-                  onChange={(e) => setRecibirData({...recibirData, proveedor: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  placeholder="Nombre del proveedor"
-                  required
-                />
-              </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Selector de insumo */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Insumo *
+                        </label>
+                        <div className="relative">
+                          {/* Campo de búsqueda */}
+                          <input
+                            type="text"
+                            value={searchInsumo[index] || ''}
+                            onChange={(e) => {
+                              setSearchInsumo({...searchInsumo, [index]: e.target.value});
+                              setDropdownOpen({...dropdownOpen, [index]: true});
+                            }}
+                            onFocus={() => setDropdownOpen({...dropdownOpen, [index]: true})}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700"
+                            placeholder="Buscar insumo..."
+                          />
+                          
+                          {/* Dropdown con resultados */}
+                          {dropdownOpen[index] && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {filtrarInsumos(searchInsumo[index] || '').length > 0 ? (
+                                filtrarInsumos(searchInsumo[index] || '').map(insumoOption => {
+                                  const hasName = insumoOption.fields.nombre && insumoOption.fields.nombre.trim();
+                                  const unidad = insumoOption.fields['Unidad Ingresa Insumo'] || insumoOption.fields.unidad_medida || 'unidad';
+                                  const displayName = hasName ? insumoOption.fields.nombre : `Sin nombre - ${insumoOption.id.slice(-6)}`;
+                                  
+                                  return (
+                                    <div
+                                      key={insumoOption.id}
+                                      onClick={() => {
+                                        const nuevosInsumos = [...recibirData.insumos];
+                                        nuevosInsumos[index].insumoId = insumoOption.id;
+                                        setRecibirData({ ...recibirData, insumos: nuevosInsumos });
+                                        setSearchInsumo({...searchInsumo, [index]: displayName || ''});
+                                        setDropdownOpen({...dropdownOpen, [index]: false});
+                                      }}
+                                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                    >
+                                      <div className="font-medium text-gray-900">{displayName}</div>
+                                      <div className="text-sm text-gray-500">{unidad}</div>
+                                      {insumoOption.fields.categoria_insumo && (
+                                        <div className="text-xs text-gray-400">{insumoOption.fields.categoria_insumo}</div>
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="px-3 py-2 text-gray-500 text-center">
+                                  No se encontraron insumos
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Botón para cerrar dropdown */}
+                          {dropdownOpen[index] && (
+                            <div 
+                              className="fixed inset-0 z-5"
+                              onClick={() => setDropdownOpen({...dropdownOpen, [index]: false})}
+                            />
+                          )}
+                        </div>
+                        
+                        {/* Mostrar información de la unidad cuando se selecciona un insumo */}
+                        {insumo.insumoId && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-sm text-blue-800 flex items-center space-x-2">
+                              <span>📏</span>
+                              <span>
+                                <strong>Unidad:</strong> {
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] || 
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
+                                  'Sin unidad'
+                                }
+                              </span>
+                            </p>
+                          </div>
+                        )}
+                      </div>
 
-              {/* Número de factura */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Número de factura
-                </label>
-                <input
-                  type="text"
-                  value={recibirData.numeroFactura}
-                  onChange={(e) => setRecibirData({...recibirData, numeroFactura: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  placeholder="Número de factura o referencia"
-                />
-              </div>
+                      {/* Cantidad */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Cantidad *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={insumo.cantidadIngresaUnidades}
+                          onChange={(e) => {
+                            const nuevosInsumos = [...recibirData.insumos];
+                            nuevosInsumos[index].cantidadIngresaUnidades = e.target.value;
+                            setRecibirData({ ...recibirData, insumos: nuevosInsumos });
+                          }}
+                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700"
+                          placeholder={
+                            insumo.insumoId 
+                              ? `Cantidad en ${
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] || 
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
+                                  'unidades'
+                                }`
+                              : "Cantidad"
+                          }
+                          required
+                        />
+                      </div>
 
-              {/* Fecha de vencimiento */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fecha de vencimiento
-                </label>
-                <input
-                  type="date"
-                  value={recibirData.fechaVencimiento}
-                  onChange={(e) => setRecibirData({...recibirData, fechaVencimiento: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                />
-              </div>
-
-              {/* Observaciones */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Observaciones
-                </label>
-                <textarea
-                  value={recibirData.observaciones}
-                  onChange={(e) => setRecibirData({...recibirData, observaciones: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  rows={3}
-                  placeholder="Detalles adicionales del pedido..."
-                />
+                      {/* Fecha de vencimiento */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Fecha de vencimiento
+                        </label>
+                        <input
+                          type="date"
+                          value={insumo.fechaVencimiento}
+                          onChange={(e) => {
+                            const nuevosInsumos = [...recibirData.insumos];
+                            nuevosInsumos[index].fechaVencimiento = e.target.value;
+                            setRecibirData({ ...recibirData, insumos: nuevosInsumos });
+                          }}
+                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Botones */}
-              <div className="flex space-x-3 pt-4">
+              <div className="flex space-x-3">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50 transition-colors"
                 >
                   {isSubmitting ? 'Recibiendo...' : 'Recibir Pedido'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowRecibirPedidoForm(false)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  onClick={handleCancelarRecibirPedido}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -1105,6 +1351,8 @@ const StockInsumosPage = () => {
         </div>
       )}
       
+      </div>
+
       <Footer />
     </>
   );
