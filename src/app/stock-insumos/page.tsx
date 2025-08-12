@@ -43,14 +43,17 @@ const StockInsumosPage = () => {
   const [showDescontarStockForm, setShowDescontarStockForm] = useState(false);
   const [showRecibirPedidoForm, setShowRecibirPedidoForm] = useState(false);
   
-  // Formulario nuevo insumo
+  // Formulario nuevo insumo - ahora permite múltiples insumos
   const [newInsumoData, setNewInsumoData] = useState({
-    nombre: '',
-    categoria_insumo: 'Materiales y Suministros Generales',
-    unidad_medida: 'Unidad (Und)',
-    descripcion: '',
-    rangoMinimoStock: 10,
-    estado: 'Disponible'
+    insumos: [{
+      nombre: '',
+      categoria_insumo: 'Materiales y Suministros Generales',
+      unidad_medida: 'UNIDAD',
+      descripcion: '',
+      cantidadPresentacion: '',
+      cantidadInicial: '',
+      fechaVencimiento: ''
+    }]
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,10 +61,11 @@ const StockInsumosPage = () => {
 
   // Formularios para operaciones de stock (independientes)
   const [descontarData, setDescontarData] = useState({
-    insumoId: '',
-    cantidad: 0,
-    motivo: '',
-    observaciones: ''
+    insumos: [{
+      insumoId: '',  // Link to Insumos Laboratorio
+      cantidadSalidaUnidades: '',  // Cantidad Salida Unidades (como string para mejor UX)
+      entradaId: '', // Nueva propiedad para la entrada específica
+    }]
   });
 
   const [recibirData, setRecibirData] = useState({
@@ -75,6 +79,10 @@ const StockInsumosPage = () => {
   // Estados para búsqueda en dropdowns
   const [searchInsumo, setSearchInsumo] = useState<{[key: number]: string}>({});
   const [dropdownOpen, setDropdownOpen] = useState<{[key: number]: boolean}>({});
+
+  // Nuevo estado para manejar las entradas disponibles
+  const [entradasDisponibles, setEntradasDisponibles] = useState<{[key: number]: any[]}>({});
+  const [loadingEntradas, setLoadingEntradas] = useState<{[key: number]: boolean}>({});
 
   // Cantidades específicas por insumo (ya no se usa, eliminar)
   // const [cantidadesPorInsumo, setCantidadesPorInsumo] = useState<{[key: string]: number}>({});
@@ -98,17 +106,63 @@ const StockInsumosPage = () => {
     "Equipo de Protección Personal"
   ];
 
-  // Unidades de medida exactas de Airtable
+  // Unidades de medida exactas de Airtable según documentación
   const unidadesMedida = [
-    "Unidad (Und)", 
-    "Gramos (Gr)", 
-    "Mililitros (Ml)"
+    "UNIDAD",
+    "TARRO DE 500GR",
+    "TARRO DE 1KG",
+    "TARRO DE 1000L",
+    "TARRO DE 500ML",
+    "TARRO DE 250ML",
+    "TARRO DE 100ML",
+    "TARRO DE 100GR",
+    "TARRO DE 250GR",
+    "TARRO DE 200ML",
+    "TARRO DE 50ML",
+    "TARRO DE 1000ML",
+    "BOLSA DE 1KG",
+    "BOLSA DE 500GR",
+    "PAQUETE",
+    "CAJA JERINGAS 80UND",
+    "CAJA JERINGAS 40UND",
+    "TARRO DE 20000ML",
+    "TARRO DE 3800ML",
+    "TARRO DE 2000ML",
+    "CAJA 100UND",
+    "CAJA 50UND"
   ];
 
   // Cargar datos al iniciar
   useEffect(() => {
     fetchInsumos();
   }, []);
+
+  // Función para cargar entradas disponibles de un insumo específico
+  const fetchEntradasDisponibles = async (insumoId: string, index: number) => {
+    if (!insumoId) {
+      setEntradasDisponibles(prev => ({ ...prev, [index]: [] }));
+      return;
+    }
+
+    setLoadingEntradas(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const response = await fetch(`/api/entrada-insumos?insumoId=${insumoId}&disponibles=true`);
+      const data = await response.json();
+
+      if (data.success) {
+        setEntradasDisponibles(prev => ({ ...prev, [index]: data.entradas || [] }));
+      } else {
+        console.error('Error al cargar entradas:', data.error);
+        setEntradasDisponibles(prev => ({ ...prev, [index]: [] }));
+      }
+    } catch (error) {
+      console.error('Error al cargar entradas disponibles:', error);
+      setEntradasDisponibles(prev => ({ ...prev, [index]: [] }));
+    } finally {
+      setLoadingEntradas(prev => ({ ...prev, [index]: false }));
+    }
+  };
 
   const fetchInsumos = async () => {
     setLoading(true);
@@ -145,41 +199,122 @@ const StockInsumosPage = () => {
     setSubmitStatus('idle');
 
     try {
-      console.log('📝 STOCK-INSUMOS: Creando insumo con datos:', newInsumoData);
+      // Validar que hay al menos un insumo válido
+      const insumosValidos = newInsumoData.insumos.filter(
+        insumo => insumo.nombre.trim() !== '' && 
+                  insumo.cantidadPresentacion && 
+                  Number(insumo.cantidadPresentacion) > 0 &&
+                  insumo.cantidadInicial && 
+                  Number(insumo.cantidadInicial) >= 1
+      );
       
-      const response = await fetch('/api/stock-insumos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newInsumoData),
-      });
+      if (insumosValidos.length === 0) {
+        alert('Debe agregar al menos un insumo con nombre, cantidad de presentación y cantidad inicial válidos (mínimo 1).');
+        setIsSubmitting(false);
+        return;
+      }
 
-      const data = await response.json();
-      console.log('📋 STOCK-INSUMOS: Response de creación:', data);
+      console.log('📝 STOCK-INSUMOS: Creando insumos con datos:', insumosValidos);
+      console.log('👤 STOCK-INSUMOS: Usuario que registra:', user?.nombre || 'Usuario no identificado');
+      
+      // Crear cada insumo individualmente
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const insumo of insumosValidos) {
+        try {
+          // PASO 1: Crear el insumo en la tabla Insumos Laboratorio
+          console.log(`🔸 Creando insumo: ${insumo.nombre}`);
+          const insumoResponse = await fetch('/api/stock-insumos', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              nombre: insumo.nombre,
+              categoria_insumo: insumo.categoria_insumo,
+              unidad_medida: insumo.unidad_medida,
+              cantidadPresentacion: Number(insumo.cantidadPresentacion),
+              descripcion: insumo.descripcion || '',
+              realizaRegistro: user?.nombre || 'Usuario no identificado'
+            }),
+          });
 
-      if (data.success) {
+          const insumoData = await insumoResponse.json();
+          console.log(`📋 Response insumo ${insumo.nombre}:`, insumoData);
+
+          if (insumoData.success && insumoData.insumo?.id) {
+            // PASO 2: Crear la entrada inicial en la tabla Entrada Insumos
+            console.log(`🔸 Creando entrada inicial para insumo ID: ${insumoData.insumo.id}`);
+            console.log(`👤 Entrada registrada por: ${user?.nombre || 'Usuario no identificado'}`);
+            const entradaResponse = await fetch('/api/entrada-insumos', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                records: [{
+                  fields: {
+                    'Insumos Laboratorio': [insumoData.insumo.id],
+                    'Cantidad Ingresa Unidades': Number(insumo.cantidadInicial),
+                    'Realiza Registro': user?.nombre || 'Usuario no identificado',
+                    ...(insumo.fechaVencimiento && { 'fecha_vencimiento': insumo.fechaVencimiento })
+                  }
+                }]
+              }),
+            });
+
+            const entradaData = await entradaResponse.json();
+            console.log(`📋 Response entrada ${insumo.nombre}:`, entradaData);
+
+            if (entradaData.success) {
+              successCount++;
+              console.log(`✅ Insumo ${insumo.nombre} creado exitosamente con entrada inicial`);
+            } else {
+              errorCount++;
+              console.error(`❌ Error al crear entrada para ${insumo.nombre}:`, entradaData.error);
+              // El insumo se creó pero la entrada falló
+              alert(`Insumo ${insumo.nombre} creado, pero error al registrar entrada inicial: ${entradaData.error}`);
+            }
+          } else {
+            errorCount++;
+            console.error(`❌ Error al crear insumo ${insumo.nombre}:`, insumoData.error);
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ Error de red para ${insumo.nombre}:`, error);
+        }
+      }
+
+      if (successCount > 0) {
         setSubmitStatus('success');
         setNewInsumoData({
-          nombre: '',
-          categoria_insumo: 'Materiales y Suministros Generales',
-          unidad_medida: 'Unidad (Und)',
-          descripcion: '',
-          rangoMinimoStock: 10,
-          estado: 'Disponible'
+          insumos: [{
+            nombre: '',
+            categoria_insumo: 'Materiales y Suministros Generales',
+            unidad_medida: 'UNIDAD',
+            descripcion: '',
+            cantidadPresentacion: '',
+            cantidadInicial: '',
+            fechaVencimiento: ''
+          }]
         });
         setShowNewInsumoForm(false);
         fetchInsumos(); // Recargar la lista
+        
+        if (errorCount > 0) {
+          alert(`Se crearon ${successCount} insumos exitosamente, pero ${errorCount} tuvieron problemas.`);
+        } else {
+          alert(`✅ Se crearon ${successCount} insumo${successCount > 1 ? 's' : ''} exitosamente con sus entradas iniciales.`);
+        }
       } else {
         setSubmitStatus('error');
-        console.error('Error al crear insumo:', data.error);
-        console.error('Detalles del error:', data.details);
-        alert(`Error al crear insumo: ${data.error}${data.details ? '\nDetalles: ' + data.details : ''}`);
+        alert(`Error: No se pudo crear ningún insumo. ${errorCount} intentos fallaron.`);
       }
     } catch (error) {
       setSubmitStatus('error');
-      console.error('Error de red o procesamiento:', error);
-      alert(`Error de red: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      console.error('Error de procesamiento general:', error);
+      alert(`Error de procesamiento: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -187,11 +322,52 @@ const StockInsumosPage = () => {
 
   const handleDescontarStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!descontarData.insumoId || descontarData.cantidad <= 0) return;
+    
+    // Validar que hay al menos un insumo válido
+    const insumosValidos = descontarData.insumos.filter(
+      insumo => insumo.insumoId && insumo.entradaId && insumo.cantidadSalidaUnidades && Number(insumo.cantidadSalidaUnidades) > 0
+    );
+    
+    if (insumosValidos.length === 0) {
+      alert('Debe seleccionar al menos un insumo con entrada específica y cantidad válida.');
+      return;
+    }
+
+    // Validar que todos los insumos seleccionados existen
+    const insumosNoEncontrados = insumosValidos.filter(insumo => 
+      !insumos.find(ins => ins.id === insumo.insumoId)
+    );
+    
+    if (insumosNoEncontrados.length > 0) {
+      alert('Algunos insumos seleccionados no se encontraron. Por favor, actualice la página.');
+      return;
+    }
+
+    // Validar que todas las entradas seleccionadas están disponibles
+    for (let i = 0; i < insumosValidos.length; i++) {
+      const insumo = insumosValidos[i];
+      const index = descontarData.insumos.findIndex(item => item.insumoId === insumo.insumoId && item.entradaId === insumo.entradaId);
+      const entradas = entradasDisponibles[index] || [];
+      const entradaSeleccionada = entradas.find(entrada => entrada.id === insumo.entradaId);
+      
+      if (!entradaSeleccionada) {
+        alert(`La entrada seleccionada para el insumo no está disponible. Por favor, seleccione otra entrada.`);
+        return;
+      }
+      
+      const stockDisponible = entradaSeleccionada.fields['Total Cantidad Granel Actual'] || 0;
+      const cantidadSolicitada = Number(insumo.cantidadSalidaUnidades);
+      
+      if (cantidadSolicitada > stockDisponible) {
+        alert(`La cantidad solicitada (${cantidadSolicitada}) excede el stock disponible (${stockDisponible}) para la entrada seleccionada.`);
+        return;
+      }
+    }
 
     // Solicitar confirmación antes de proceder
+    const totalInsumos = insumosValidos.length;
     const confirmacion = window.confirm(
-      `¿Está seguro de descontar ${descontarData.cantidad} unidades del insumo seleccionado?\n\nEsta acción no se puede deshacer.`
+      `¿Está seguro de sacar ${totalInsumos} insumo(s) del inventario?\n\nEsta acción no se puede deshacer.`
     );
 
     if (!confirmacion) {
@@ -202,40 +378,45 @@ const StockInsumosPage = () => {
     setSubmitStatus('idle');
 
     try {
-      console.log('📤 STOCK-INSUMOS: Descontando stock:', descontarData);
+      console.log('📤 STOCK-INSUMOS: Sacando insumos del inventario:', insumosValidos);
       
-      const response = await fetch('/api/stock-insumos', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: descontarData.insumoId,
-          operacion: 'descontar',
-          cantidad: descontarData.cantidad,
-          motivo: descontarData.motivo,
-          observaciones: descontarData.observaciones
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setSubmitStatus('success');
-        setDescontarData({ 
-          insumoId: '',
-          cantidad: 0,
-          motivo: '', 
-          observaciones: '' 
+      // Crear registros en la tabla Salida Insumos de Airtable
+      for (const insumoItem of insumosValidos) {
+        const response = await fetch('/api/salida-insumos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            'Insumos Laboratorio': [insumoItem.insumoId], // Link al insumo
+            'Entrada': [insumoItem.entradaId], // Link a la entrada específica
+            'Cantidad Salida Unidades': Number(insumoItem.cantidadSalidaUnidades), // Cantidad a sacar
+            'Fecha Evento': new Date().toISOString().split('T')[0], // Fecha actual
+            'Realiza Registro': user?.nombre || 'Usuario no identificado' // Usuario actual
+          }),
         });
-        setShowDescontarStockForm(false);
-        fetchInsumos(); // Recargar la lista
-      } else {
-        console.error('Error al descontar stock:', data.error);
-        setSubmitStatus('error');
+
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || `Error al procesar insumo ${insumoItem.insumoId}`);
+        }
       }
+
+      setSubmitStatus('success');
+      setDescontarData({
+        insumos: [{
+          insumoId: '',
+          cantidadSalidaUnidades: '',
+          entradaId: '',
+        }]
+      });
+      setEntradasDisponibles({});
+      setLoadingEntradas({});
+      setShowDescontarStockForm(false);
+      fetchInsumos(); // Recargar la lista
     } catch (error) {
       setSubmitStatus('error');
-      console.error('Error:', error);
+      console.error('Error al sacar insumos del inventario:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -344,16 +525,19 @@ const StockInsumosPage = () => {
 
   const handleCancelarDescontarStock = () => {
     const confirmacion = window.confirm(
-      '¿Está seguro de cancelar el formulario de descuento?\n\nSe perderán todos los datos ingresados.'
+      '¿Está seguro de cancelar el formulario de sacar inventario?\n\nSe perderán todos los datos ingresados.'
     );
 
     if (confirmacion) {
-      setDescontarData({ 
-        insumoId: '',
-        cantidad: 0,
-        motivo: '', 
-        observaciones: '' 
+      setDescontarData({
+        insumos: [{
+          insumoId: '',
+          cantidadSalidaUnidades: '',
+          entradaId: '',
+        }]
       });
+      setEntradasDisponibles({});
+      setLoadingEntradas({});
       setShowDescontarStockForm(false);
     }
   };
@@ -541,7 +725,7 @@ const StockInsumosPage = () => {
                       className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center space-x-2"
                     >
                       <span>📤</span>
-                      <span>Descontar de Inventario</span>
+                      <span>Sacar de Inventario</span>
                     </button>
                     
                     <button
@@ -644,7 +828,6 @@ const StockInsumosPage = () => {
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Cantidad Presentación</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Unidades</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Granel</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Stock Mínimo</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Estado</th>
                         </tr>
                       </thead>
@@ -655,16 +838,13 @@ const StockInsumosPage = () => {
                           const totalUnidades = insumo.fields['Total Insumo Unidades'] || 0;
                           const totalGranel = insumo.fields['Total Insumo Granel'] || 0;
                           const cantidadPresentacion = insumo.fields['Cantidad Presentacion Insumo'] || 0;
-                          const rangoMinimo = insumo.fields['Rango Minimo Stock'] || 0;
                           const estado = insumo.fields.estado || 'Disponible';
                           
-                          // Lógica corregida de estados basada en Total Insumo Unidades:
+                          // Lógica simplificada de estados basada en Total Insumo Unidades:
                           // - Agotado: totalUnidades = 0
-                          // - Poco Stock: 0 < totalUnidades < mínimo
-                          // - Disponible: totalUnidades >= mínimo
+                          // - Disponible: totalUnidades > 0
                           const esAgotado = totalUnidades === 0;
-                          const esPocoStock = totalUnidades > 0 && totalUnidades < rangoMinimo;
-                          const esDisponible = totalUnidades >= rangoMinimo;
+                          const esDisponible = totalUnidades > 0;
                           
                           return (
                             <tr 
@@ -673,8 +853,7 @@ const StockInsumosPage = () => {
                                 index % 2 === 0 ? 'bg-white' : 'bg-gray-25'
                               } ${
                                 !hasName ? 'bg-yellow-25 hover:bg-yellow-50' : 
-                                esAgotado ? 'bg-red-25 hover:bg-red-50' :
-                                esPocoStock ? 'bg-orange-25 hover:bg-orange-50' : ''
+                                esAgotado ? 'bg-red-25 hover:bg-red-50' : ''
                               }`}
                             >
                               {/* Nombre del insumo */}
@@ -715,8 +894,7 @@ const StockInsumosPage = () => {
                               {/* Total Unidades */}
                               <td className="py-3 px-4 text-center">
                                 <span className={`font-bold text-lg ${
-                                  esAgotado ? 'text-red-600' :
-                                  esPocoStock ? 'text-orange-600' : 'text-green-600'
+                                  esAgotado ? 'text-red-600' : 'text-green-600'
                                 }`}>
                                   {totalUnidades}
                                 </span>
@@ -727,23 +905,14 @@ const StockInsumosPage = () => {
                                 <span className="font-medium text-gray-700">
                                   {totalGranel}
                                 </span>
-                                <div className="text-xs text-gray-500">gr/ml</div>
-                              </td>
-                              
-                              {/* Stock Mínimo */}
-                              <td className="py-3 px-4 text-center text-gray-600">
-                                {rangoMinimo}
                               </td>
                               
                               {/* Estado */}
                               <td className="py-3 px-4 text-center">
                                 <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                                  esAgotado ? 'bg-red-100 text-red-800' :
-                                  esPocoStock ? 'bg-orange-100 text-orange-800' :
-                                  'bg-green-100 text-green-800'
+                                  esAgotado ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                                 }`}>
-                                  {esAgotado ? '🔴 Agotado' :
-                                   esPocoStock ? '🟡 Poco Stock' : '🟢 Disponible'}
+                                  {esAgotado ? '� Agotado' : '🟢 Disponible'}
                                 </span>
                               </td>
                             </tr>
@@ -772,183 +941,356 @@ const StockInsumosPage = () => {
 
       {/* Modal para crear nuevo insumo */}
       {showNewInsumoForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto">
             {/* Header del modal */}
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-8 rounded-t-xl">
-              <div className="flex items-center space-x-3">
-                <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-                  <span className="text-3xl">📦</span>
-                </div>
-                <div>
-                  <h2 className="text-3xl font-bold">Agregar Nuevo Insumo</h2>
-                  <p className="text-green-100 mt-1">Complete la información del insumo a registrar</p>
-                </div>
+            <div className="bg-emerald-600 text-white p-6 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center space-x-2">
+                  <span>📦</span>
+                  <span>Registrar Nuevo Insumo</span>
+                </h2>
+                
+                {/* Botón de cerrar */}
+                <button
+                  onClick={() => setShowNewInsumoForm(false)}
+                  className="text-white hover:text-gray-200 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             </div>
             
-            <form onSubmit={handleCreateInsumo} className="p-8 space-y-6">
-              {/* Nombre del insumo */}
-              <div>
-                <label className="block text-lg font-semibold text-gray-800 mb-3">
-                  <span className="flex items-center space-x-2">
-                    <span>🏷️</span>
-                    <span>Nombre del Insumo</span>
-                    <span className="text-red-500">*</span>
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newInsumoData.nombre}
-                  onChange={(e) => setNewInsumoData({...newInsumoData, nombre: e.target.value})}
-                  className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  placeholder="Ej: Agua destilada 1L, Guantes de nitrilo, etc."
-                />
-              </div>
-
-              {/* Categoría */}
-              <div>
-                <label className="block text-lg font-semibold text-gray-800 mb-3">
-                  <span className="flex items-center space-x-2">
-                    <span>📂</span>
-                    <span>Categoría</span>
-                    <span className="text-red-500">*</span>
-                  </span>
-                </label>
-                <select
-                  required
-                  value={newInsumoData.categoria_insumo}
-                  onChange={(e) => setNewInsumoData({...newInsumoData, categoria_insumo: e.target.value})}
-                  className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                >
-                  {categorias.map(categoria => (
-                    <option key={categoria} value={categoria}>{categoria}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Unidad de medida */}
-              <div>
-                <label className="block text-lg font-semibold text-gray-800 mb-3">
-                  <span className="flex items-center space-x-2">
-                    <span>⚖️</span>
-                    <span>Unidad de Medida</span>
-                    <span className="text-red-500">*</span>
-                  </span>
-                </label>
-                <select
-                  required
-                  value={newInsumoData.unidad_medida}
-                  onChange={(e) => setNewInsumoData({...newInsumoData, unidad_medida: e.target.value})}
-                  className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                >
-                  {unidadesMedida.map(unidad => (
-                    <option key={unidad} value={unidad}>{unidad}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Descripción */}
-              <div>
-                <label className="block text-lg font-semibold text-gray-800 mb-3">
-                  <span className="flex items-center space-x-2">
-                    <span>📝</span>
-                    <span>Descripción</span>
-                    <span className="text-gray-400">(Opcional)</span>
-                  </span>
-                </label>
-                <div className="relative">
-                  <textarea
-                    rows={4}
-                    value={newInsumoData.descripcion}
-                    onChange={(e) => setNewInsumoData({...newInsumoData, descripcion: e.target.value})}
-                    className="w-full px-4 py-3 pr-12 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                    placeholder="Descripción detallada del insumo, especificaciones, uso, etc."
-                  />
-                  <div className="absolute top-3 right-3">
-                    <AudioRecorderSimple
-                      currentText={newInsumoData.descripcion || ''}
-                      onTextChange={(text) => setNewInsumoData({...newInsumoData, descripcion: text})}
-                      onTranscriptionComplete={(text) => {
-                        // Si ya hay texto, agregar al final
-                        const currentText = newInsumoData.descripcion || '';
-                        const newText = currentText ? `${currentText} ${text}` : text;
-                        setNewInsumoData({...newInsumoData, descripcion: newText});
-                      }}
-                    />
-                  </div>
+            <form onSubmit={handleCreateInsumo} className="p-6 space-y-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+                    <span>📦</span>
+                    <span>Insumos a Registrar ({newInsumoData.insumos.length})</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewInsumoData({
+                        ...newInsumoData,
+                        insumos: [...newInsumoData.insumos, {
+                          nombre: '',
+                          categoria_insumo: 'Materiales y Suministros Generales',
+                          unidad_medida: 'UNIDAD',
+                          descripcion: '',
+                          cantidadPresentacion: '',
+                          cantidadInicial: '',
+                          fechaVencimiento: ''
+                        }]
+                      });
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg transform hover:scale-105"
+                  >
+                    <span className="text-lg">➕</span>
+                    <span>Agregar Otro Insumo</span>
+                  </button>
                 </div>
+
+                {/* Lista de insumos */}
+                {newInsumoData.insumos.map((insumo, index) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 mb-3 last:mb-0 shadow-sm">
+                    {/* Header del insumo */}
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                        <span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full text-sm font-bold">
+                          #{index + 1}
+                        </span>
+                        <span>Insumo {index + 1}</span>
+                      </h4>
+                      {newInsumoData.insumos.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nuevosInsumos = newInsumoData.insumos.filter((_, i) => i !== index);
+                            setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                          }}
+                          className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-1"
+                        >
+                          <span>🗑️</span>
+                          <span>Eliminar</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Grid de campos para cada insumo */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      
+                      {/* Columna izquierda */}
+                      <div className="space-y-3">
+                        {/* Nombre del insumo */}
+                        <div className="group">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">🏷️</span>
+                              <span>Nombre del Insumo</span>
+                              <span className="text-red-500">*</span>
+                            </div>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={insumo.nombre}
+                            onChange={(e) => {
+                              const nuevosInsumos = [...newInsumoData.insumos];
+                              nuevosInsumos[index] = {...nuevosInsumos[index], nombre: e.target.value};
+                              setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                            }}
+                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white placeholder-gray-500 text-gray-700"
+                            placeholder="Ej: Agua destilada 1L, Guantes de nitrilo, Medio de cultivo..."
+                          />
+                        </div>
+
+                        {/* Categoría */}
+                        <div className="group">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">📂</span>
+                              <span>Categoría</span>
+                              <span className="text-red-500">*</span>
+                            </div>
+                          </label>
+                          <select
+                            required
+                            value={insumo.categoria_insumo}
+                            onChange={(e) => {
+                              const nuevosInsumos = [...newInsumoData.insumos];
+                              nuevosInsumos[index] = {...nuevosInsumos[index], categoria_insumo: e.target.value};
+                              setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                            }}
+                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white appearance-none cursor-pointer placeholder-gray-500 text-gray-700"
+                          >
+                            {categorias.map(categoria => (
+                              <option key={categoria} value={categoria} className="text-gray-700">{categoria}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Unidad de medida */}
+                        <div className="group">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">⚖️</span>
+                              <span>Unidad de Medida</span>
+                              <span className="text-red-500">*</span>
+                            </div>
+                          </label>
+                          <select
+                            required
+                            value={insumo.unidad_medida}
+                            onChange={(e) => {
+                              const nuevosInsumos = [...newInsumoData.insumos];
+                              nuevosInsumos[index] = {...nuevosInsumos[index], unidad_medida: e.target.value};
+                              setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                            }}
+                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white appearance-none cursor-pointer placeholder-gray-500 text-gray-700"
+                          >
+                            {unidadesMedida.map(unidad => (
+                              <option key={unidad} value={unidad} className="text-gray-700">{unidad}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Columna derecha */}
+                      <div className="space-y-3">
+                        {/* Descripción */}
+                        <div className="group">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">📝</span>
+                              <span>Descripción</span>
+                              <span className="text-gray-400 text-sm font-normal">(Opcional)</span>
+                            </div>
+                          </label>
+                          <div className="relative">
+                            <textarea
+                              rows={3}
+                              value={insumo.descripcion}
+                              onChange={(e) => {
+                                const nuevosInsumos = [...newInsumoData.insumos];
+                                nuevosInsumos[index] = {...nuevosInsumos[index], descripcion: e.target.value};
+                                setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                              }}
+                              className="w-full px-3 py-2 pr-12 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white resize-none placeholder-gray-500 text-gray-700"
+                              placeholder="Especificaciones técnicas, marca, modelo, uso recomendado..."
+                            />
+                            <div className="absolute top-3 right-3">
+                              <AudioRecorderSimple
+                                currentText={insumo.descripcion || ''}
+                                onTextChange={(text) => {
+                                  const nuevosInsumos = [...newInsumoData.insumos];
+                                  nuevosInsumos[index] = {...nuevosInsumos[index], descripcion: text};
+                                  setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                                }}
+                                onTranscriptionComplete={(text) => {
+                                  const currentText = insumo.descripcion || '';
+                                  const newText = currentText ? `${currentText} ${text}` : text;
+                                  const nuevosInsumos = [...newInsumoData.insumos];
+                                  nuevosInsumos[index] = {...nuevosInsumos[index], descripcion: newText};
+                                  setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Cantidad de Presentación */}
+                        <div className="group">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">📦</span>
+                              <span>Cantidad de Presentación</span>
+                              <span className="text-red-500">*</span>
+                            </div>
+                          </label>
+                          <input
+                            type="number"
+                            min="0.1"
+                            step="0.1"
+                            required
+                            value={insumo.cantidadPresentacion}
+                            onChange={(e) => {
+                              const nuevosInsumos = [...newInsumoData.insumos];
+                              nuevosInsumos[index] = {...nuevosInsumos[index], cantidadPresentacion: e.target.value};
+                              setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                            }}
+                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white placeholder-gray-500 text-gray-700"
+                            placeholder="Ej: 500 (para TARRO DE 500GR)"
+                          />
+                        </div>
+
+                        {/* Cantidad Inicial */}
+                        <div className="group">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">📊</span>
+                              <span>Cantidad Inicial</span>
+                              <span className="text-red-500">*</span>
+                            </div>
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            required
+                            value={insumo.cantidadInicial}
+                            onChange={(e) => {
+                              const nuevosInsumos = [...newInsumoData.insumos];
+                              nuevosInsumos[index] = {...nuevosInsumos[index], cantidadInicial: e.target.value};
+                              setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                            }}
+                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white placeholder-gray-500 text-gray-700"
+                            placeholder="Mínimo 1 unidad para ingresar al inventario"
+                          />
+                        </div>
+
+                        {/* Fecha de Vencimiento */}
+                        <div className="group">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">📅</span>
+                              <span>Fecha de Vencimiento</span>
+                              <span className="text-gray-400 text-sm font-normal">(Opcional)</span>
+                            </div>
+                          </label>
+                          <input
+                            type="date"
+                            value={insumo.fechaVencimiento}
+                            onChange={(e) => {
+                              const nuevosInsumos = [...newInsumoData.insumos];
+                              nuevosInsumos[index] = {...nuevosInsumos[index], fechaVencimiento: e.target.value};
+                              setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
+                            }}
+                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white placeholder-gray-500 text-gray-700"
+                          />
+                        </div>
+
+                        {/* Card de información para el insumo */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <h5 className="text-xs font-semibold text-blue-800 mb-1 flex items-center space-x-1">
+                            <span className="text-sm">💡</span>
+                            <span>Información</span>
+                          </h5>
+                          <ul className="space-y-1 text-blue-700 text-xs">
+                            <li className="flex items-start space-x-1">
+                              <span className="text-blue-500 font-bold">•</span>
+                              <span>Si especifica cantidad inicial, se creará automáticamente la entrada de inventario</span>
+                            </li>
+                            <li className="flex items-start space-x-1">
+                              <span className="text-blue-500 font-bold">•</span>
+                              <span>La cantidad de presentación se usa para cálculos en granel</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {/* Stock mínimo */}
-              <div>
-                <label className="block text-lg font-semibold text-gray-800 mb-3">
-                  <span className="flex items-center space-x-2">
-                    <span>📊</span>
-                    <span>Stock Mínimo</span>
-                    <span className="text-red-500">*</span>
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={newInsumoData.rangoMinimoStock}
-                  onChange={(e) => setNewInsumoData({...newInsumoData, rangoMinimoStock: parseInt(e.target.value)})}
-                  className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  placeholder="Ej: 10"
-                />
-                <p className="text-gray-600 text-sm mt-2">
-                  Cantidad mínima antes de mostrar alerta de poco stock
-                </p>
-              </div>
-
-              {/* Botones */}
+              {/* Botones mejorados */}
               <div className="flex gap-4 pt-6 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => setShowNewInsumoForm(false)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-4 rounded-lg text-lg font-semibold transition-all duration-200 border-2 border-gray-300"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-4 rounded-xl text-lg font-semibold transition-all duration-200 border-2 border-gray-200 hover:border-gray-300 flex items-center justify-center space-x-2"
                 >
-                  Cancelar
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span>Cancelar</span>
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-4 rounded-lg text-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                  className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white px-6 py-4 rounded-xl text-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
                 >
                   {isSubmitting ? (
-                    <span className="flex items-center justify-center space-x-2">
-                      <span className="animate-spin">⏳</span>
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                       <span>Creando...</span>
-                    </span>
+                    </>
                   ) : (
-                    <span className="flex items-center justify-center space-x-2">
-                      <span>📦</span>
-                      <span>Crear Insumo</span>
-                    </span>
+                    <>
+                      <span className="text-xl">📦</span>
+                      <span>Crear {newInsumoData.insumos.length} Insumo{newInsumoData.insumos.length > 1 ? 's' : ''}</span>
+                    </>
                   )}
                 </button>
               </div>
               
-              {/* Mensajes de estado */}
+              {/* Mensajes de estado mejorados */}
               {submitStatus === 'success' && (
-                <div className="bg-green-50 border-2 border-green-200 text-green-800 px-6 py-4 rounded-lg flex items-center space-x-3">
-                  <span className="text-2xl">✅</span>
+                <div className="mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 text-green-800 px-6 py-4 rounded-xl flex items-center space-x-3 animate-in slide-in-from-top-2 duration-300">
+                  <div className="bg-green-200 p-2 rounded-full">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
                   <div>
-                    <p className="font-semibold">¡Insumo creado exitosamente!</p>
-                    <p className="text-sm">El insumo ha sido agregado al inventario.</p>
+                    <p className="font-semibold text-lg">¡Insumo creado exitosamente!</p>
+                    <p className="text-sm text-green-700">El insumo ha sido agregado al inventario y está listo para usar.</p>
                   </div>
                 </div>
               )}
               
               {submitStatus === 'error' && (
-                <div className="bg-red-50 border-2 border-red-200 text-red-800 px-6 py-4 rounded-lg flex items-center space-x-3">
-                  <span className="text-2xl">❌</span>
+                <div className="mt-6 bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 text-red-800 px-6 py-4 rounded-xl flex items-center space-x-3 animate-in slide-in-from-top-2 duration-300">
+                  <div className="bg-red-200 p-2 rounded-full">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
                   <div>
-                    <p className="font-semibold">Error al crear el insumo</p>
-                    <p className="text-sm">Por favor, revise los datos e intente nuevamente.</p>
+                    <p className="font-semibold text-lg">Error al crear el insumo</p>
+                    <p className="text-sm text-red-700">Por favor, revise los datos e intente nuevamente.</p>
                   </div>
                 </div>
               )}
@@ -957,137 +1299,284 @@ const StockInsumosPage = () => {
         </div>
       )}
 
-      {/* Modal para descontar de inventario */}
+      {/* Modal para sacar de inventario */}
       {showDescontarStockForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="bg-gradient-to-r from-orange-600 to-orange-700 text-white p-6 rounded-t-xl">
               <div className="flex items-center">
-                <h2 className="text-xl font-bold">📤 Descontar de Inventario</h2>
+                <h2 className="text-xl font-bold">📤 Sacar de Inventario</h2>
               </div>
             </div>
             
             <form onSubmit={handleDescontarStock} className="p-6 space-y-6">
-              {/* Información del descuento */}
+              {/* Lista de Insumos */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
                     <span>📤</span>
-                    <span>Información del Descuento</span>
+                    <span>Insumos a Sacar ({descontarData.insumos.length})</span>
                   </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDescontarData({
+                        ...descontarData,
+                        insumos: [
+                          ...descontarData.insumos,
+                          {
+                            insumoId: '',
+                            cantidadSalidaUnidades: '',
+                            entradaId: '',
+                          }
+                        ]
+                      });
+                    }}
+                    className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    <span>➕</span>
+                    <span>Agregar Insumo</span>
+                  </button>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Selector de insumo */}
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">
-                        Insumo *
-                      </label>
-                      <select
-                        value={descontarData.insumoId}
-                        onChange={(e) => setDescontarData({...descontarData, insumoId: e.target.value})}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
-                        required
-                      >
-                        <option value="">Seleccionar insumo</option>
-                        {insumos.map(insumo => {
-                          const hasName = insumo.fields.nombre && insumo.fields.nombre.trim();
-                          const totalUnidades = insumo.fields['Total Insumo Unidades'] || 0;
-                          const unidadPresentacion = insumo.fields['Unidad Ingresa Insumo'] || insumo.fields.unidad_medida || 'unidad';
-                          return (
-                            <option key={insumo.id} value={insumo.id}>
-                              {hasName ? insumo.fields.nombre : `Sin nombre - ${insumo.id.slice(-6)}`} 
-                              (Stock: {totalUnidades} {unidadPresentacion})
-                            </option>
-                          );
-                        })}
-                      </select>
-                      
-                      {/* Mostrar información del insumo seleccionado */}
-                      {descontarData.insumoId && (
-                        <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
-                          <p className="text-sm text-orange-800 flex items-center space-x-2">
-                            <span>📏</span>
-                            <span>
-                              <strong>Unidad:</strong> {
-                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields['Unidad Ingresa Insumo'] ||
-                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields.unidad_medida || 
-                                'Sin unidad'
+                {descontarData.insumos.map((insumo, index) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-gray-800">Insumo #{index + 1}</h4>
+                      {descontarData.insumos.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nuevosInsumos = descontarData.insumos.filter((_, i) => i !== index);
+                            setDescontarData({ ...descontarData, insumos: nuevosInsumos });
+                            
+                            // Limpiar estados de entradas para este índice
+                            const newEntradasDisponibles = {...entradasDisponibles};
+                            const newLoadingEntradas = {...loadingEntradas};
+                            delete newEntradasDisponibles[index];
+                            delete newLoadingEntradas[index];
+                            
+                            // Reindexar los estados restantes
+                            const reindexedEntradas: {[key: number]: any[]} = {};
+                            const reindexedLoading: {[key: number]: boolean} = {};
+                            Object.keys(newEntradasDisponibles).forEach((key) => {
+                              const numKey = Number(key);
+                              if (numKey > index) {
+                                reindexedEntradas[numKey - 1] = newEntradasDisponibles[numKey];
+                                reindexedLoading[numKey - 1] = newLoadingEntradas[numKey];
+                              } else if (numKey < index) {
+                                reindexedEntradas[numKey] = newEntradasDisponibles[numKey];
+                                reindexedLoading[numKey] = newLoadingEntradas[numKey];
                               }
-                            </span>
-                          </p>
-                          <p className="text-sm text-orange-800 flex items-center space-x-2 mt-1">
-                            <span>📊</span>
-                            <span>
-                              <strong>Stock Actual:</strong> {
-                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields['Total Insumo Unidades'] || 0
-                              } unidades
-                            </span>
-                          </p>
-                        </div>
+                            });
+                            
+                            setEntradasDisponibles(reindexedEntradas);
+                            setLoadingEntradas(reindexedLoading);
+                          }}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                        >
+                          <span className="text-lg">🗑️</span>
+                        </button>
                       )}
                     </div>
 
-                    {/* Cantidad a descontar */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">
-                        Cantidad a descontar *
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={descontarData.cantidad}
-                        onChange={(e) => setDescontarData({...descontarData, cantidad: Number(e.target.value)})}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
-                        placeholder={
-                          descontarData.insumoId 
-                            ? `Cantidad en ${
-                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields['Unidad Ingresa Insumo'] ||
-                                insumos.find(ins => ins.id === descontarData.insumoId)?.fields.unidad_medida || 
-                                'unidades'
-                              }`
-                            : "Cantidad a descontar"
-                        }
-                        required
-                      />
-                    </div>
+                    <div className="space-y-4">
+                      {/* Selector de insumo */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Insumo *
+                        </label>
+                        <select
+                          value={insumo.insumoId}
+                          onChange={(e) => {
+                            const nuevosInsumos = [...descontarData.insumos];
+                            nuevosInsumos[index].insumoId = e.target.value;
+                            nuevosInsumos[index].entradaId = ''; // Reset entrada selection
+                            setDescontarData({ ...descontarData, insumos: nuevosInsumos });
+                            
+                            // Cargar entradas disponibles para este insumo
+                            fetchEntradasDisponibles(e.target.value, index);
+                          }}
+                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
+                          required
+                        >
+                          <option value="">Seleccionar insumo</option>
+                          {insumos.map(insumoOption => {
+                            const hasName = insumoOption.fields.nombre && insumoOption.fields.nombre.trim();
+                            const totalUnidades = insumoOption.fields['Total Insumo Unidades'] || 0;
+                            const unidadPresentacion = insumoOption.fields['Unidad Ingresa Insumo'] || insumoOption.fields.unidad_medida || 'unidad';
+                            return (
+                              <option key={insumoOption.id} value={insumoOption.id}>
+                                {hasName ? insumoOption.fields.nombre : `Sin nombre - ${insumoOption.id.slice(-6)}`} 
+                                (Stock: {totalUnidades} {unidadPresentacion})
+                              </option>
+                            );
+                          })}
+                        </select>
+                        
+                        {/* Mostrar información del insumo seleccionado */}
+                        {insumo.insumoId && (
+                          <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                            <p className="text-sm text-orange-800 flex items-center space-x-2">
+                              <span>📏</span>
+                              <span>
+                                <strong>Unidad:</strong> {
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] ||
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
+                                  'Sin unidad'
+                                }
+                              </span>
+                            </p>
+                            <p className="text-sm text-orange-800 flex items-center space-x-2 mt-1">
+                              <span>📊</span>
+                              <span>
+                                <strong>Stock Actual:</strong> {
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields['Total Insumo Unidades'] || 0
+                                } unidades
+                              </span>
+                            </p>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Motivo */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">
-                        Motivo *
-                      </label>
-                      <select
-                        value={descontarData.motivo}
-                        onChange={(e) => setDescontarData({...descontarData, motivo: e.target.value})}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
-                        required
-                      >
-                        <option value="">Seleccionar motivo</option>
-                        <option value="Uso en laboratorio">Uso en laboratorio</option>
-                        <option value="Vencimiento">Vencimiento</option>
-                        <option value="Daño/Pérdida">Daño/Pérdida</option>
-                        <option value="Transferencia">Transferencia</option>
-                        <option value="Otro">Otro</option>
-                      </select>
-                    </div>
+                      {/* Selector de entrada específica */}
+                      {insumo.insumoId && (
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-800 mb-2">
+                            Seleccionar Lote/Entrada *
+                          </label>
+                          
+                          {loadingEntradas[index] ? (
+                            <div className="flex items-center justify-center py-3">
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
+                              <span className="ml-2 text-sm text-gray-600">Cargando entradas...</span>
+                            </div>
+                          ) : (
+                            <select
+                              value={insumo.entradaId}
+                              onChange={(e) => {
+                                const nuevosInsumos = [...descontarData.insumos];
+                                nuevosInsumos[index].entradaId = e.target.value;
+                                setDescontarData({ ...descontarData, insumos: nuevosInsumos });
+                              }}
+                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
+                              required
+                            >
+                              <option value="">Seleccionar entrada</option>
+                              {(entradasDisponibles[index] || []).map(entrada => {
+                                const fechaIngreso = entrada.fields.fecha_ingreso ? new Date(entrada.fields.fecha_ingreso).toLocaleDateString() : 'Sin fecha';
+                                const fechaVencimiento = entrada.fields.fecha_vencimiento ? new Date(entrada.fields.fecha_vencimiento).toLocaleDateString() : 'No aplica';
+                                const stockDisponible = entrada.fields['Total Cantidad Granel Actual'] || 0;
+                                const estadoVencimiento = entrada.fields.estado_vencimiento_producto || 'Sin estado';
+                                
+                                return (
+                                  <option key={entrada.id} value={entrada.id}>
+                                    📅 {fechaIngreso} | 📊 {stockDisponible} disponible | 📆 Vence: {fechaVencimiento} | {estadoVencimiento}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          )}
+                          
+                          {/* Mostrar información detallada de la entrada seleccionada */}
+                          {insumo.entradaId && entradasDisponibles[index] && (
+                            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              {(() => {
+                                const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
+                                if (!entradaSeleccionada) return null;
+                                
+                                const fechaIngreso = entradaSeleccionada.fields.fecha_ingreso ? new Date(entradaSeleccionada.fields.fecha_ingreso).toLocaleDateString() : 'Sin fecha';
+                                const fechaVencimiento = entradaSeleccionada.fields.fecha_vencimiento ? new Date(entradaSeleccionada.fields.fecha_vencimiento).toLocaleDateString() : 'No aplica';
+                                const stockDisponible = entradaSeleccionada.fields['Total Cantidad Granel Actual'] || 0;
+                                const estadoVencimiento = entradaSeleccionada.fields.estado_vencimiento_producto || 'Sin estado';
+                                
+                                const getEstadoColor = (estado: string) => {
+                                  if (estado.includes('Producto vigente')) return 'text-green-700';
+                                  if (estado.includes('Próximo a vencer')) return 'text-yellow-700';
+                                  if (estado.includes('Urgente utilizar')) return 'text-orange-700';
+                                  if (estado.includes('Producto vencido')) return 'text-red-700';
+                                  return 'text-gray-700';
+                                };
+                                
+                                return (
+                                  <div className="space-y-2">
+                                    <p className="text-sm text-blue-800 flex items-center space-x-2">
+                                      <span>📅</span>
+                                      <span><strong>Fecha de ingreso:</strong> {fechaIngreso}</span>
+                                    </p>
+                                    <p className="text-sm text-blue-800 flex items-center space-x-2">
+                                      <span>📊</span>
+                                      <span><strong>Stock disponible:</strong> {stockDisponible} unidades</span>
+                                    </p>
+                                    <p className="text-sm text-blue-800 flex items-center space-x-2">
+                                      <span>📆</span>
+                                      <span><strong>Fecha de vencimiento:</strong> {fechaVencimiento}</span>
+                                    </p>
+                                    <p className={`text-sm flex items-center space-x-2 ${getEstadoColor(estadoVencimiento)}`}>
+                                      <span>⚠️</span>
+                                      <span><strong>Estado:</strong> {estadoVencimiento}</span>
+                                    </p>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+                          
+                          {!loadingEntradas[index] && (!entradasDisponibles[index] || entradasDisponibles[index].length === 0) && (
+                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                              <p className="text-sm text-red-800 flex items-center space-x-2">
+                                <span>⚠️</span>
+                                <span>No hay entradas disponibles para este insumo</span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                    {/* Observaciones */}
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">
-                        Observaciones
-                      </label>
-                      <textarea
-                        value={descontarData.observaciones}
-                        onChange={(e) => setDescontarData({...descontarData, observaciones: e.target.value})}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
-                        rows={3}
-                        placeholder="Detalles adicionales sobre el descuento..."
-                      />
+                      {/* Cantidad a sacar */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Cantidad a sacar *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={(() => {
+                            if (!insumo.entradaId || !entradasDisponibles[index]) return undefined;
+                            const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
+                            return entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || undefined;
+                          })()}
+                          value={insumo.cantidadSalidaUnidades}
+                          onChange={(e) => {
+                            const nuevosInsumos = [...descontarData.insumos];
+                            nuevosInsumos[index].cantidadSalidaUnidades = e.target.value;
+                            setDescontarData({ ...descontarData, insumos: nuevosInsumos });
+                          }}
+                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700 placeholder:text-gray-700 placeholder:font-semibold"
+                          placeholder={
+                            insumo.entradaId && entradasDisponibles[index]
+                              ? (() => {
+                                  const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
+                                  const stockDisponible = entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || 0;
+                                  const unidad = insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] ||
+                                                insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
+                                                'unidades';
+                                  return `Máximo ${stockDisponible} ${unidad}`;
+                                })()
+                              : insumo.insumoId 
+                                ? `En ${
+                                    insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] ||
+                                    insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
+                                    'unidades'
+                                  }`
+                                : "Cantidad"
+                          }
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
 
               {/* Botones */}
@@ -1097,7 +1586,7 @@ const StockInsumosPage = () => {
                   disabled={isSubmitting}
                   className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50 transition-colors"
                 >
-                  {isSubmitting ? 'Descontando...' : 'Descontar Stock'}
+                  {isSubmitting ? 'Sacando...' : 'Sacar de Inventario'}
                 </button>
                 <button
                   type="button"
@@ -1213,7 +1702,7 @@ const StockInsumosPage = () => {
                               setDropdownOpen({...dropdownOpen, [index]: true});
                             }}
                             onFocus={() => setDropdownOpen({...dropdownOpen, [index]: true})}
-                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700"
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700 placeholder:text-gray-700 placeholder:font-semibold"
                             placeholder="Buscar insumo..."
                           />
                           
@@ -1294,7 +1783,7 @@ const StockInsumosPage = () => {
                             nuevosInsumos[index].cantidadIngresaUnidades = e.target.value;
                             setRecibirData({ ...recibirData, insumos: nuevosInsumos });
                           }}
-                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700"
+                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700 placeholder:text-gray-500 placeholder:font-medium"
                           placeholder={
                             insumo.insumoId 
                               ? `Cantidad en ${
@@ -1321,7 +1810,7 @@ const StockInsumosPage = () => {
                             nuevosInsumos[index].fechaVencimiento = e.target.value;
                             setRecibirData({ ...recibirData, insumos: nuevosInsumos });
                           }}
-                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700"
+                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-700 placeholder-gray-500"
                         />
                       </div>
                     </div>

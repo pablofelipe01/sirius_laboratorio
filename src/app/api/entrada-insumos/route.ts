@@ -120,18 +120,54 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const maxRecords = searchParams.get('maxRecords') || '100';
-    const view = searchParams.get('view') || 'Grid%20view';
+    const insumoId = searchParams.get('insumoId');
+    const soloDisponibles = searchParams.get('disponibles') === 'true';
 
-    console.log('📋 ENTRADA-INSUMOS API: Obteniendo registros...');
+    console.log('📋 ENTRADA-INSUMOS API: Parámetros recibidos:', {
+      insumoId,
+      soloDisponibles,
+      maxRecords
+    });
+
+    // Construir la URL base
+    let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ENTRADA_INSUMOS}`;
+    const queryParams = new URLSearchParams();
     
-    const airtableResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ENTRADA_INSUMOS}?maxRecords=${maxRecords}&view=${view}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-        },
-      }
-    );
+    // Agregar maxRecords
+    queryParams.append('maxRecords', maxRecords);
+
+    // Construir filtro
+    let filterFormula = '';
+    
+    if (insumoId && soloDisponibles) {
+      // Filtrar por insumo específico Y stock disponible > 0
+      filterFormula = `AND(FIND('${insumoId}', CONCATENATE({Insumos Laboratorio})), {Total Cantidad Granel Actual} > 0)`;
+    } else if (insumoId) {
+      // Solo filtrar por insumo específico
+      filterFormula = `FIND('${insumoId}', CONCATENATE({Insumos Laboratorio}))`;
+    } else if (soloDisponibles) {
+      // Solo filtrar por stock disponible > 0
+      filterFormula = `{Total Cantidad Granel Actual} > 0`;
+    }
+    
+    if (filterFormula) {
+      queryParams.append('filterByFormula', filterFormula);
+    }
+    
+    // Ordenar por fecha de vencimiento (próximos a vencer primero para FIFO)
+    queryParams.append('sort[0][field]', 'fecha_vencimiento');
+    queryParams.append('sort[0][direction]', 'asc');
+
+    url += '?' + queryParams.toString();
+    
+    console.log('🔗 ENTRADA-INSUMOS API: URL construida:', url);
+    
+    const airtableResponse = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (!airtableResponse.ok) {
       const errorText = await airtableResponse.text();
@@ -148,7 +184,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       entradas: airtableData.records || [],
-      count: airtableData.records?.length || 0
+      count: airtableData.records?.length || 0,
+      filtros: {
+        insumoId,
+        soloDisponibles
+      }
     });
 
   } catch (error) {

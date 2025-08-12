@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
     const insumoData = await request.json();
     
     console.log('📋 API STOCK-INSUMOS POST: Datos recibidos:', insumoData);
+    console.log('👤 API STOCK-INSUMOS POST: Registrado por:', insumoData.realizaRegistro || 'No especificado');
 
     const tableId = process.env.AIRTABLE_TABLE_INSUMOS_LABORATORIO;
     
@@ -138,25 +139,79 @@ export async function POST(request: NextRequest) {
       throw new Error('El nombre del insumo es requerido');
     }
 
-    // Mapear los campos al formato de Airtable usando nombres exactos
-    const fieldsToCreate = {
-      'nombre': insumoData.nombre.trim(),
-      'categoria_insumo': insumoData.categoria_insumo || 'Materiales y Suministros Generales',
-      'unidad_medida': insumoData.unidad_medida || 'Unidad (Und)',
-      // 'descripcion': No enviar este campo ya que parece ser autogenerado por Airtable
-      'Rango Minimo Stock': insumoData.rangoMinimoStock || 10,
-      'estado': insumoData.estado || 'Disponible'
-      // 'Total Cantidad Producto': Campo computado, no se puede enviar
+    // Mapear los campos al formato de Airtable usando field IDs exactos de la documentación
+    const fieldsToCreate: any = {
+      [process.env.AIRTABLE_FIELD_INSUMOS_NOMBRE || 'nombre']: insumoData.nombre.trim(),
+      [process.env.AIRTABLE_FIELD_INSUMOS_CATEGORIA_INSUMO || 'categoria_insumo']: insumoData.categoria_insumo || 'Materiales y Suministros Generales',
+      [process.env.AIRTABLE_FIELD_INSUMOS_UNIDAD_INGRESA_INSUMO || 'Unidad Ingresa Insumo']: insumoData.unidad_medida || 'UNIDAD',
     };
+
+    // Agregar campo Realiza Registro si está definido
+    if (insumoData.realizaRegistro) {
+      fieldsToCreate[process.env.AIRTABLE_FIELD_INSUMOS_REALIZA_REGISTRO || 'Realiza Registro'] = insumoData.realizaRegistro;
+    }
+
+    // Agregar campos opcionales
+    if (insumoData.descripcion && insumoData.descripcion.trim() !== '') {
+      fieldsToCreate[process.env.AIRTABLE_FIELD_INSUMOS_DESCRIPCION || 'descripcion'] = insumoData.descripcion.trim();
+    }
+
+    // Agregar cantidad presentación insumo si está definida
+    if (insumoData.cantidadPresentacion && Number(insumoData.cantidadPresentacion) > 0) {
+      fieldsToCreate[process.env.AIRTABLE_FIELD_INSUMOS_CANTIDAD_PRESENTACION_INSUMO || 'Cantidad Presentacion Insumo'] = Number(insumoData.cantidadPresentacion);
+    }
 
     console.log('📋 API STOCK-INSUMOS POST: Campos a crear:', fieldsToCreate);
 
     // Crear el registro en Airtable
     const createdRecords = await base(tableId).create([{
       fields: fieldsToCreate
-    }]);
+    }], { typecast: true }); // typecast para auto-conversión de tipos
 
     const createdRecord = createdRecords[0];
+
+    console.log('✅ API STOCK-INSUMOS POST: Insumo creado:', {
+      id: createdRecord.id,
+      fields: createdRecord.fields
+    });
+
+    // Si se proporciona cantidad inicial y fecha de vencimiento, crear registro en Entrada Insumos
+    if (insumoData.cantidadInicial && Number(insumoData.cantidadInicial) > 0) {
+      try {
+        console.log('� API STOCK-INSUMOS POST: Creando entrada inicial de insumo...');
+        
+        const entradaFields: any = {
+          [process.env.AIRTABLE_FIELD_ENTRADA_INSUMOS_INSUMOS_LABORATORIO || 'Insumos Laboratorio']: [createdRecord.id],
+          [process.env.AIRTABLE_FIELD_ENTRADA_INSUMOS_CANTIDAD_INGRESA_UNIDADES || 'Cantidad Ingresa Unidades']: Number(insumoData.cantidadInicial),
+          [process.env.AIRTABLE_FIELD_ENTRADA_INSUMOS_REALIZA_REGISTRO || 'Realiza Registro']: 'Sistema - Registro inicial'
+        };
+
+        // Agregar fecha de ingreso (hoy)
+        const today = new Date().toISOString().split('T')[0];
+        entradaFields[process.env.AIRTABLE_FIELD_ENTRADA_INSUMOS_FECHA_INGRESO || 'Fecha Ingreso'] = today;
+
+        // Agregar fecha de vencimiento si se proporciona
+        if (insumoData.fechaVencimiento) {
+          entradaFields[process.env.AIRTABLE_FIELD_ENTRADA_INSUMOS_FECHA_VENCIMIENTO || 'Fecha Vencimiento'] = insumoData.fechaVencimiento;
+        }
+
+        // Calcular cantidad en formato granel
+        const cantidadPresentacion = Number(insumoData.cantidadPresentacion) || 1;
+        const cantidadGranel = Number(insumoData.cantidadInicial) * cantidadPresentacion;
+        entradaFields[process.env.AIRTABLE_FIELD_ENTRADA_INSUMOS_CANTIDAD_FORMATO_GRANEL || 'Cantidad Formato Granel'] = cantidadGranel;
+
+        console.log('📋 API STOCK-INSUMOS POST: Campos de entrada:', entradaFields);
+
+        await base(process.env.AIRTABLE_TABLE_ENTRADA_INSUMOS || 'Entrada Insumos').create([{
+          fields: entradaFields
+        }], { typecast: true });
+
+        console.log('✅ API STOCK-INSUMOS POST: Entrada inicial creada exitosamente');
+      } catch (entradaError) {
+        console.warn('⚠️ API STOCK-INSUMOS POST: Error al crear entrada inicial:', entradaError);
+        // No fallar la operación completa por este error
+      }
+    }
 
     console.log('✅ API STOCK-INSUMOS POST: Insumo creado:', {
       id: createdRecord.id,
