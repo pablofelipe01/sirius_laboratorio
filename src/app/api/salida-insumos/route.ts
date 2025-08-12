@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Configuración de Airtable para tabla Salida Insumos
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_TABLE_SALIDA_INSUMOS = 'tblXWnQ1E6gelly4s'; // ID de la tabla Salida Insumos
+const AIRTABLE_TABLE_SALIDA_INSUMOS = process.env.AIRTABLE_TABLE_SALIDA_INSUMOS;
 
 // Crear múltiples registros de salida de insumos
 export async function POST(request: NextRequest) {
