@@ -355,7 +355,7 @@ const StockInsumosPage = () => {
         return;
       }
       
-      const stockDisponible = entradaSeleccionada.fields['Total Cantidad Granel Actual'] || 0;
+      const stockDisponible = entradaSeleccionada.fields['Cantidad Ingresa Unidades'] || 0;
       const cantidadSolicitada = Number(insumo.cantidadSalidaUnidades);
       
       if (cantidadSolicitada > stockDisponible) {
@@ -1540,16 +1540,32 @@ const StockInsumosPage = () => {
                         </label>
                         <input
                           type="number"
-                          min="1"
+                          step="0.01"
+                          min="0.01"
                           max={(() => {
                             if (!insumo.entradaId || !entradasDisponibles[index]) return undefined;
                             const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
-                            return entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || undefined;
+                            return entradaSeleccionada?.fields['Cantidad Ingresa Unidades'] || undefined;
                           })()}
                           value={insumo.cantidadSalidaUnidades}
                           onChange={(e) => {
+                            const valorIngresado = Number(e.target.value);
+                            let valorFinal = e.target.value;
+                            
+                            // Validar que no exceda el stock disponible
+                            if (insumo.entradaId && entradasDisponibles[index]) {
+                              const entradaSeleccionada = entradasDisponibles[index].find(ent => ent.id === insumo.entradaId);
+                              const stockDisponible = entradaSeleccionada?.fields['Cantidad Ingresa Unidades'] || 0;
+                              
+                              if (valorIngresado > stockDisponible) {
+                                valorFinal = stockDisponible.toString();
+                                // Mostrar alerta cuando se intente exceder el límite
+                                alert(`No puedes sacar más de ${stockDisponible} unidades. Esa es la cantidad disponible en esta entrada.`);
+                              }
+                            }
+                            
                             const nuevosInsumos = [...descontarData.insumos];
-                            nuevosInsumos[index].cantidadSalidaUnidades = e.target.value;
+                            nuevosInsumos[index].cantidadSalidaUnidades = valorFinal;
                             setDescontarData({ ...descontarData, insumos: nuevosInsumos });
                           }}
                           className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700 placeholder:text-gray-700 placeholder:font-semibold"
@@ -1558,18 +1574,9 @@ const StockInsumosPage = () => {
                               ? (() => {
                                   const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
                                   const stockDisponible = entradaSeleccionada?.fields['Cantidad Ingresa Unidades'] || 0;
-                                  const unidad = insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] ||
-                                                insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
-                                                'unidades';
-                                  return `Máximo ${stockDisponible} ${unidad}`;
+                                  return `Ingrese cantidad en unidades (máximo ${stockDisponible})`;
                                 })()
-                              : insumo.insumoId 
-                                ? `En ${
-                                    insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] ||
-                                    insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
-                                    'unidades'
-                                  }`
-                                : "Cantidad"
+                              : "Ingrese cantidad en unidades"
                           }
                           required
                         />
