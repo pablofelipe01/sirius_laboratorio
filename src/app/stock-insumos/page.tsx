@@ -1466,7 +1466,7 @@ const StockInsumosPage = () => {
                               {(entradasDisponibles[index] || []).map(entrada => {
                                 const fechaIngreso = entrada.fields.fecha_ingreso ? new Date(entrada.fields.fecha_ingreso).toLocaleDateString() : 'Sin fecha';
                                 const fechaVencimiento = entrada.fields.fecha_vencimiento ? new Date(entrada.fields.fecha_vencimiento).toLocaleDateString() : 'No aplica';
-                                const stockDisponible = entrada.fields['Total Cantidad Granel Actual'] || 0;
+                                const stockDisponible = entrada.fields['Cantidad Ingresa Unidades'] || 0;
                                 const estadoVencimiento = entrada.fields.estado_vencimiento_producto || 'Sin estado';
                                 
                                 return (
@@ -1487,7 +1487,7 @@ const StockInsumosPage = () => {
                                 
                                 const fechaIngreso = entradaSeleccionada.fields.fecha_ingreso ? new Date(entradaSeleccionada.fields.fecha_ingreso).toLocaleDateString() : 'Sin fecha';
                                 const fechaVencimiento = entradaSeleccionada.fields.fecha_vencimiento ? new Date(entradaSeleccionada.fields.fecha_vencimiento).toLocaleDateString() : 'No aplica';
-                                const stockDisponible = entradaSeleccionada.fields['Total Cantidad Granel Actual'] || 0;
+                                const stockDisponible = entradaSeleccionada.fields['Cantidad Ingresa Unidades'] || 0;
                                 const estadoVencimiento = entradaSeleccionada.fields.estado_vencimiento_producto || 'Sin estado';
                                 
                                 const getEstadoColor = (estado: string) => {
