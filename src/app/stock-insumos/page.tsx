@@ -1557,7 +1557,7 @@ const StockInsumosPage = () => {
                             insumo.entradaId && entradasDisponibles[index]
                               ? (() => {
                                   const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
-                                  const stockDisponible = entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || 0;
+                                  const stockDisponible = entradaSeleccionada?.fields['Cantidad Ingresa Unidades'] || 0;
                                   const unidad = insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] ||
                                                 insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
                                                 'unidades';
