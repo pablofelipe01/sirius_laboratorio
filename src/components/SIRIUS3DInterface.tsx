@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, Suspense } from 'react';
+import { useRef, useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Sphere, PerspectiveCamera } from '@react-three/drei';
 import { motion } from 'framer-motion';
@@ -11,197 +11,280 @@ interface SIRIUSSphereProps {
   isSpeaking: boolean;
   isThinking: boolean;
   audioLevel: number;
+  morphPattern: number;
+  onMorphChange: (pattern: number) => void;
 }
 
-function SIRIUSSphere({ isListening, isSpeaking, isThinking, audioLevel }: SIRIUSSphereProps) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
-  
-  useFrame((state, delta) => {
-    if (meshRef.current) {
-      // Rotación suave
-      meshRef.current.rotation.x += delta * 0.2;
-      meshRef.current.rotation.y += delta * 0.3;
-      
-      // Animación basada en el estado
-      if (isListening) {
-        // Pulso cuando está escuchando
-        const scale = 1 + Math.sin(state.clock.elapsedTime * 8) * 0.1 * audioLevel;
-        meshRef.current.scale.setScalar(scale);
-      } else if (isSpeaking) {
-        // Vibración cuando habla
-        const scale = 1 + Math.sin(state.clock.elapsedTime * 15) * 0.05;
-        meshRef.current.scale.setScalar(scale);
-      } else if (isThinking) {
-        // Pulso lento cuando piensa
-        const scale = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.08;
-        meshRef.current.scale.setScalar(scale);
-      } else {
-        // Estado normal
-        meshRef.current.scale.setScalar(1);
-      }
+// Patrones morfológicos para las figuras
+const PARTICLE_COUNT = 2000;  // Reducir para mejor rendimiento y visibilidad
+const SPARK_COUNT = 800;
+
+function normalise(points: THREE.Vector3[], size: number): THREE.Vector3[] {
+  if (points.length === 0) return [];
+  const box = new THREE.Box3().setFromPoints(points);
+  const maxDim = Math.max(...box.getSize(new THREE.Vector3()).toArray()) || 1;
+  const centre = box.getCenter(new THREE.Vector3());
+  return points.map(p => p.clone().sub(centre).multiplyScalar(size / maxDim));
+}
+
+function torusKnot(n: number): THREE.Vector3[] {
+  const geometry = new THREE.TorusKnotGeometry(10, 3, 200, 16, 2, 3);
+  const points: THREE.Vector3[] = [];
+  const positionAttribute = geometry.attributes.position;
+  for (let i = 0; i < positionAttribute.count; i++) {
+    points.push(new THREE.Vector3().fromBufferAttribute(positionAttribute, i));
+  }
+  const result: THREE.Vector3[] = [];
+  for (let i = 0; i < n; i++) {
+    result.push(points[i % points.length].clone());
+  }
+  return normalise(result, 50);
+}
+
+function halvorsen(n: number): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  let x = 0.1, y = 0, z = 0;
+  const a = 1.89;
+  const dt = 0.005;
+  for (let i = 0; i < n * 25; i++) {
+    const dx = -a * x - 4 * y - 4 * z - y * y;
+    const dy = -a * y - 4 * z - 4 * x - z * z;
+    const dz = -a * z - 4 * x - 4 * y - x * x;
+    x += dx * dt;
+    y += dy * dt;
+    z += dz * dt;
+    if (i > 200 && i % 25 === 0) {
+      pts.push(new THREE.Vector3(x, y, z));
     }
+    if (pts.length >= n) break;
+  }
+  while(pts.length < n) pts.push(pts[Math.floor(Math.random()*pts.length)].clone());
+  return normalise(pts, 60);
+}
+
+function dualHelix(n: number): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  const turns = 5;
+  const radius = 15;
+  const height = 40;
+  for (let i = 0; i < n; i++) {
+    const isSecondHelix = i % 2 === 0;
+    const angle = (i / n) * Math.PI * 2 * turns;
+    const y = (i / n) * height - height / 2;
+    const r = radius + (isSecondHelix ? 5 : -5);
+    const x = Math.cos(angle) * r;
+    const z = Math.sin(angle) * r;
+    pts.push(new THREE.Vector3(x, y, z));
+  }
+  return normalise(pts, 60);
+}
+
+function deJong(n: number): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  let x = 0.1, y = 0.1;
+  const a = 1.4, b = -2.3, c = 2.4, d = -2.1;
+  for (let i = 0; i < n; i++) {
+    const xn = Math.sin(a * y) - Math.cos(b * x);
+    const yn = Math.sin(c * x) - Math.cos(d * y);
+    x = xn;
+    y = yn;
+    const z = Math.sin(x * y * 0.5);
+    pts.push(new THREE.Vector3(x, y, z));
+  }
+  return normalise(pts, 55);
+}
+
+const PATTERNS = [torusKnot, halvorsen, dualHelix, deJong];
+
+// Componente de partículas morfológicas
+// Esfera avanzada con efectos de ruido y shaders
+function AdvancedSphere({ isListening, isSpeaking, isThinking }: { 
+  isListening: boolean;
+  isSpeaking: boolean;
+  isThinking: boolean;
+}) {
+  const sphereRef = useRef<THREE.Mesh>(null);
+  const geometryRef = useRef<THREE.SphereGeometry>(null);
+  const originalPositionsRef = useRef<Float32Array>(null);
+  
+  // Parámetros de la esfera
+  const params = useMemo(() => ({
+    radius: 1.5,
+    widthSegments: 64,
+    heightSegments: 64,
+    noiseScale: 0.5,
+    noiseStrength: isSpeaking ? 0.8 : isListening ? 0.3 : isThinking ? 0.2 : 0.1,
+    timeFactorX: 0.2,
+    timeFactorY: 0.3,
+    timeFactorZ: 0.1,
+    hueSpeed: isSpeaking ? 0.1 : isListening ? 0.05 : isThinking ? 0.02 : 0.01,
+  }), [isSpeaking, isListening, isThinking]);
+
+  // Material con efectos
+  const material = useMemo(() => {
+    return new THREE.MeshPhongMaterial({
+      color: new THREE.Color().setHSL(0.5, 0.8, 0.6),
+      specular: 0xffffff,
+      shininess: 100,
+      flatShading: false,
+    });
+  }, []);
+
+  // Función de ruido simplificada (Perlin noise básico)
+  const noise = useCallback((x: number, y: number, z: number): number => {
+    return (Math.sin(x * 12.9898) * Math.cos(y * 78.233) * Math.sin(z * 37.719)) * 0.5 + 0.5;
+  }, []);
+
+  // Crear geometría inicial
+  useEffect(() => {
+    if (geometryRef.current) {
+      const positionAttribute = geometryRef.current.getAttribute('position');
+      originalPositionsRef.current = new Float32Array(positionAttribute.array);
+    }
+  }, []);
+
+  // Animación principal
+  useFrame((state) => {
+    if (!sphereRef.current || !geometryRef.current || !originalPositionsRef.current) return;
     
-    if (materialRef.current) {
-      // Cambio de color según el estado - colores brillantes como la estrella SIRIUS en el espacio
-      if (isListening) {
-        materialRef.current.color.setHSL(0.55, 1.0, 0.8); // Azul estelar brillante
-        materialRef.current.emissive.setHSL(0.55, 0.9, 0.4);
-      } else if (isSpeaking) {
-        materialRef.current.color.setHSL(0.3, 1.0, 0.85); // Verde esmeralda cósmico
-        materialRef.current.emissive.setHSL(0.3, 0.8, 0.35);
-      } else if (isThinking) {
-        materialRef.current.color.setHSL(0.75, 0.9, 0.8); // Púrpura nebuloso
-        materialRef.current.emissive.setHSL(0.75, 0.7, 0.25);
-      } else {
-        // Estado normal - Blanco azulado como SIRIUS, la estrella más brillante del cielo
-        materialRef.current.color.setHSL(0.58, 0.4, 0.95); // Blanco estelar puro
-        materialRef.current.emissive.setHSL(0.58, 0.5, 0.2);
-      }
+    const elapsedTime = state.clock.elapsedTime;
+    const geometry = geometryRef.current;
+    const positionAttribute = geometry.getAttribute('position');
+    const originalPositions = originalPositionsRef.current;
+
+    // Actualizar parámetros según estado
+    const currentNoiseStrength = isSpeaking ? 0.8 : isListening ? 0.3 : isThinking ? 0.2 : 0.1;
+    const currentHueSpeed = isSpeaking ? 0.1 : isListening ? 0.05 : isThinking ? 0.02 : 0.01;
+
+    // Aplicar distorsión de ruido
+    for (let i = 0; i < positionAttribute.count; i++) {
+      const x = originalPositions[i * 3];
+      const y = originalPositions[i * 3 + 1];
+      const z = originalPositions[i * 3 + 2];
+
+      const nx = x * params.noiseScale + elapsedTime * params.timeFactorX;
+      const ny = y * params.noiseScale + elapsedTime * params.timeFactorY;
+      const nz = z * params.noiseScale + elapsedTime * params.timeFactorZ;
+
+      const distortion = noise(nx, ny, nz) * currentNoiseStrength;
+
+      const originalVector = new THREE.Vector3(x, y, z).normalize();
+      positionAttribute.setXYZ(
+        i,
+        x + originalVector.x * distortion,
+        y + originalVector.y * distortion,
+        z + originalVector.z * distortion
+      );
+    }
+
+    positionAttribute.needsUpdate = true;
+    geometry.computeVertexNormals();
+
+    // Rotación sutil
+    sphereRef.current.rotation.x += 0.0005 * Math.sin(elapsedTime * 0.1);
+    sphereRef.current.rotation.y += 0.0007 * Math.cos(elapsedTime * 0.08);
+    sphereRef.current.rotation.z += 0.0003 * Math.sin(elapsedTime * 0.15);
+
+    // Cambio de color dinámico
+    const hue = (elapsedTime * currentHueSpeed) % 1;
+    const saturation = isSpeaking ? 1.0 : isListening ? 0.8 : isThinking ? 0.6 : 0.4;
+    const lightness = isSpeaking ? 0.7 : isListening ? 0.6 : isThinking ? 0.5 : 0.4;
+    
+    if (material) {
+      material.color.setHSL(hue, saturation, lightness);
+      material.emissive.setHSL(hue, saturation * 0.3, lightness * 0.2);
+    }
+
+    // Escalado según estado
+    if (isSpeaking) {
+      const scale = 1 + Math.sin(elapsedTime * 8) * 0.1;
+      sphereRef.current.scale.setScalar(scale);
+    } else if (isListening) {
+      const scale = 1 + Math.sin(elapsedTime * 4) * 0.05;
+      sphereRef.current.scale.setScalar(scale);
+    } else if (isThinking) {
+      const scale = 1 + Math.sin(elapsedTime * 2) * 0.03;
+      sphereRef.current.scale.setScalar(scale);
+    } else {
+      sphereRef.current.scale.setScalar(1);
     }
   });
 
   return (
     <group>
-      {/* Núcleo energético central */}
-      <Sphere args={[0.8, 32, 32]} position={[0, 0, 0]}>
-        <meshBasicMaterial
-          transparent
-          opacity={0.9}
-          color={
-            isListening ? "#00FFFF" :
-            isSpeaking ? "#00FF00" :
-            isThinking ? "#FF00FF" :
-            "#FFFFFF"
-          }
-        />
-      </Sphere>
-      
-      {/* Esfera principal de SIRIUS con efectos cristalinos */}
-      <Sphere ref={meshRef} args={[2.2, 128, 128]} position={[0, 0, 0]}>
-        <meshPhysicalMaterial
-          ref={materialRef}
-          transparent
-          opacity={0.8}
-          roughness={0.0}
-          metalness={0.2}
-          clearcoat={1.0}
-          clearcoatRoughness={0.0}
-          transmission={0.4}
-          thickness={0.8}
-          ior={1.5}
-          envMapIntensity={2.0}
-        />
-      </Sphere>
-      
-      {/* Esfera interna con efectos cristalinos mejorados */}
-      <Sphere args={[1.8, 64, 64]} position={[0, 0, 0]}>
-        <meshPhysicalMaterial
-          transparent
-          opacity={0.4}
-          transmission={0.9}
-          thickness={0.8}
-          roughness={0.0}
-          metalness={0.0}
-          clearcoat={1.0}
-          clearcoatRoughness={0.0}
-          ior={1.4}
-          color={
-            isListening ? "#00BFFF" :  // Azul eléctrico brillante
-            isSpeaking ? "#32CD32" :   // Verde lima vibrante
-            isThinking ? "#9370DB" :   // Púrpura médium brillante
-            "#E0FFFF"                  // Cyan claro cristalino
-          }
-          emissive={
-            isListening ? "#0080FF" :
-            isSpeaking ? "#00FF32" :
-            isThinking ? "#8A2BE2" :
-            "#4169E1"
-          }
-          emissiveIntensity={isListening || isSpeaking || isThinking ? 0.8 : 0.4}
-        />
-      </Sphere>
-      
-      {/* Anillo exterior con efectos holográficos */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[2.8, 0.08, 12, 100]} />
-        <meshPhysicalMaterial
-          transparent
-          opacity={isListening || isSpeaking || isThinking ? 0.9 : 0.6}
-          transmission={0.3}
-          thickness={0.2}
-          roughness={0.1}
-          metalness={0.8}
-          clearcoat={1.0}
-          clearcoatRoughness={0.0}
-          color={
-            isListening ? "#00FFFF" :  // Cyan brillante
-            isSpeaking ? "#00FF7F" :   // Spring green
-            isThinking ? "#DA70D6" :   // Orchid
-            "#4169E1"                  // Royal blue
-          }
-          emissive={
-            isListening ? "#0080FF" :
-            isSpeaking ? "#00FF00" :
-            isThinking ? "#8B00FF" :
-            "#1E90FF"
-          }
-          emissiveIntensity={isListening || isSpeaking || isThinking ? 1.0 : 0.5}
+      {/* Esfera principal con efectos de ruido */}
+      <mesh ref={sphereRef} material={material}>
+        <sphereGeometry 
+          ref={geometryRef}
+          args={[params.radius, params.widthSegments, params.heightSegments]} 
         />
       </mesh>
       
-      {/* Segundo anillo rotando en dirección opuesta */}
-      <mesh rotation={[0, Math.PI / 4, Math.PI / 2]}>
-        <torusGeometry args={[3.2, 0.04, 8, 64]} />
-        <meshBasicMaterial
-          transparent
-          opacity={isListening || isSpeaking || isThinking ? 0.7 : 0.3}
-          color={
-            isListening ? "#00CED1" :  // Dark turquoise
-            isSpeaking ? "#ADFF2F" :   // Green yellow
-            isThinking ? "#BA55D3" :   // Medium orchid
-            "#6495ED"                  // Cornflower blue
-          }
-        />
-      </mesh>
-      
-      {/* Partículas orbitales mejoradas */}
-      {Array.from({ length: 50 }).map((_, i) => (
-        <ParticleOrbit key={i} index={i} isActive={isListening || isSpeaking || isThinking} />
-      ))}
-      
-      {/* Efecto de ondas energéticas */}
-      {(isListening || isSpeaking || isThinking) && (
+      {/* Efectos adicionales cuando está activo */}
+      {(isSpeaking || isListening) && (
         <>
-          <mesh>
-            <sphereGeometry args={[4.5, 32, 32]} />
+          {/* Esfera wireframe exterior */}
+          <mesh scale={1.2}>
+            <sphereGeometry args={[params.radius, 32, 32]} />
             <meshBasicMaterial
-              transparent
-              opacity={0.1}
-              color={
-                isListening ? "#00FFFF" :
-                isSpeaking ? "#00FF7F" :
-                "#DA70D6"
-              }
+              color={isSpeaking ? "#00ff00" : "#00ffff"}
               wireframe
+              transparent
+              opacity={0.3}
             />
           </mesh>
           
-          <mesh>
-            <sphereGeometry args={[5.2, 24, 24]} />
-            <meshBasicMaterial
-              transparent
-              opacity={0.05}
-              color={
-                isListening ? "#0080FF" :
-                isSpeaking ? "#32CD32" :
-                "#9370DB"
-              }
-              wireframe
-            />
-          </mesh>
+          {/* Partículas orbitales */}
+          {Array.from({ length: 50 }).map((_, i) => {
+            const angle = (i / 50) * Math.PI * 2;
+            const radius = 2.5;
+            return (
+              <mesh 
+                key={i}
+                position={[
+                  Math.cos(angle) * radius,
+                  Math.sin(angle * 0.5) * radius * 0.3,
+                  Math.sin(angle) * radius
+                ]}
+              >
+                <sphereGeometry args={[0.02, 8, 8]} />
+                <meshBasicMaterial 
+                  color={isSpeaking ? "#00ff88" : "#00ccff"}
+                  transparent
+                  opacity={0.8}
+                />
+              </mesh>
+            );
+          })}
         </>
       )}
+      
+      {/* Ondas de energía cuando habla */}
+      {isSpeaking && [1, 2, 3].map((scale, i) => (
+        <mesh key={i} scale={scale + 0.5}>
+          <sphereGeometry args={[params.radius * 1.5, 16, 16]} />
+          <meshBasicMaterial
+            color="#00ff44"
+            wireframe
+            transparent
+            opacity={0.1 / scale}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function SIRIUSSphere({ isListening, isSpeaking, isThinking, audioLevel, morphPattern, onMorphChange }: SIRIUSSphereProps) {
+  
+  return (
+    <group>
+      {/* Esfera Avanzada con Efectos de Ruido */}
+      <AdvancedSphere
+        isListening={isListening}
+        isSpeaking={isSpeaking}
+        isThinking={isThinking}
+      />
     </group>
   );
 }
@@ -286,6 +369,7 @@ export default function SIRIUS3DInterface() {
   const [microphonePermission, setMicrophonePermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [morphPattern, setMorphPattern] = useState(0);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -1052,16 +1136,16 @@ export default function SIRIUS3DInterface() {
           left: 50%;
           transform: translateX(-50%);
           display: flex;
-          gap: 30px;
+          gap: 20px;
           z-index: 20;
         }
 
         .control-button {
-          width: 80px;
-          height: 80px;
+          width: 70px;
+          height: 70px;
           border: none;
           border-radius: 50%;
-          font-size: 28px;
+          font-size: 24px;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           position: relative;
@@ -1112,6 +1196,17 @@ export default function SIRIUS3DInterface() {
           color: #9ca3af;
           cursor: not-allowed;
           box-shadow: none;
+        }
+
+        .morph-btn {
+          background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+          color: white;
+          box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .morph-btn:hover {
+          background: linear-gradient(135deg, #7c3aed, #6d28d9);
+          transform: scale(1.05);
         }
 
         @keyframes recording-pulse {
@@ -1260,29 +1355,25 @@ export default function SIRIUS3DInterface() {
           <Canvas camera={{ position: [0, 0, 8], fov: 75 }}>
             <PerspectiveCamera makeDefault position={[0, 0, 8]} />
             
-            {/* Iluminación mejorada para espacio */}
-            <ambientLight intensity={0.2} color="#4A90E2" />
-            <pointLight position={[10, 10, 10]} intensity={2} color="#ffffff" />
-            <pointLight position={[-10, -10, -10]} intensity={1.5} color="#87CEEB" />
-            <pointLight position={[5, -5, 5]} intensity={1} color="#FFD700" />
-            <spotLight 
-              position={[0, 15, 0]} 
-              intensity={2} 
-              angle={0.4} 
-              penumbra={0.5} 
-              color="#ffffff"
-              castShadow
-            />
+            {/* Iluminación optimizada para efectos Phong */}
+            <ambientLight intensity={0.4} color="#404040" />
+            <directionalLight position={[1, 1, 1]} intensity={1.5} color="#ffffff" />
+            <directionalLight position={[-1, -1, -1]} intensity={1.0} color="#ffffff" />
+            <pointLight position={[0, 0, 5]} intensity={2} color="#ffffff" />
             
-            {/* Luz de relleno azul del espacio */}
-            <hemisphereLight args={['#87CEEB', '#000080', 0.4]} />
-            
-            <Suspense fallback={null}>
+            <Suspense fallback={
+              <mesh>
+                <sphereGeometry args={[1, 16, 16]} />
+                <meshBasicMaterial color="#ff0000" wireframe />
+              </mesh>
+            }>
               <SIRIUSSphere
                 isListening={isRecording}
                 isSpeaking={isSpeaking}
                 isThinking={isThinking}
                 audioLevel={audioLevel}
+                morphPattern={morphPattern}
+                onMorphChange={setMorphPattern}
               />
             </Suspense>
           </Canvas>
@@ -1290,6 +1381,21 @@ export default function SIRIUS3DInterface() {
 
         {/* UI superpuesta */}
         <div className="relative z-10 min-h-[calc(100vh-8rem)] flex flex-col">
+          {/* Indicador de patrón morfológico - esquina superior derecha */}
+          <div className="absolute top-4 right-4">
+            <motion.div
+              className="bg-black/70 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-cyan-500/30"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="text-xs text-cyan-400 font-medium mb-1">Modo de Efectos</div>
+              <div className="text-sm text-white font-bold">
+                {['Tranquilo', 'Energético', 'Intenso', 'Máximo'][morphPattern]}
+              </div>
+            </motion.div>
+          </div>
+          
           {/* Estado actual centrado más arriba */}
           <div className="flex-1 flex flex-col items-center justify-start pt-20 px-6">
             <motion.div 
@@ -1366,6 +1472,17 @@ export default function SIRIUS3DInterface() {
                     title="Detener SIRIUS"
                   >
                     <span>⏹️</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      // Trigger de efectos especiales en la esfera
+                      setMorphPattern((prev) => (prev + 1) % 4);
+                    }}
+                    className="control-button morph-btn"
+                    title="Activar efectos especiales"
+                  >
+                    <span>✨</span>
                   </button>
                 </>
               )}

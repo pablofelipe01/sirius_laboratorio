@@ -19,6 +19,7 @@ interface SalidaCepaRecord {
   cantidadBolsasUsadas: number;
   cepaId: string;
   inoculacionId: string;
+  userName?: string; // Usuario que realiza la operación
 }
 
 export async function POST(request: NextRequest) {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { registros }: { registros: SalidaCepaRecord[] } = await request.json();
+    const { registros, userName }: { registros: SalidaCepaRecord[], userName?: string } = await request.json();
     
     console.log('🔄 Creando registros de Salida Cepas:', {
       cantidad: registros.length,
@@ -50,7 +51,8 @@ export async function POST(request: NextRequest) {
         'Fecha Evento': registro.fechaEvento,
         'Cantidad Bolsas': registro.cantidadBolsasUsadas,
         'Cepas': [registro.cepaId],
-        'Inoculacion': [registro.inoculacionId]
+        'Inoculacion': [registro.inoculacionId],
+        'Realiza Registro': registro.userName || userName || 'Usuario Desconocido'
       }
     }));
 

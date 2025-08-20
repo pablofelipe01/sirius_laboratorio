@@ -56,13 +56,27 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data!;
 
+    // Mapear el tipo de registro del frontend a los valores de Airtable
+    const mapearTipoCepa = (tipoRegistro: string): string => {
+      switch (tipoRegistro) {
+        case 'Cepa Producida por Inoculación':
+          return 'Produccion - Inoculacion';
+        case 'Cepa Adquirida por Compra':
+          return 'Adquirida - Comprada';
+        case 'Cepa Convertida desde Lote de Producción':
+          return 'Bolsas Normales - Convertida';
+        default:
+          throw new Error(`Tipo de registro no válido: ${tipoRegistro}`);
+      }
+    };
+
     // Usar la tabla de Cepas desde variables de entorno
     const tableId = process.env.AIRTABLE_TABLE_CEPAS;
     
     if (!tableId) {
       throw new Error('Missing AIRTABLE_TABLE_CEPAS environment variable');
     }
-    
+
     // Crear registro en Airtable usando nombres de campos exactos de la documentación
     const record = await base(tableId).create([
       {
@@ -71,7 +85,8 @@ export async function POST(request: NextRequest) {
           'Cantidad Bolsas': data.cantidadBolsas,
           'Microorganismos': [data.microorganismoId], // Array de IDs
           'Responsables': data.responsablesIds, // Array de IDs
-          'Realiza Registro': data.registradoPor // Nombre del usuario que registra
+          'Realiza Registro': data.registradoPor, // Nombre del usuario que registra
+          'Tipo Cepa': mapearTipoCepa(data.tipoRegistro) // Mapear el tipo de registro
         }
       }
     ]);

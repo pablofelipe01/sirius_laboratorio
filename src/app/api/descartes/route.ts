@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
             [SALIDA_CEPAS_FECHA_EVENTO!]: data.fechaDescarte, // Fecha Evento
             [SALIDA_CEPAS_CANTIDAD_BOLSAS!]: data.cantidad, // Cantidad Bolsas
             [SALIDA_CEPAS_CEPAS!]: [data.loteId], // Cepas (vincular con el lote de cepa)
+            'Realiza Registro': data.registradoPor, // Usuario que realiza el descarte
             // El campo Descartes se llenará después cuando vinculemos ambos registros
           }
         }
@@ -197,6 +198,7 @@ export async function POST(request: NextRequest) {
             [SALIDA_INOCULACION_FECHA_EVENTO!]: data.fechaDescarte, // Fecha Evento
             [SALIDA_INOCULACION_CANTIDAD_BOLSAS!]: data.cantidad, // Cantidad Bolsas
             [SALIDA_INOCULACION_LOTE_ALTERADO!]: [data.loteId], // Lote Alterado (vincular con el lote de inoculación)
+            'Realiza Registro': data.registradoPor, // Realiza Registro - usuario que hace el descarte
             // El campo Descartes se llenará después cuando vinculemos ambos registros
           }
         }

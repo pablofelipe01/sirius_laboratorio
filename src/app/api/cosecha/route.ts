@@ -163,7 +163,8 @@ export async function POST(request: NextRequest) {
                   [process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_FECHA_EVENTO!]: today, // Fecha Evento (fecha de cosecha)
                   [process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_CANTIDAD_BOLSAS!]: cantidad, // Cantidad Bolsas utilizadas
                   [process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_LOTE_ALTERADO!]: [loteId], // Lote Alterado (ID del lote de inoculación)
-                  [process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_COSECHA!]: [result.id] // Cosecha Laboratorio (vincular con el evento de cosecha)
+                  [process.env.AIRTABLE_FIELD_SALIDA_INOCULACION_COSECHA!]: [result.id], // Cosecha Laboratorio (vincular con el evento de cosecha)
+                  'Realiza Registro': body.registradoPor || 'Usuario Desconocido' // Usuario que realizó la cosecha
                 }
               }),
             });
@@ -238,7 +239,8 @@ export async function POST(request: NextRequest) {
                   [process.env.AIRTABLE_FIELD_SALIDA_CEPAS_FECHA_EVENTO!]: today, // Fecha Evento (fecha de cosecha)
                   [process.env.AIRTABLE_FIELD_SALIDA_CEPAS_CANTIDAD_BOLSAS!]: cantidad, // Cantidad Bolsas utilizadas
                   [process.env.AIRTABLE_FIELD_SALIDA_CEPAS_CEPAS!]: [cepaId], // Cepas (ID de la cepa)
-                  [process.env.AIRTABLE_FIELD_SALIDA_CEPAS_COSECHA!]: [result.id] // Cosecha Laboratorio (vincular con el evento de cosecha)
+                  [process.env.AIRTABLE_FIELD_SALIDA_CEPAS_COSECHA!]: [result.id], // Cosecha Laboratorio (vincular con el evento de cosecha)
+                  'Realiza Registro': body.registradoPor || 'Usuario Desconocido' // Usuario que realizó la cosecha
                 }
               }),
             });

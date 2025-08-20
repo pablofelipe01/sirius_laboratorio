@@ -218,6 +218,8 @@ const MushroomInoculationForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [insumosCalculados, setInsumosCalculados] = useState<any[]>([]);
 
   const [microorganisms, setMicroorganisms] = useState<Microorganism[]>([]);
   const [loadingMicroorganisms, setLoadingMicroorganisms] = useState(true);
@@ -327,17 +329,29 @@ const MushroomInoculationForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitStatus('idle');
     setErrorMessage('');
 
     // Validación: verificar que se hayan seleccionado cepas
     if (formData.cepasSeleccionadas.length === 0) {
       setErrorMessage('❌ Error: Debe seleccionar al menos una cepa para continuar con la inoculación.');
       setSubmitStatus('error');
-      setIsSubmitting(false);
       return;
     }
+
+    // Calcular insumos necesarios basado en la cantidad total de bolsas
+    const totalBolsas = formData.bagQuantity;
+    const insumosNecesarios = calcularInsumos(totalBolsas);
+    setInsumosCalculados(insumosNecesarios);
+
+    // Mostrar modal de confirmación
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setShowConfirmModal(false);
+    setIsSubmitting(true);
+    setSubmitStatus('idle');
+    setErrorMessage('');
 
     try {
       // Enviar datos a la API de Airtable
@@ -353,6 +367,7 @@ const MushroomInoculationForm = () => {
 
       if (response.ok && result.success) {
         // Si la inoculación se creó exitosamente, crear registros de Salida Cepas
+        // LÓGICA TRANSACCIONAL: Si falla la salida de cepas, eliminar la inoculación creada
         if (formData.cepasSeleccionadas.length > 0 && result.recordId) {
           try {
             const salidaCepasData = formData.cepasSeleccionadas.map(cepa => ({
@@ -367,24 +382,169 @@ const MushroomInoculationForm = () => {
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ registros: salidaCepasData }),
+              body: JSON.stringify({ 
+                registros: salidaCepasData,
+                userName: user?.nombre || formData.registradoPor
+              }),
             });
 
             const salidaResult = await salidaResponse.json();
             
             if (salidaResponse.ok && salidaResult.success) {
               console.log('✅ Registros de Salida Cepas creados:', salidaResult.total);
+              
+              // Ahora crear las salidas de insumos
+              try {
+                console.log('📦 Creando salidas de insumos...');
+                
+                const salidaInsumosData = insumosCalculados.map(insumo => ({
+                  fecha: formData.inoculationDate,
+                  cantidad: insumo.cantidad,
+                  unidad: insumo.unidad,
+                  insumoId: insumo.id,
+                  equivalenciaGramos: insumo.equivalenciaGramos,
+                  inoculacionId: result.recordId,
+                  userName: user?.nombre || formData.registradoPor,
+                  nombreEvento: `Inoculación ${formData.microorganism} - ${formData.bagQuantity} bolsas`
+                }));
+
+                const salidaInsumosResponse = await fetch('/api/salida-insumos-auto', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ 
+                    registros: salidaInsumosData,
+                    inoculacionId: result.recordId,
+                    userName: user?.nombre || formData.registradoPor
+                  }),
+                });
+
+                const salidaInsumosResult = await salidaInsumosResponse.json();
+                
+                if (salidaInsumosResponse.ok && salidaInsumosResult.success) {
+                  console.log('✅ Registros de Salida Insumos creados:', salidaInsumosResult.total);
+                  console.log('✅ Transacción completa: Inoculación + Salida Cepas + Salida Insumos');
+                } else {
+                  console.error('❌ Error al crear registros de Salida Insumos:', salidaInsumosResult.error);
+                  console.log('🔄 Iniciando rollback completo...');
+                  
+                  // ROLLBACK COMPLETO: Eliminar inoculación y salidas de cepas
+                  try {
+                    // Primero intentar eliminar la inoculación
+                    const rollbackResponse = await fetch(`/api/inoculacion/${result.recordId}`, {
+                      method: 'DELETE',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                    });
+                    
+                    if (rollbackResponse.ok) {
+                      console.log('✅ Rollback: Inoculación eliminada');
+                      setSubmitStatus('error');
+                      setErrorMessage(`Error transaccional: No se pudo registrar la salida de insumos. Todas las operaciones fueron canceladas automáticamente. Detalle: ${salidaInsumosResult.error}`);
+                    } else {
+                      setSubmitStatus('error');
+                      setErrorMessage(`Error crítico: Fallo al registrar salida de insumos Y no se pudo deshacer completamente. ID de inoculación: ${result.recordId}. Contacte al administrador.`);
+                    }
+                  } catch (rollbackError) {
+                    console.error('❌ Error en rollback completo:', rollbackError);
+                    setSubmitStatus('error');
+                    setErrorMessage(`Error crítico durante rollback completo. ID de inoculación: ${result.recordId}. Contacte al administrador.`);
+                  }
+                  return; // Salir sin marcar como éxito
+                }
+              } catch (error) {
+                console.error('❌ Error de conexión al crear Salida Insumos:', error);
+                console.log('🔄 Iniciando rollback por error de conexión en insumos...');
+                
+                // ROLLBACK por error de conexión en insumos
+                try {
+                  const rollbackResponse = await fetch(`/api/inoculacion/${result.recordId}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                  });
+                  
+                  if (rollbackResponse.ok) {
+                    console.log('✅ Rollback exitoso: Inoculación eliminada');
+                    setSubmitStatus('error');
+                    setErrorMessage('Error de conexión al registrar la salida de insumos. Todas las operaciones fueron canceladas automáticamente. Intente nuevamente.');
+                  } else {
+                    setSubmitStatus('error');
+                    setErrorMessage(`Error crítico: Fallo de conexión en insumos Y no se pudo deshacer. ID: ${result.recordId}. Contacte al administrador.`);
+                  }
+                } catch (rollbackError) {
+                  console.error('❌ Error doble de conexión en rollback:', rollbackError);
+                  setSubmitStatus('error');
+                  setErrorMessage(`Error crítico de conexión doble en insumos. ID de inoculación: ${result.recordId}. Contacte al administrador.`);
+                }
+                return; // Salir sin marcar como éxito
+              }
             } else {
               console.error('❌ Error al crear registros de Salida Cepas:', salidaResult.error);
-              // No fallar el proceso principal, solo mostrar advertencia
-              setErrorMessage(`Inoculación creada exitosamente, pero hubo un problema al registrar la salida de cepas: ${salidaResult.error}`);
+              console.log('🔄 Iniciando rollback de la inoculación...');
+              
+              // ROLLBACK: Eliminar la inoculación creada porque falló la salida de cepas
+              try {
+                const rollbackResponse = await fetch(`/api/inoculacion/${result.recordId}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                });
+                
+                const rollbackResult = await rollbackResponse.json();
+                
+                if (rollbackResponse.ok && rollbackResult.success) {
+                  console.log('✅ Rollback exitoso: Inoculación eliminada');
+                  setSubmitStatus('error');
+                  setErrorMessage(`Error transaccional: No se pudo registrar la salida de cepas. La inoculación fue cancelada automáticamente. Detalle: ${salidaResult.error}`);
+                } else {
+                  console.error('❌ Error en rollback:', rollbackResult.error);
+                  setSubmitStatus('error');
+                  setErrorMessage(`Error crítico: Fallo al registrar salida de cepas Y no se pudo deshacer la inoculación. Contacte al administrador. ID de inoculación: ${result.recordId}`);
+                }
+              } catch (rollbackError) {
+                console.error('❌ Error de conexión en rollback:', rollbackError);
+                setSubmitStatus('error');
+                setErrorMessage(`Error crítico de conexión durante rollback. ID de inoculación: ${result.recordId}. Contacte al administrador.`);
+              }
+              return; // Salir sin marcar como éxito
             }
           } catch (error) {
             console.error('❌ Error de conexión al crear Salida Cepas:', error);
-            setErrorMessage('Inoculación creada exitosamente, pero hubo un problema de conexión al registrar la salida de cepas.');
+            console.log('🔄 Iniciando rollback por error de conexión...');
+            
+            // ROLLBACK: Eliminar la inoculación creada porque falló la conexión
+            try {
+              const rollbackResponse = await fetch(`/api/inoculacion/${result.recordId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              });
+              
+              if (rollbackResponse.ok) {
+                console.log('✅ Rollback exitoso: Inoculación eliminada');
+                setSubmitStatus('error');
+                setErrorMessage('Error de conexión al registrar la salida de cepas. La inoculación fue cancelada automáticamente. Intente nuevamente.');
+              } else {
+                console.error('❌ Error en rollback por conexión');
+                setSubmitStatus('error');
+                setErrorMessage(`Error crítico: Fallo de conexión Y no se pudo deshacer la inoculación. ID: ${result.recordId}. Contacte al administrador.`);
+              }
+            } catch (rollbackError) {
+              console.error('❌ Error doble de conexión en rollback:', rollbackError);
+              setSubmitStatus('error');
+              setErrorMessage(`Error crítico de conexión doble. ID de inoculación: ${result.recordId}. Contacte al administrador.`);
+            }
+            return; // Salir sin marcar como éxito
           }
         }
 
+        // Solo llegar aquí si todo fue exitoso
         setSubmitStatus('success');
         
         setFormData({
@@ -407,6 +567,66 @@ const MushroomInoculationForm = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCancelSubmit = () => {
+    setShowConfirmModal(false);
+  };
+
+  // Función para calcular insumos según la fórmula maestra
+  const calcularInsumos = (cantidadBolsas: number) => {
+    const formInsumos = [
+      {
+        id: 'recAhttbj6RjnpACX',
+        nombre: 'Arroz',
+        cantidad: cantidadBolsas * 150,
+        unidad: 'gr',
+        descripcion: 'Arroz por @',
+        equivalenciaGramos: 11339.8 // 1 paquete = 11,339.8gr
+      },
+      {
+        id: 'rec6U8tw8EEoFx52A',
+        nombre: 'Clorafenicol',
+        cantidad: cantidadBolsas * 0.014,
+        unidad: 'gr',
+        descripcion: 'Antibiótico-cloranfenicol',
+        equivalenciaGramos: 20 // 1 unidad = 20gr
+      },
+      {
+        id: 'recXBHudUK2T0OcPI',
+        nombre: 'Melaza',
+        cantidad: cantidadBolsas * 0.56,
+        unidad: 'gr',
+        descripcion: 'Melaza',
+        equivalenciaGramos: 30000 // 1 unidad = 30,000gr
+      },
+      {
+        id: 'recHlpm0r9IILswJP',
+        nombre: 'Bolsa polipropileno',
+        cantidad: cantidadBolsas * 1,
+        unidad: 'unidad',
+        descripcion: 'Bolsas de Polipropileno x 100und',
+        equivalenciaGramos: 100 // 1 paquete = 100 unidades
+      },
+      {
+        id: 'rec9AVRKuMfYoLozj',
+        nombre: 'Tween 80',
+        cantidad: cantidadBolsas * 0.028,
+        unidad: 'ml',
+        descripcion: 'Tween 80 x 500ml',
+        equivalenciaGramos: 500 // 1 tarro = 500ml
+      },
+      {
+        id: 'recd9ipWHpeMzBX3O',
+        nombre: 'Algodón',
+        cantidad: cantidadBolsas * 0.42,
+        unidad: 'gr',
+        descripcion: 'Bolsa copos de algodón x 500 gr',
+        equivalenciaGramos: 500 // 1 bolsa = 500gr
+      }
+    ];
+
+    return formInsumos;
   };
 
   return (
@@ -639,6 +859,193 @@ const MushroomInoculationForm = () => {
             </div>
           </form>
         </div>
+
+        {/* Modal de Confirmación */}
+        {showConfirmModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl max-w-md w-full max-h-[75vh] overflow-y-auto border border-white/20">
+              {/* Header del Modal */}
+              <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 p-3 rounded-t-2xl">
+                <div className="flex items-center text-white">
+                  <div className="bg-white/20 rounded-full p-1.5 mr-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold">Confirmar Inoculación</h3>
+                    <p className="text-blue-100 text-xs">Revise los datos antes de proceder</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contenido del Modal */}
+              <div className="p-3 space-y-3">
+                {/* Información General */}
+                <div className="bg-blue-50 rounded-xl p-2.5 border border-blue-200">
+                  <h4 className="font-semibold text-blue-900 mb-1.5 text-sm flex items-center">
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Información General
+                  </h4>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-600">📅 Fecha:</span>
+                      <span className="text-gray-900">
+                        {formData.inoculationDate ? 
+                          new Date(formData.inoculationDate + 'T00:00:00').toLocaleDateString('es-CO')
+                          : 'No especificada'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-600">🧬 Microorganismo:</span>
+                      <span className="text-gray-900 text-right max-w-[60%]">{formData.microorganism || 'No seleccionado'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-600">📦 Bolsas:</span>
+                      <span className="text-gray-900 font-semibold">{formData.bagQuantity}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Responsables */}
+                {formData.responsables.length > 0 && (
+                  <div className="bg-green-50 rounded-xl p-2.5 border border-green-200">
+                    <h4 className="font-semibold text-green-900 mb-1.5 text-sm">
+                      👥 Responsables ({formData.responsables.length})
+                    </h4>
+                    <div className="flex flex-wrap gap-1">
+                      {formData.responsables.map((responsable, index) => (
+                        <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                          {responsable}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cepas Seleccionadas */}
+                {formData.cepasSeleccionadas.length > 0 && (
+                  <div className="bg-purple-50 rounded-xl p-2.5 border border-purple-200">
+                    <h4 className="font-semibold text-purple-900 mb-1.5 text-sm">
+                      🧬 Cepas ({formData.cepasSeleccionadas.length})
+                    </h4>
+                    <div className="space-y-1">
+                      {formData.cepasSeleccionadas.map((cepa, index) => (
+                        <div key={index} className="bg-white rounded-lg p-2 border border-purple-200 flex justify-between items-center">
+                          <span className="font-medium text-purple-900 text-sm">{cepa.abreviatura}</span>
+                          <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-semibold">
+                            {cepa.cantidad}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-purple-200">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-purple-900 text-sm">Total:</span>
+                        <span className="bg-purple-600 text-white px-3 py-1 rounded-full font-bold text-sm">
+                          {formData.cepasSeleccionadas.reduce((total, cepa) => total + cepa.cantidad, 0)} bolsas
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Insumos Calculados */}
+                {insumosCalculados.length > 0 && (
+                  <div className="bg-orange-50 rounded-xl p-2.5 border border-orange-200">
+                    <h4 className="font-semibold text-orange-900 mb-1.5 text-sm">
+                      📦 Insumos Requeridos (Fórmula Maestra)
+                    </h4>
+                    <div className="space-y-1">
+                      {insumosCalculados.map((insumo, index) => (
+                        <div key={index} className="bg-white rounded-lg p-2 border border-orange-200 flex justify-between items-center">
+                          <div className="flex-1">
+                            <span className="font-medium text-orange-900 text-sm">{insumo.nombre}</span>
+                            <p className="text-xs text-orange-700">{insumo.descripcion}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-semibold">
+                              {insumo.cantidad < 1 ? 
+                                insumo.cantidad.toFixed(3) :
+                                insumo.cantidad % 1 === 0 ? 
+                                  insumo.cantidad.toLocaleString() : 
+                                  insumo.cantidad.toFixed(2)
+                              } {insumo.unidad}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-orange-200">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-orange-900 text-sm">Para:</span>
+                        <span className="bg-orange-600 text-white px-3 py-1 rounded-full font-bold text-sm">
+                          {formData.bagQuantity} bolsas de inoculación
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-2 p-2 bg-orange-100 rounded-lg">
+                      <p className="text-orange-800 text-xs font-medium">
+                        💡 Estos insumos serán automáticamente descontados del inventario usando lógica FIFO (primero el stock más antiguo)
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Advertencia */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-2.5">
+                  <div className="flex items-start">
+                    <svg className="w-4 h-4 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                      <h4 className="text-yellow-800 font-semibold text-sm">⚠️ Confirmación</h4>
+                      <p className="text-yellow-700 text-xs mt-0.5">
+                        Se registrará la inoculación, la salida de cepas Y la salida automática de los insumos mostrados arriba.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones del Modal */}
+              <div className="bg-gray-50 px-3 py-2.5 rounded-b-2xl flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={handleCancelSubmit}
+                  className="px-3 py-1.5 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-100 transition-all duration-300 text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSubmit}
+                  disabled={isSubmitting}
+                  className={`px-4 py-1.5 rounded-lg font-semibold transition-all duration-300 text-sm ${
+                    isSubmitting
+                      ? 'bg-gray-400 cursor-not-allowed text-white'
+                      : 'bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-800 text-white shadow-lg'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Procesando...
+                    </div>
+                  ) : (
+                    '✅ Confirmar'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

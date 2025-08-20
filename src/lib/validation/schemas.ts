@@ -98,6 +98,14 @@ export const CepasSchema = z.object({
     .min(1, 'La fecha de creación es requerida')
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD)'),
   
+  tipoRegistro: z.string()
+    .min(1, 'El tipo de registro es requerido')
+    .refine((val) => [
+      'Cepa Producida por Inoculación',
+      'Cepa Adquirida por Compra', 
+      'Cepa Convertida desde Lote de Producción'
+    ].includes(val), 'Tipo de registro no válido'),
+  
   cantidadBolsas: z.number()
     .int('La cantidad de bolsas debe ser un número entero')
     .min(1, 'La cantidad mínima es 1 bolsa')
@@ -120,7 +128,12 @@ export const CepasSchema = z.object({
   
   registradoPor: z.string()
     .min(1, 'El nombre del usuario que registra es requerido')
-    .max(100, 'El nombre del usuario es demasiado largo')
+    .max(100, 'El nombre del usuario es demasiado largo'),
+  
+  // Campos opcionales para conversión desde lote
+  loteSeleccionadoId: z.string().optional(),
+  loteSeleccionado: z.string().optional(),
+  cantidadDescontarLote: z.number().optional()
 });
 
 // Tipos TypeScript generados a partir de los esquemas

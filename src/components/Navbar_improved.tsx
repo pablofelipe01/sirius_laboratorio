@@ -166,7 +166,7 @@ const Navbar = () => {
                       { href: "/almacenamiento", label: "Almacenamiento", emoji: "📦", color: "bg-orange-50" },
                       { href: "/descartes", label: "Descartes", emoji: "🗑️", color: "bg-red-50" },
                       { href: "/stock-insumos", label: "Stock Insumos", emoji: "📋", color: "bg-teal-50" },
-                      { href: "/ordenes-compras", label: "Pedidos Laboratorio", emoji: "🛒", color: "bg-emerald-50" },
+                      { href: "/clientes", label: "Clientes", emoji: "�", color: "bg-emerald-50" },
                     ]}
                   />
                   
@@ -370,7 +370,7 @@ const Navbar = () => {
                           </Link>
                           
                           <Link
-                            href="/ordenes-compras"
+                            href="/clientes"
                             onClick={closeMobileMenu}
                             className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors ${
                               isScrolled 
@@ -379,7 +379,7 @@ const Navbar = () => {
                             }`}
                           >
                             <span className="text-lg">🛒</span>
-                            <span className="font-medium">Pedidos Laboratorio</span>
+                            <span className="font-medium">Clientes</span>
                           </Link>
                         </div>
                       </div>
