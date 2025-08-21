@@ -109,6 +109,7 @@ const StockInsumosPage = () => {
   // Unidades de medida exactas de Airtable según documentación
   const unidadesMedida = [
     "UNIDAD",
+    "TARRO DE 80GR",
     "TARRO DE 500GR",
     "TARRO DE 1KG",
     "TARRO DE 1000L",

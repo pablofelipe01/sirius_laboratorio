@@ -6,24 +6,12 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID!);
 
-interface RegistroInsumo {
-  insumoId: string;
-  cantidad: number; // cantidad en gramos/ml
-  unidad: string;
-  fecha: string;
-  inoculacionId?: string;
-  cepaId?: string;
-  userName: string;
-  equivalenciaGramos: number; // cuántos gramos equivale 1 unidad
-  nombreEvento: string; // nombre descriptivo del evento
-}
-
 export async function POST(request: NextRequest) {
   console.log('📦 API SALIDA-INSUMOS AUTO: Iniciando creación automática con lógica FIFO...');
   
   try {
     const body = await request.json();
-    const { registros, inoculacionId, cepaId, userName } = body;
+    const { registros, inoculacionId, cepaId, fermentacionId } = body;
 
     if (!registros || registros.length === 0) {
       return NextResponse.json({ 
@@ -33,15 +21,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar que se proporcione al menos uno de los IDs de referencia
-    if (!inoculacionId && !cepaId) {
+    if (!inoculacionId && !cepaId && !fermentacionId) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Debe proporcionarse inoculacionId o cepaId' 
+        error: 'Debe proporcionarse inoculacionId, cepaId o fermentacionId' 
       }, { status: 400 });
     }
 
-    const tipoEvento = inoculacionId ? 'inoculación' : 'cepa';
-    const referenciaId = inoculacionId || cepaId;
+    const tipoEvento = inoculacionId ? 'inoculación' : cepaId ? 'cepa' : 'fermentación';
+    const referenciaId = inoculacionId || cepaId || fermentacionId;
     
     console.log(`📋 API SALIDA-INSUMOS AUTO: Procesando ${registros.length} insumos con lógica FIFO para ${tipoEvento} ${referenciaId}`);
     
@@ -94,7 +82,20 @@ export async function POST(request: NextRequest) {
             console.log(`📤 Usando ${unidadesAUsar} unidades de la entrada ${entrada.id}`);
 
             // Crear registro de salida para esta entrada específica
-            const registroSalida: any = {
+            const registroSalida: {
+              fields: {
+                'Cantidad Salida Unidades': number;
+                'Fecha Evento': string;
+                'Entrada': string[];
+                'Insumos Laboratorio': string[];
+                'Nombre Evento': string;
+                'Realiza Registro': string;
+                'Inoculacion'?: string[];
+                'Cepa'?: string[];
+                'Cepas'?: string[];
+                'Fermentacion'?: string[];
+              };
+            } = {
               fields: {
                 'Cantidad Salida Unidades': unidadesAUsar,
                 'Fecha Evento': registro.fecha,
@@ -111,6 +112,9 @@ export async function POST(request: NextRequest) {
             }
             if (cepaId) {
               registroSalida.fields['Cepas'] = [cepaId]; // Usar 'Cepas' (plural) según documentación
+            }
+            if (fermentacionId) {
+              registroSalida.fields['Fermentacion'] = [fermentacionId]; // Vincular a la fermentación
             }
 
             console.log(`📋 Registro a crear en Airtable:`, registroSalida);
