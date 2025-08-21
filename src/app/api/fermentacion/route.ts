@@ -1,163 +1,187 @@
 import { NextResponse } from 'next/server';
-import Airtable from 'airtable';
 
-// Configurar Airtable
-if (process.env.AIRTABLE_API_KEY) {
-  Airtable.configure({ apiKey: process.env.AIRTABLE_API_KEY });
-} else if (process.env.AIRTABLE_PAT) {
-  Airtable.configure({ apiKey: process.env.AIRTABLE_PAT });
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_TOKEN = process.env.AIRTABLE_API_KEY; // Usar AIRTABLE_API_KEY en lugar de AIRTABLE_TOKEN
+const FERMENTACION_TABLE_ID = process.env.AIRTABLE_TABLE_FERMENTACION;
+
+// Interfaz para los registros de Fermentación
+interface FermentacionRecord {
+  id: string;
+  createdTime: string;
+  fields: {
+    ID?: string;
+    Creada?: string;
+    'Microorganismo'?: string[];
+    'Fecha Inicia Fermentacion'?: string;
+    'Fecha Termina Fermentacion'?: string;
+    Estado?: string;
+    'Cantidad Litros'?: number;
+    'Total Litros'?: number;
+    Observaciones?: string;
+    Responsables?: string[];
+    'Realiza Registro'?: string;
+    'Cantidad Litros Salida Fermentacion'?: number[];
+    Microorganismos?: string[];
+    'Salida Fermentacion'?: string[];
+    'Salida Insumos'?: string[];
+  };
 }
 
-const base = Airtable.base(process.env.AIRTABLE_BASE_ID!);
-
-export async function GET() {
+export async function GET(request: Request) {
+  console.log('🔬 FERMENTACION API: Iniciando request GET...');
+  
   try {
-    const tableId = process.env.AIRTABLE_TABLE_FERMENTACION;
-    
-    if (!tableId) {
-      throw new Error('Missing AIRTABLE_TABLE_FERMENTACION environment variable');
+    if (!AIRTABLE_BASE_ID || !AIRTABLE_TOKEN || !FERMENTACION_TABLE_ID) {
+      console.error('❌ FERMENTACION API: Variables de entorno faltantes', {
+        AIRTABLE_BASE_ID: !!AIRTABLE_BASE_ID,
+        AIRTABLE_API_KEY: !!AIRTABLE_TOKEN,
+        AIRTABLE_TABLE_FERMENTACION: !!FERMENTACION_TABLE_ID
+      });
+      return NextResponse.json(
+        { error: 'Configuración de Airtable incompleta' },
+        { status: 500 }
+      );
     }
 
-    const records = await base(tableId)
-      .select({
-        fields: [
-          'ID', 
-          'Microorganismo', 
-          'Etapa', 
-          'Fecha Inicia Fermentacion', 
-          'Fecha Termina Fermentacion',
-          'Estado',
-          'Cantidad Litros',
-          'Total Litros',
-          'Observaciones',
-          'Realiza Registro',
-          'Microorganismos'
-        ],
-        sort: [{ field: 'Fecha Inicia Fermentacion', direction: 'desc' }]
-      })
-      .all();
+    const url = new URL(request.url);
+    const filterByFormula = url.searchParams.get('filterByFormula');
+    const maxRecords = url.searchParams.get('maxRecords') || '100';
 
-    const fermentaciones = records.map(record => ({
-      id: record.id,
-      microorganismo: record.fields['Microorganismo'],
-      etapa: record.fields['Etapa'] as string,
-      fechaIniciaFermentacion: record.fields['Fecha Inicia Fermentacion'] as string,
-      fechaTerminaFermentacion: record.fields['Fecha Termina Fermentacion'] as string,
-      estado: record.fields['Estado'],
-      cantidadLitros: record.fields['Cantidad Litros'] as number,
-      totalLitros: record.fields['Total Litros'],
-      observaciones: record.fields['Observaciones'] as string,
-      realizaRegistro: record.fields['Realiza Registro'] as string,
-      microorganismos: record.fields['Microorganismos'] as string[]
-    }));
+    console.log('📡 FERMENTACION API: Parametros de consulta:', {
+      filterByFormula,
+      maxRecords
+    });
+
+    // Construir URL de Airtable
+    const airtableUrl = new URL(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${FERMENTACION_TABLE_ID}`);
+    airtableUrl.searchParams.append('maxRecords', maxRecords);
+    
+    if (filterByFormula) {
+      airtableUrl.searchParams.append('filterByFormula', filterByFormula);
+    }
+
+    console.log('🌐 FERMENTACION API: URL construida:', airtableUrl.toString());
+
+    const response = await fetch(airtableUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('❌ FERMENTACION API: Error en response de Airtable:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ FERMENTACION API: Detalles del error:', errorText);
+      return NextResponse.json(
+        { error: `Error de Airtable: ${response.status} ${response.statusText}` },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    console.log('✅ FERMENTACION API: Datos recibidos exitosamente', {
+      recordCount: data.records?.length || 0,
+      hasOffset: !!data.offset
+    });
+
+    // Log de algunos registros para debug
+    if (data.records && data.records.length > 0) {
+      console.log('📊 FERMENTACION API: Primer registro de muestra:', {
+        id: data.records[0].id,
+        microorganismo: data.records[0].fields?.['Microorganismo'],
+        estado: data.records[0].fields?.['Estado'],
+        cantidadLitros: data.records[0].fields?.['Cantidad Litros'],
+        totalLitros: data.records[0].fields?.['Total Litros']
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      fermentaciones
+      records: data.records as FermentacionRecord[],
+      offset: data.offset
     });
+
   } catch (error) {
-    console.error('Error fetching fermentaciones:', error);
+    console.error('❌ FERMENTACION API: Error en catch:', error);
     return NextResponse.json(
-      { success: false, error: 'Error al obtener fermentaciones' },
+      { 
+        success: false,
+        error: 'Error interno del servidor',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
       { status: 500 }
     );
   }
 }
 
-export async function POST(request: Request) {
+export async function PUT(request: Request) {
+  console.log('🔄 FERMENTACION API: Iniciando request PUT...');
+  
   try {
-    const tableId = process.env.AIRTABLE_TABLE_FERMENTACION;
-    
-    console.log('🔍 FERMENTACION: Table ID:', tableId);
-    console.log('🔍 FERMENTACION: Base ID:', process.env.AIRTABLE_BASE_ID);
-    console.log('🔍 FERMENTACION: API Key present:', !!process.env.AIRTABLE_API_KEY);
-    
-    if (!tableId) {
-      console.error('❌ FERMENTACION: Missing AIRTABLE_TABLE_FERMENTACION environment variable');
-      throw new Error('Missing AIRTABLE_TABLE_FERMENTACION environment variable');
+    if (!AIRTABLE_BASE_ID || !AIRTABLE_TOKEN || !FERMENTACION_TABLE_ID) {
+      console.error('❌ FERMENTACION API: Variables de entorno faltantes', {
+        AIRTABLE_BASE_ID: !!AIRTABLE_BASE_ID,
+        AIRTABLE_API_KEY: !!AIRTABLE_TOKEN,
+        AIRTABLE_TABLE_FERMENTACION: !!FERMENTACION_TABLE_ID
+      });
+      return NextResponse.json(
+        { error: 'Configuración de Airtable incompleta' },
+        { status: 500 }
+      );
     }
 
     const body = await request.json();
-    console.log('🧬 FERMENTACION: Datos recibidos:', body);
+    console.log('📝 FERMENTACION API: Datos recibidos para actualización:', body);
 
-    const { 
-      microorganismoId, 
-      cantidadLitros, 
-      fechaInicio, 
-      observaciones, 
-      realizaRegistro,
-      responsablesEquipo 
-    } = body;
+    const { recordId, updates } = body;
 
-    // Validaciones
-    if (!microorganismoId || !cantidadLitros || !fechaInicio) {
+    if (!recordId || !updates) {
+      console.error('❌ FERMENTACION API: Faltan datos requeridos');
       return NextResponse.json(
-        { success: false, error: 'Faltan datos requeridos: microorganismo, cantidad y fecha' },
+        { error: 'Record ID y updates son requeridos' },
         { status: 400 }
       );
     }
 
-    // Calcular fecha de finalización (3 días después)
-    // Asegurar que la fecha de inicio esté en el formato correcto
-    const fechaInicioDate = new Date(fechaInicio + 'T05:00:00.000Z'); // Agregar hora para evitar problemas de zona horaria
-    const fechaFinalizacion = new Date(fechaInicioDate);
-    fechaFinalizacion.setDate(fechaFinalizacion.getDate() + 3);
+    const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${FERMENTACION_TABLE_ID}/${recordId}`;
 
-    console.log('📅 FERMENTACION: Fechas calculadas:', {
-      fechaInicioOriginal: fechaInicio,
-      fechaInicio: fechaInicioDate.toISOString(),
-      fechaFinalizacion: fechaFinalizacion.toISOString()
+    const response = await fetch(airtableUrl, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: updates
+      })
     });
 
-    // Estructura de datos según la documentación de Airtable
-    const recordData = {
-      fields: {
-        'Etapa': 'Fermentación',
-        'Fecha Inicia Fermentacion': fechaInicioDate.toISOString(),
-        'Fecha Termina Fermentacion': fechaFinalizacion.toISOString(),
-        'Cantidad Litros': Number(cantidadLitros),
-        'Observaciones': observaciones || '',
-        'Realiza Registro': realizaRegistro || 'Sistema',
-        'Microorganismos': [microorganismoId] // Array de IDs de microorganismos
-      }
-    };
+    if (!response.ok) {
+      console.error('❌ FERMENTACION API: Error al actualizar registro:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ FERMENTACION API: Detalles del error:', errorText);
+      return NextResponse.json(
+        { error: `Error de Airtable: ${response.status} ${response.statusText}` },
+        { status: response.status }
+      );
+    }
 
-    console.log('📝 FERMENTACION: Datos a crear:', recordData);
-
-    // Crear el registro en Airtable usando el formato correcto con typecast
-    const record = await base(tableId).create(recordData.fields, { typecast: true });
-
-    console.log('✅ FERMENTACION: Registro creado exitosamente:', {
-      id: record.id,
-      fields: record.fields
-    });
+    const updatedRecord = await response.json();
+    console.log('✅ FERMENTACION API: Registro actualizado exitosamente:', updatedRecord.id);
 
     return NextResponse.json({
       success: true,
-      message: `Fermentación de ${cantidadLitros}L iniciada exitosamente`,
-      fermentacionId: record.id,
-      fechaInicio: fechaInicioDate.toISOString(),
-      fechaFinalizacion: fechaFinalizacion.toISOString(),
-      recordCreated: record.fields
+      record: updatedRecord
     });
 
   } catch (error) {
-    console.error('❌ FERMENTACION: Error completo:', error);
-    
-    if (error instanceof Error) {
-      console.error('❌ FERMENTACION: Error message:', error.message);
-      console.error('❌ FERMENTACION: Error stack:', error.stack);
-    }
-    
-    // Si es un error de Airtable, mostrar detalles específicos
-    if (typeof error === 'object' && error !== null && 'error' in error) {
-      console.error('❌ FERMENTACION: Airtable error details:', error);
-    }
-    
+    console.error('❌ FERMENTACION API: Error en catch:', error);
     return NextResponse.json(
       { 
-        success: false, 
-        error: 'Error al crear fermentación: ' + (error instanceof Error ? error.message : 'Error desconocido'),
+        success: false,
+        error: 'Error interno del servidor',
         details: error instanceof Error ? error.message : 'Error desconocido'
       },
       { status: 500 }
