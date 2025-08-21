@@ -23,37 +23,54 @@ async function buscarInsumosPorNombre(nombresInsumos: string[]) {
       return [];
     }
 
-    console.log('🔍 BUSCAR INSUMOS: Buscando:', nombresInsumos);
+    console.log('🔍 [PROD-DEBUG] ===== FUNCIÓN BUSCAR INSUMOS POR NOMBRE =====');
+    console.log('🔍 [PROD-DEBUG] Insumos a buscar:', nombresInsumos);
+    console.log('🔍 [PROD-DEBUG] Cantidad de insumos:', nombresInsumos.length);
+    console.log('🗄️ [PROD-DEBUG] AIRTABLE_TABLE_INSUMOS:', AIRTABLE_TABLE_INSUMOS);
 
     const insumosEncontrados = [];
 
     for (const nombreInsumo of nombresInsumos) {
+      console.log(`🔎 [PROD-DEBUG] Buscando insumo: "${nombreInsumo}"`);
+      
       // Crear filtro para buscar el insumo por nombre (case insensitive)
       const filterFormula = `SEARCH(UPPER("${nombreInsumo}"), UPPER({nombre}))`;
       const encodedFilter = encodeURIComponent(filterFormula);
+      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_INSUMOS}?filterByFormula=${encodedFilter}`;
+      
+      console.log(`🌐 [PROD-DEBUG] URL de búsqueda: ${url}`);
+      console.log(`📋 [PROD-DEBUG] Filter formula: ${filterFormula}`);
 
-      const response = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_INSUMOS}?filterByFormula=${encodedFilter}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log(`📡 [PROD-DEBUG] Response status para ${nombreInsumo}:`, response.status);
+      console.log(`✅ [PROD-DEBUG] Response ok para ${nombreInsumo}:`, response.ok);
 
       if (response.ok) {
         const data = await response.json();
+        console.log(`📋 [PROD-DEBUG] Datos recibidos para ${nombreInsumo}:`, JSON.stringify(data, null, 2));
+        console.log(`📊 [PROD-DEBUG] Cantidad de registros encontrados: ${data.records?.length || 0}`);
+        
         if (data.records && data.records.length > 0) {
           const insumo = data.records[0]; // Tomar el primer resultado
-          insumosEncontrados.push({
+          console.log(`📦 [PROD-DEBUG] Primer insumo encontrado:`, JSON.stringify(insumo, null, 2));
+          
+          const insumoData = {
             id: insumo.id,
             nombre: insumo.fields.nombre || nombreInsumo,
             nombreBuscado: nombreInsumo,
             encontrado: true,
             presentacion: insumo.fields['Cantidad Presentacion Insumo'] || 1 // Obtener la presentación
-          });
-          console.log(`✅ INSUMO ENCONTRADO: ${nombreInsumo} -> ID: ${insumo.id}, Presentación: ${insumo.fields['Cantidad Presentacion Insumo'] || 1}`);
+          };
+          
+          insumosEncontrados.push(insumoData);
+          console.log(`✅ [PROD-DEBUG] INSUMO ENCONTRADO: ${nombreInsumo} -> ID: ${insumo.id}, Presentación: ${insumo.fields['Cantidad Presentacion Insumo'] || 1}`);
+          console.log(`📦 [PROD-DEBUG] Objeto insumo agregado:`, JSON.stringify(insumoData, null, 2));
         } else {
           insumosEncontrados.push({
             id: null,
@@ -151,25 +168,40 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  console.log('🚀 [PROD-DEBUG] ===== INICIANDO API PRODUCCION-BACTERIAS =====');
+  console.log('🌍 [PROD-DEBUG] Environment:', process.env.NODE_ENV);
+  console.log('📅 [PROD-DEBUG] Timestamp:', new Date().toISOString());
+  
   try {
     const body = await request.json();
-    console.log('🧬 API PRODUCCION-BACTERIAS: Body recibido:', body);
+    console.log('📦 [PROD-DEBUG] Request body recibido:', JSON.stringify(body, null, 2));
     
     const { microorganismoId, cantidadLitros, fechaInicio, observaciones, realizaRegistro, responsablesEquipo } = body;
 
+    console.log('🔍 [PROD-DEBUG] Datos extraídos del body:');
+    console.log('  - microorganismoId:', microorganismoId);
+    console.log('  - cantidadLitros:', cantidadLitros, '(tipo:', typeof cantidadLitros, ')');
+    console.log('  - fechaInicio:', fechaInicio);
+    console.log('  - realizaRegistro:', realizaRegistro);
+    console.log('  - responsablesEquipo:', responsablesEquipo);
+
     // Validación de campos requeridos
     if (!microorganismoId) {
-      console.error('❌ API PRODUCCION-BACTERIAS: microorganismoId faltante');
+      console.error('❌ [PROD-DEBUG] API PRODUCCION-BACTERIAS: microorganismoId faltante');
       return NextResponse.json({ success: false, error: 'microorganismoId es requerido' }, { status: 400 });
     }
     
     if (!cantidadLitros) {
-      console.error('❌ API PRODUCCION-BACTERIAS: cantidadLitros faltante');
+      console.error('❌ [PROD-DEBUG] API PRODUCCION-BACTERIAS: cantidadLitros faltante');
       return NextResponse.json({ success: false, error: 'cantidadLitros es requerido' }, { status: 400 });
     }
 
+    console.log('🔑 [PROD-DEBUG] Verificando configuración de Airtable...');
+    console.log('  - AIRTABLE_API_KEY exists:', !!AIRTABLE_API_KEY);
+    console.log('  - AIRTABLE_BASE_ID exists:', !!AIRTABLE_BASE_ID);
+    
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      console.error('❌ API PRODUCCION-BACTERIAS: Configuración de Airtable incompleta');
+      console.error('❌ [PROD-DEBUG] API PRODUCCION-BACTERIAS: Configuración de Airtable incompleta');
       return NextResponse.json(
         { success: false, error: 'Configuración de Airtable incompleta' },
         { status: 500 }
@@ -178,6 +210,7 @@ export async function POST(request: Request) {
 
     // Usar la tabla de fermentación
     const AIRTABLE_TABLE_FERMENTACION = process.env.AIRTABLE_TABLE_FERMENTACION;
+    console.log('🗄️ [PROD-DEBUG] AIRTABLE_TABLE_FERMENTACION:', AIRTABLE_TABLE_FERMENTACION);
     
     if (!AIRTABLE_TABLE_FERMENTACION) {
       console.error('❌ API PRODUCCION-BACTERIAS: AIRTABLE_TABLE_FERMENTACION no configurado');
@@ -201,12 +234,16 @@ export async function POST(request: Request) {
     fechaFinalizacion.setDate(fechaFinalizacion.getDate() + 3); // 3 días de fermentación
 
     console.log('📅 API PRODUCCION-BACTERIAS: Fecha inicio original:', fechaInicio);
-    console.log('📅 API PRODUCCION-BACTERIAS: Fecha inicio procesada:', fechaInicioDate.toISOString());
-    console.log('📅 API PRODUCCION-BACTERIAS: Fecha finalización:', fechaFinalizacion.toISOString());
+    console.log('📅 [PROD-DEBUG] API PRODUCCION-BACTERIAS: Fecha inicio procesada:', fechaInicioDate.toISOString());
+    console.log('📅 [PROD-DEBUG] API PRODUCCION-BACTERIAS: Fecha finalización:', fechaFinalizacion.toISOString());
 
     // Obtener información del microorganismo para determinar si es Bacillus thuringiensis
+    console.log('🦠 [PROD-DEBUG] ===== INICIANDO BÚSQUEDA DE MICROORGANISMO =====');
+    console.log('🔍 [PROD-DEBUG] microorganismoId a buscar:', microorganismoId);
+    console.log('🗄️ [PROD-DEBUG] AIRTABLE_TABLE_MICROORGANISMOS:', AIRTABLE_TABLE_MICROORGANISMOS);
+    
     let insumosCalculados: Array<{
-      id: string;
+      id: string | null;
       nombre: string;
       nombreBuscado: string;
       encontrado: boolean;
@@ -218,39 +255,78 @@ export async function POST(request: Request) {
     let microorganismoInfo = null;
     
     try {
-      const microorganismoResponse = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_MICROORGANISMOS}/${microorganismoId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const microorganismoUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_MICROORGANISMOS}/${microorganismoId}`;
+      console.log('🌐 [PROD-DEBUG] URL de microorganismo:', microorganismoUrl);
+      
+      const microorganismoResponse = await fetch(microorganismoUrl, {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('📡 [PROD-DEBUG] Response status microorganismo:', microorganismoResponse.status);
+      console.log('✅ [PROD-DEBUG] Response ok microorganismo:', microorganismoResponse.ok);
       
       if (microorganismoResponse.ok) {
         const microorganismoData = await microorganismoResponse.json();
         microorganismoInfo = microorganismoData.fields;
-        console.log('🦠 MICROORGANISMO INFO:', microorganismoInfo?.Microorganismo);
+        console.log('🦠 [PROD-DEBUG] MICROORGANISMO INFO completo:', JSON.stringify(microorganismoInfo, null, 2));
+        console.log('🦠 [PROD-DEBUG] Nombre del microorganismo:', microorganismoInfo?.Microorganismo);
         
         // Si es Bacillus thuringiensis, calcular insumos necesarios
-        if (microorganismoInfo?.Microorganismo === 'Bacillus thuringiensis') {
-          console.log('🧬 CALCULANDO INSUMOS PARA BACILLUS THURINGIENSIS...');
+        const nombreMicroorganismo = microorganismoInfo?.Microorganismo;
+        console.log('🔍 [PROD-DEBUG] Verificando si es Bacillus thuringiensis...');
+        console.log('🔍 [PROD-DEBUG] Nombre recibido:', `"${nombreMicroorganismo}"`);
+        console.log('🔍 [PROD-DEBUG] Comparación exacta:', nombreMicroorganismo === 'Bacillus thuringiensis');
+        console.log('🔍 [PROD-DEBUG] Tipo de dato:', typeof nombreMicroorganismo);
+        
+        if (nombreMicroorganismo === 'Bacillus thuringiensis') {
+          console.log('🧬 [PROD-DEBUG] ===== ES BACILLUS THURINGIENSIS - INICIANDO CÁLCULO DE INSUMOS =====');
+          
+          // Verificar fórmula desde variables de entorno
+          console.log('🧪 [PROD-DEBUG] Verificando fórmula BACILLUS_FORMULA:');
+          console.log('  - BACILLUS_DIPEL_PER_LITER:', process.env.BACILLUS_DIPEL_PER_LITER);
+          console.log('  - BACILLUS_MELAZA_PER_LITER:', process.env.BACILLUS_MELAZA_PER_LITER);
+          console.log('  - BACILLUS_TOMATE_PER_LITER:', process.env.BACILLUS_TOMATE_PER_LITER);
+          console.log('  - BACILLUS_LEVADURA_PER_LITER:', process.env.BACILLUS_LEVADURA_PER_LITER);
+          console.log('🧪 [PROD-DEBUG] BACILLUS_FORMULA calculada:', BACILLUS_FORMULA);
           
           // Buscar los insumos en la tabla
           const nombresInsumos = Object.keys(BACILLUS_FORMULA);
+          console.log('🔍 [PROD-DEBUG] Nombres de insumos a buscar:', nombresInsumos);
+          console.log('📏 [PROD-DEBUG] Cantidad de litros para calcular:', cantidadLitros);
+          
+          console.log('🔎 [PROD-DEBUG] ===== INICIANDO BÚSQUEDA DE INSUMOS =====');
           const insumosEncontrados = await buscarInsumosPorNombre(nombresInsumos);
+          console.log('📋 [PROD-DEBUG] Insumos encontrados (resultado buscarInsumosPorNombre):', JSON.stringify(insumosEncontrados, null, 2));
           
           // Calcular cantidades necesarias según el volumen
-          insumosCalculados = insumosEncontrados.map(insumo => ({
-            ...insumo,
-            cantidadPorLitro: BACILLUS_FORMULA[insumo.nombreBuscado] || 0,
-            cantidadTotal: (BACILLUS_FORMULA[insumo.nombreBuscado] || 0) * Number(cantidadLitros),
-            unidad: 'gramos',
-            presentacion: insumo.presentacion || 1 // Asegurar que tenemos la presentación
-          }));
+          console.log('🧮 [PROD-DEBUG] ===== CALCULANDO CANTIDADES =====');
+          insumosCalculados = insumosEncontrados.map(insumo => {
+            const cantidadPorLitro = BACILLUS_FORMULA[insumo.nombreBuscado] || 0;
+            const cantidadTotal = cantidadPorLitro * Number(cantidadLitros);
+            
+            console.log(`🧮 [PROD-DEBUG] Calculando ${insumo.nombreBuscado}:`);
+            console.log(`  - Cantidad por litro: ${cantidadPorLitro}`);
+            console.log(`  - Litros: ${cantidadLitros}`);
+            console.log(`  - Cantidad total: ${cantidadTotal}`);
+            console.log(`  - Presentación: ${insumo.presentacion}`);
+            
+            return {
+              ...insumo,
+              cantidadPorLitro,
+              cantidadTotal,
+              unidad: 'gramos',
+              presentacion: insumo.presentacion || 1 // Asegurar que tenemos la presentación
+            };
+          });
           
-          console.log('📊 INSUMOS CALCULADOS:', insumosCalculados);
+          console.log('📊 [PROD-DEBUG] INSUMOS CALCULADOS FINAL:', JSON.stringify(insumosCalculados, null, 2));
+        } else {
+          console.log('❌ [PROD-DEBUG] NO ES BACILLUS THURINGIENSIS - No se calcularán insumos automáticos');
+          console.log('🔍 [PROD-DEBUG] Nombre esperado: "Bacillus thuringiensis"');
+          console.log('🔍 [PROD-DEBUG] Nombre recibido: "' + nombreMicroorganismo + '"');
         }
       }
     } catch (error) {
@@ -305,14 +381,30 @@ export async function POST(request: Request) {
 
     // Si hay insumos calculados para Bacillus thuringiensis, crear registros de salida
     let salidasInsumosCreadas = null;
+    console.log('🔍 [PROD-DEBUG] ===== VERIFICANDO SI HAY INSUMOS CALCULADOS =====');
+    console.log('🔍 [PROD-DEBUG] insumosCalculados.length:', insumosCalculados.length);
+    console.log('🔍 [PROD-DEBUG] insumosCalculados:', JSON.stringify(insumosCalculados, null, 2));
+    
+    const insumosEncontrados = insumosCalculados.filter(i => i.encontrado);
+    console.log('🔍 [PROD-DEBUG] Insumos encontrados (filtrados):', insumosEncontrados.length);
+    console.log('🔍 [PROD-DEBUG] Lista de encontrados:', JSON.stringify(insumosEncontrados, null, 2));
+    
+    const condicion1 = insumosCalculados.length > 0;
+    const condicion2 = insumosCalculados.some(i => i.encontrado);
+    console.log('🔍 [PROD-DEBUG] Condición 1 (length > 0):', condicion1);
+    console.log('🔍 [PROD-DEBUG] Condición 2 (some encontrado):', condicion2);
+    console.log('🔍 [PROD-DEBUG] Condición combinada:', condicion1 && condicion2);
+    
     if (insumosCalculados.length > 0 && insumosCalculados.some(i => i.encontrado)) {
+      console.log('� [PROD-DEBUG] ===== INICIANDO DESCUENTO AUTOMÁTICO DE INSUMOS =====');
+      
       try {
-        console.log('📦 INICIANDO DESCUENTO AUTOMÁTICO DE INSUMOS...');
-        
         // Preparar datos para el descuento automático
-        const salidaInsumosData = insumosCalculados
-          .filter(insumo => insumo.encontrado && insumo.id) // Solo insumos encontrados
-          .map(insumo => ({
+        const insumosParaSalida = insumosCalculados.filter(insumo => insumo.encontrado && insumo.id);
+        console.log('📦 [PROD-DEBUG] Insumos para salida (con ID):', JSON.stringify(insumosParaSalida, null, 2));
+        
+        const salidaInsumosData = insumosParaSalida.map(insumo => {
+          const registroSalida = {
             fecha: fechaInicioDate.toISOString().split('T')[0], // Solo fecha, no tiempo
             cantidad: insumo.cantidadTotal, // cantidad total en gramos
             unidad: 'gr',
@@ -321,25 +413,43 @@ export async function POST(request: Request) {
             fermentacionId: createdRecord.id,
             userName: realizaRegistro || 'Sistema',
             nombreEvento: `Fermentación ${microorganismoInfo?.Microorganismo} - ${cantidadLitros}L`
-          }));
+          };
+          
+          console.log(`📋 [PROD-DEBUG] Registro de salida para ${insumo.nombre}:`, JSON.stringify(registroSalida, null, 2));
+          return registroSalida;
+        });
 
-        console.log('📋 DATOS PARA SALIDA DE INSUMOS:', salidaInsumosData);
+        console.log('📋 [PROD-DEBUG] DATOS COMPLETOS PARA SALIDA DE INSUMOS:', JSON.stringify(salidaInsumosData, null, 2));
 
+        // Preparar el payload completo
+        const payloadSalidaInsumos = { 
+          registros: salidaInsumosData,
+          fermentacionId: createdRecord.id,
+          userName: realizaRegistro || 'Sistema'
+        };
+        
+        console.log('📤 [PROD-DEBUG] PAYLOAD COMPLETO PARA SALIDA-INSUMOS-AUTO:', JSON.stringify(payloadSalidaInsumos, null, 2));
+
+        // Construir URL del endpoint
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+        const salidaInsumosUrl = `${baseUrl}/api/salida-insumos-auto`;
+        console.log('🌐 [PROD-DEBUG] URL del endpoint salida-insumos-auto:', salidaInsumosUrl);
+        
         // Llamar al endpoint de salida-insumos-auto
-        const salidaInsumosResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/salida-insumos-auto`, {
+        console.log('📞 [PROD-DEBUG] ===== LLAMANDO A SALIDA-INSUMOS-AUTO =====');
+        const salidaInsumosResponse = await fetch(salidaInsumosUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
-            registros: salidaInsumosData,
-            fermentacionId: createdRecord.id,
-            userName: realizaRegistro || 'Sistema'
-          }),
+          body: JSON.stringify(payloadSalidaInsumos),
         });
 
+        console.log('📡 [PROD-DEBUG] Response status salida-insumos-auto:', salidaInsumosResponse.status);
+        console.log('✅ [PROD-DEBUG] Response ok salida-insumos-auto:', salidaInsumosResponse.ok);
+
         const salidaInsumosResult = await salidaInsumosResponse.json();
-        console.log('📊 RESPUESTA SALIDA INSUMOS:', salidaInsumosResult);
+        console.log('📊 [PROD-DEBUG] RESPUESTA COMPLETA SALIDA INSUMOS:', JSON.stringify(salidaInsumosResult, null, 2));
         
         if (salidaInsumosResponse.ok && salidaInsumosResult.success) {
           console.log('✅ DESCUENTO DE INSUMOS COMPLETADO EXITOSAMENTE');
