@@ -430,28 +430,41 @@ export async function POST(request: Request) {
         
         console.log('📤 [PROD-DEBUG] PAYLOAD COMPLETO PARA SALIDA-INSUMOS-AUTO:', JSON.stringify(payloadSalidaInsumos, null, 2));
 
-        // Construir URL del endpoint
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
-        const salidaInsumosUrl = `${baseUrl}/api/salida-insumos-auto`;
-        console.log('🌐 [PROD-DEBUG] URL del endpoint salida-insumos-auto:', salidaInsumosUrl);
+        // Llamar directamente a la función de salida-insumos-auto sin fetch HTTP
+        console.log('📞 [PROD-DEBUG] ===== LLAMANDO DIRECTAMENTE A SALIDA-INSUMOS-AUTO =====');
         
-        // Llamar al endpoint de salida-insumos-auto
-        console.log('📞 [PROD-DEBUG] ===== LLAMANDO A SALIDA-INSUMOS-AUTO =====');
-        const salidaInsumosResponse = await fetch(salidaInsumosUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payloadSalidaInsumos),
-        });
-
-        console.log('📡 [PROD-DEBUG] Response status salida-insumos-auto:', salidaInsumosResponse.status);
-        console.log('✅ [PROD-DEBUG] Response ok salida-insumos-auto:', salidaInsumosResponse.ok);
-
-        const salidaInsumosResult = await salidaInsumosResponse.json();
-        console.log('📊 [PROD-DEBUG] RESPUESTA COMPLETA SALIDA INSUMOS:', JSON.stringify(salidaInsumosResult, null, 2));
+        let salidaInsumosResult: any;
         
-        if (salidaInsumosResponse.ok && salidaInsumosResult.success) {
+        try {
+          // Crear un request mock para la función del endpoint
+          const mockRequest = new Request('http://localhost:3000/api/salida-insumos-auto', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payloadSalidaInsumos),
+          });
+          
+          console.log('🔄 [PROD-DEBUG] Importando y ejecutando función directamente...');
+          
+          // Importar y llamar directamente la función
+          const salidaInsumosModule = await import('../salida-insumos-auto/route');
+          const directResponse = await salidaInsumosModule.POST(mockRequest as any);
+          salidaInsumosResult = await directResponse.json();
+          
+          console.log('✅ [PROD-DEBUG] Llamada directa exitosa:', JSON.stringify(salidaInsumosResult, null, 2));
+          
+        } catch (directError: unknown) {
+          console.error('❌ [PROD-DEBUG] ERROR EN LLAMADA DIRECTA:', directError);
+          salidaInsumosResult = {
+            success: false,
+            error: 'Error al procesar salidas de insumos',
+            details: directError instanceof Error ? directError.message : 'Error desconocido',
+            directCallFailed: true
+          };
+        }
+        
+        if (salidaInsumosResult.success) {
           console.log('✅ [PROD-DEBUG] DESCUENTO DE INSUMOS COMPLETADO EXITOSAMENTE');
           salidasInsumosCreadas = {
             success: true,
@@ -460,10 +473,10 @@ export async function POST(request: Request) {
           };
         } else {
           console.error('❌ [PROD-DEBUG] ===== ERROR EN DESCUENTO DE INSUMOS =====');
-          console.error('❌ [PROD-DEBUG] Response ok:', salidaInsumosResponse.ok);
-          console.error('❌ [PROD-DEBUG] Response status:', salidaInsumosResponse.status);
           console.error('❌ [PROD-DEBUG] Result success:', salidaInsumosResult.success);
           console.error('❌ [PROD-DEBUG] Error details:', salidaInsumosResult.error);
+          console.error('❌ [PROD-DEBUG] Status from result:', salidaInsumosResult.status);
+          console.error('❌ [PROD-DEBUG] Is HTML response:', salidaInsumosResult.isHtmlResponse);
           
           // ROLLBACK: Eliminar la fermentación creada si falla el descuento
           console.log('🔄 [PROD-DEBUG] ===== INICIANDO ROLLBACK TRANSACCIONAL =====');

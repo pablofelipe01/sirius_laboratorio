@@ -11,6 +11,31 @@ export async function POST(request: NextRequest) {
   console.log('🌍 [PROD-DEBUG] Environment:', process.env.NODE_ENV);
   console.log('📅 [PROD-DEBUG] Timestamp:', new Date().toISOString());
   
+  // 🔧 VALIDACIÓN CRÍTICA DE VARIABLES DE ENTORNO
+  console.log('🔧 [PROD-DEBUG] ===== VALIDANDO VARIABLES DE ENTORNO =====');
+  console.log('🔧 [PROD-DEBUG] AIRTABLE_API_KEY existe:', !!process.env.AIRTABLE_API_KEY);
+  console.log('🔧 [PROD-DEBUG] AIRTABLE_BASE_ID existe:', !!process.env.AIRTABLE_BASE_ID);
+  console.log('🔧 [PROD-DEBUG] AIRTABLE_API_KEY prefix:', process.env.AIRTABLE_API_KEY?.substring(0, 10) + '...');
+  console.log('🔧 [PROD-DEBUG] AIRTABLE_BASE_ID value:', process.env.AIRTABLE_BASE_ID);
+  
+  if (!process.env.AIRTABLE_API_KEY) {
+    console.error('❌ [PROD-DEBUG] FATAL: AIRTABLE_API_KEY no está configurada');
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Error de configuración: AIRTABLE_API_KEY no configurada',
+      details: 'Variable de entorno faltante en producción'
+    }, { status: 500 });
+  }
+  
+  if (!process.env.AIRTABLE_BASE_ID) {
+    console.error('❌ [PROD-DEBUG] FATAL: AIRTABLE_BASE_ID no está configurada');
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Error de configuración: AIRTABLE_BASE_ID no configurada',
+      details: 'Variable de entorno faltante en producción'
+    }, { status: 500 });
+  }
+  
   try {
     const body = await request.json();
     console.log('📦 [PROD-DEBUG] Request body completo:', JSON.stringify(body, null, 2));
