@@ -238,23 +238,58 @@ export default function BacteriasPage() {
       });
 
       const result = await response.json();
-      console.log('📊 Respuesta fermentación:', result);
-      console.log('📊 Status response:', response.status);
+      console.log('📊 [FRONTEND-DEBUG] ===== RESPUESTA COMPLETA DEL SERVIDOR =====');
+      console.log('📊 [FRONTEND-DEBUG] Response status:', response.status);
+      console.log('📊 [FRONTEND-DEBUG] Response ok:', response.ok);
+      console.log('📊 [FRONTEND-DEBUG] Resultado completo:', JSON.stringify(result, null, 2));
+      console.log('📊 [FRONTEND-DEBUG] result.success:', result.success);
+      console.log('📊 [FRONTEND-DEBUG] result.insumos:', result.insumos);
+      console.log('📊 [FRONTEND-DEBUG] result.insumos?.descuentoAutomatico:', result.insumos?.descuentoAutomatico);
       
       if (result.success) {
+        console.log('✅ [FRONTEND-DEBUG] ===== FERMENTACIÓN EXITOSA =====');
+        console.log('✅ [FRONTEND-DEBUG] Fermentación ID:', result.fermentacionId);
+        console.log('✅ [FRONTEND-DEBUG] Fecha inicio:', result.fechaInicio);
+        console.log('✅ [FRONTEND-DEBUG] Fecha finalización:', result.fechaFinalizacion);
+        
         const successMsg = `🧬 ¡Fermentación iniciada exitosamente!\n\n` +
               `📊 Volumen: ${produccionData.cantidadObjetivo}L\n` +
               `📅 Inicio: ${new Date(result.fechaInicio).toLocaleDateString('es-CO')}\n` +
               `📅 Finalización estimada: ${new Date(result.fechaFinalizacion).toLocaleDateString('es-CO')}\n` +
               `🆔 ID Fermentación: ${result.fermentacionId}`;
-              
-        // Agregar información de insumos si están disponibles
-        const insumosInfo = result.insumos?.descuentoAutomatico ? 
-          `\n\n📦 Descuento automático de insumos: ${result.insumos.descuentoAutomatico.success ? '✅ Completado' : '❌ Fallido'}` : '';
+
+        // Agregar información detallada de insumos
+        let insumosInfo = '';
+        console.log('🔍 [FRONTEND-DEBUG] ===== PROCESANDO INFO DE INSUMOS =====');
+        
+        if (result.insumos?.descuentoAutomatico) {
+          console.log('📦 [FRONTEND-DEBUG] Información de descuento automático encontrada');
+          console.log('📦 [FRONTEND-DEBUG] success:', result.insumos.descuentoAutomatico.success);
+          console.log('📦 [FRONTEND-DEBUG] error:', result.insumos.descuentoAutomatico.error);
+          console.log('📦 [FRONTEND-DEBUG] details:', result.insumos.descuentoAutomatico.details);
+          
+          if (result.insumos.descuentoAutomatico.success) {
+            insumosInfo = `\n\n📦 Descuento automático de insumos: ✅ Completado`;
+            console.log('✅ [FRONTEND-DEBUG] Descuento automático completado exitosamente');
+          } else {
+            const errorDetails = result.insumos.descuentoAutomatico.error || 'Error desconocido';
+            insumosInfo = `\n\n📦 Descuento automático de insumos: ❌ Fallido\n🔍 Error: ${errorDetails}`;
+            console.error('❌ [FRONTEND-DEBUG] Descuento automático falló:', errorDetails);
+            console.error('❌ [FRONTEND-DEBUG] Detalles completos:', result.insumos.descuentoAutomatico);
+          }
+        } else {
+          console.log('⚠️ [FRONTEND-DEBUG] No se encontró información de descuento automático en la respuesta');
+          console.log('⚠️ [FRONTEND-DEBUG] result.insumos:', result.insumos);
+          insumosInfo = `\n\n📦 Descuento automático de insumos: ⚠️ Sin información`;
+        }
+        
+        console.log('📝 [FRONTEND-DEBUG] Mensaje final a mostrar:', successMsg + insumosInfo);
               
         setSuccessMessage(successMsg + insumosInfo);
         setResultadoFermentacion(result); // Guardar resultado completo
         setShowSuccessModal(true);
+        
+        console.log('✅ [FRONTEND-DEBUG] Modal de éxito mostrado, limpiando formulario...');
         
         // Limpiar formulario
         setShowProduccionForm(false);
@@ -269,13 +304,23 @@ export default function BacteriasPage() {
         });
         setInsumosCalculados([]);
       } else {
-        console.error('❌ Error en la respuesta:', result);
+        console.error('❌ [FRONTEND-DEBUG] ===== ERROR EN LA RESPUESTA =====');
+        console.error('❌ [FRONTEND-DEBUG] result.success:', result.success);
+        console.error('❌ [FRONTEND-DEBUG] result.error:', result.error);
+        console.error('❌ [FRONTEND-DEBUG] result.details:', result.details);
+        console.error('❌ [FRONTEND-DEBUG] Respuesta completa:', JSON.stringify(result, null, 2));
+        
         alert(`❌ Error al iniciar fermentación:\n\n${result.error}\n\nDetalles: ${result.details || 'Sin detalles adicionales'}`);
       }
     } catch (err) {
-      console.error('❌ Error de conexión:', err);
+      console.error('❌ [FRONTEND-DEBUG] ===== ERROR DE CONEXIÓN =====');
+      console.error('❌ [FRONTEND-DEBUG] Error completo:', err);
+      console.error('❌ [FRONTEND-DEBUG] Error message:', err instanceof Error ? err.message : 'Error desconocido');
+      console.error('❌ [FRONTEND-DEBUG] Error stack:', err instanceof Error ? err.stack : 'No stack available');
+      
       alert('❌ Error de conexión al iniciar fermentación');
     } finally {
+      console.log('🔄 [FRONTEND-DEBUG] Finalizando proceso, setIsSubmitting(false)');
       setIsSubmitting(false);
     }
   };

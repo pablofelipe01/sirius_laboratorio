@@ -452,66 +452,136 @@ export async function POST(request: Request) {
         console.log('📊 [PROD-DEBUG] RESPUESTA COMPLETA SALIDA INSUMOS:', JSON.stringify(salidaInsumosResult, null, 2));
         
         if (salidaInsumosResponse.ok && salidaInsumosResult.success) {
-          console.log('✅ DESCUENTO DE INSUMOS COMPLETADO EXITOSAMENTE');
+          console.log('✅ [PROD-DEBUG] DESCUENTO DE INSUMOS COMPLETADO EXITOSAMENTE');
           salidasInsumosCreadas = {
             success: true,
             procesados: salidaInsumosResult.procesados || salidaInsumosData.length,
             message: salidaInsumosResult.message
           };
         } else {
-          console.error('❌ ERROR EN DESCUENTO DE INSUMOS:', salidaInsumosResult.error);
+          console.error('❌ [PROD-DEBUG] ===== ERROR EN DESCUENTO DE INSUMOS =====');
+          console.error('❌ [PROD-DEBUG] Response ok:', salidaInsumosResponse.ok);
+          console.error('❌ [PROD-DEBUG] Response status:', salidaInsumosResponse.status);
+          console.error('❌ [PROD-DEBUG] Result success:', salidaInsumosResult.success);
+          console.error('❌ [PROD-DEBUG] Error details:', salidaInsumosResult.error);
           
           // ROLLBACK: Eliminar la fermentación creada si falla el descuento
+          console.log('🔄 [PROD-DEBUG] ===== INICIANDO ROLLBACK TRANSACCIONAL =====');
+          console.log('🔄 [PROD-DEBUG] ID a eliminar:', createdRecord.id);
+          
           try {
-            console.log('🔄 INICIANDO ROLLBACK - Eliminando fermentación...');
-            const rollbackResponse = await fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_FERMENTACION}?records[]=${createdRecord.id}`,
-              {
-                method: 'DELETE',
-                headers: {
-                  'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-                  'Content-Type': 'application/json',
-                }
+            // Corregir la URL del DELETE - usar el formato correcto de Airtable
+            const rollbackUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_FERMENTACION}/${createdRecord.id}`;
+            console.log('🔄 [PROD-DEBUG] URL de rollback:', rollbackUrl);
+            
+            const rollbackResponse = await fetch(rollbackUrl, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                'Content-Type': 'application/json',
               }
-            );
+            });
+            
+            console.log('📡 [PROD-DEBUG] Rollback response status:', rollbackResponse.status);
+            console.log('📡 [PROD-DEBUG] Rollback response ok:', rollbackResponse.ok);
             
             if (rollbackResponse.ok) {
-              console.log('✅ ROLLBACK COMPLETADO - Fermentación eliminada');
+              const rollbackResult = await rollbackResponse.json();
+              console.log('✅ [PROD-DEBUG] ROLLBACK COMPLETADO - Fermentación eliminada:', rollbackResult);
+              
               return NextResponse.json({
                 success: false,
-                error: 'Error transaccional: No se pudieron descontar los insumos automáticamente. La fermentación fue cancelada.',
-                details: `Detalle del error: ${salidaInsumosResult.error}`
-              }, { status: 500 });
+                error: 'Error transaccional: No se pudieron descontar los insumos automáticamente. La fermentación fue cancelada para mantener consistencia.',
+                details: `Detalle del error en insumos: ${salidaInsumosResult.error || 'Error desconocido'}`,
+                rollback: true,
+                originalError: salidaInsumosResult
+              }, { status: 400 });
             } else {
-              console.error('❌ ERROR EN ROLLBACK');
+              const rollbackErrorText = await rollbackResponse.text();
+              console.error('❌ [PROD-DEBUG] ERROR EN ROLLBACK:', rollbackErrorText);
+              
               return NextResponse.json({
                 success: false,
                 error: 'Error crítico: Fermentación creada pero falló el descuento de insumos Y no se pudo deshacer automáticamente.',
-                details: `ID Fermentación: ${createdRecord.id}. Contacte al administrador.`,
-                fermentacionId: createdRecord.id
+                details: `ID Fermentación: ${createdRecord.id}. Error de rollback: ${rollbackErrorText}. Contacte al administrador.`,
+                fermentacionId: createdRecord.id,
+                rollbackFailed: true
               }, { status: 500 });
             }
-          } catch (rollbackError) {
-            console.error('❌ ERROR CRÍTICO EN ROLLBACK:', rollbackError);
+          } catch (rollbackError: unknown) {
+            console.error('❌ [PROD-DEBUG] ERROR CRÍTICO EN ROLLBACK:', rollbackError);
             return NextResponse.json({
               success: false,
               error: 'Error crítico del sistema durante rollback',
-              details: `Fermentación ${createdRecord.id} puede requerir limpieza manual`,
-              fermentacionId: createdRecord.id
+              details: `Fermentación ${createdRecord.id} puede requerir limpieza manual. Error: ${rollbackError instanceof Error ? rollbackError.message : 'Error desconocido'}`,
+              fermentacionId: createdRecord.id,
+              rollbackException: true
             }, { status: 500 });
           }
         }
-      } catch (salidasError) {
-        console.error('❌ ERROR AL PROCESAR SALIDAS DE INSUMOS:', salidasError);
-        salidasInsumosCreadas = {
-          success: false,
-          error: salidasError instanceof Error ? salidasError.message : 'Error desconocido',
-          message: 'No se pudieron procesar las salidas de insumos automáticamente'
-        };
+      } catch (salidasError: unknown) {
+        console.error('❌ [PROD-DEBUG] ===== ERROR AL PROCESAR SALIDAS DE INSUMOS (CATCH GENERAL) =====');
+        console.error('❌ [PROD-DEBUG] Tipo de error:', typeof salidasError);
+        console.error('❌ [PROD-DEBUG] Error completo:', salidasError);
+        console.error('❌ [PROD-DEBUG] Error message:', salidasError instanceof Error ? salidasError.message : 'Error desconocido');
+        console.error('❌ [PROD-DEBUG] Error stack:', salidasError instanceof Error ? salidasError.stack : 'No stack available');
+        
+        // ROLLBACK TAMBIÉN EN CASO DE EXCEPCIÓN
+        console.log('🔄 [PROD-DEBUG] ===== INICIANDO ROLLBACK POR EXCEPCIÓN =====');
+        try {
+          const rollbackUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_FERMENTACION}/${createdRecord.id}`;
+          console.log('🔄 [PROD-DEBUG] URL de rollback por excepción:', rollbackUrl);
+          
+          const rollbackResponse = await fetch(rollbackUrl, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            }
+          });
+          
+          if (rollbackResponse.ok) {
+            console.log('✅ [PROD-DEBUG] ROLLBACK POR EXCEPCIÓN COMPLETADO');
+            return NextResponse.json({
+              success: false,
+              error: 'Error transaccional: No se pudieron procesar los insumos. La fermentación fue cancelada para mantener consistencia.',
+              details: salidasError instanceof Error ? salidasError.message : 'Error desconocido en procesamiento de insumos',
+              rollback: true,
+              originalError: salidasError instanceof Error ? salidasError.stack : salidasError
+            }, { status: 400 });
+          } else {
+            console.error('❌ [PROD-DEBUG] ERROR EN ROLLBACK POR EXCEPCIÓN');
+            return NextResponse.json({
+              success: false,
+              error: 'Error crítico: Excepción en procesamiento de insumos Y fallo en rollback.',
+              details: `Fermentación ${createdRecord.id} requiere limpieza manual.`,
+              fermentacionId: createdRecord.id,
+              rollbackFailed: true,
+              originalError: salidasError instanceof Error ? salidasError.message : 'Error desconocido'
+            }, { status: 500 });
+          }
+        } catch (rollbackError: unknown) {
+          console.error('❌ [PROD-DEBUG] ERROR CRÍTICO EN ROLLBACK POR EXCEPCIÓN:', rollbackError);
+          return NextResponse.json({
+            success: false,
+            error: 'Error crítico del sistema',
+            details: `Fermentación ${createdRecord.id} y rollback fallaron. Limpieza manual requerida.`,
+            fermentacionId: createdRecord.id,
+            rollbackException: true
+          }, { status: 500 });
+        }
       }
+    } else {
+      console.log('⚠️ [PROD-DEBUG] ===== NO HAY INSUMOS CALCULADOS O NO SE ENCONTRARON =====');
+      console.log('⚠️ [PROD-DEBUG] insumosCalculados.length:', insumosCalculados.length);
+      console.log('⚠️ [PROD-DEBUG] Condición some(encontrado):', insumosCalculados.some(i => i.encontrado));
     }
 
-    return NextResponse.json({
+    console.log('📤 [PROD-DEBUG] ===== CONSTRUYENDO RESPUESTA FINAL =====');
+    console.log('📤 [PROD-DEBUG] salidasInsumosCreadas:', JSON.stringify(salidasInsumosCreadas, null, 2));
+    console.log('📤 [PROD-DEBUG] insumosCalculados.length:', insumosCalculados.length);
+
+    const respuestaFinal = {
       success: true,
       message: 'Fermentación iniciada exitosamente',
       fermentacionId: createdRecord.id,
@@ -526,7 +596,11 @@ export async function POST(request: Request) {
         insumosNecesarios: insumosCalculados,
         descuentoAutomatico: salidasInsumosCreadas
       } : null
-    });
+    };
+    
+    console.log('📤 [PROD-DEBUG] RESPUESTA FINAL COMPLETA:', JSON.stringify(respuestaFinal, null, 2));
+
+    return NextResponse.json(respuestaFinal);
 
   } catch (error) {
     console.error('❌ API PRODUCCION-BACTERIAS: Error general:', error);
