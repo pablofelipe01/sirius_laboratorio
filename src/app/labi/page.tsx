@@ -86,7 +86,7 @@ export default function SIRIUSPage() {
       </div>
       
       <Navbar />
-      <main className="pt-16">
+      <main className="pt-20">
         <SIRIUS3DInterface />
       </main>
       <Footer />

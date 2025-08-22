@@ -888,7 +888,7 @@ const StockInsumosPage = () => {
                               {/* Cantidad Presentación */}
                               <td className="py-3 px-4 text-center">
                                 <span className="font-medium text-gray-800">
-                                  {cantidadPresentacion}
+                                  {Number(cantidadPresentacion).toFixed(2)}
                                 </span>
                               </td>
                               
@@ -897,14 +897,14 @@ const StockInsumosPage = () => {
                                 <span className={`font-bold text-lg ${
                                   esAgotado ? 'text-red-600' : 'text-green-600'
                                 }`}>
-                                  {totalUnidades}
+                                  {Number(totalUnidades).toFixed(2)}
                                 </span>
                               </td>
                               
                               {/* Total Granel */}
                               <td className="py-3 px-4 text-center">
                                 <span className="font-medium text-gray-700">
-                                  {totalGranel}
+                                  {Number(totalGranel).toFixed(2)}
                                 </span>
                               </td>
                               
@@ -1409,7 +1409,7 @@ const StockInsumosPage = () => {
                             return (
                               <option key={insumoOption.id} value={insumoOption.id}>
                                 {hasName ? insumoOption.fields.nombre : `Sin nombre - ${insumoOption.id.slice(-6)}`} 
-                                (Stock: {totalUnidades} {unidadPresentacion})
+                                (Stock: {Number(totalUnidades).toFixed(2)} {unidadPresentacion})
                               </option>
                             );
                           })}
