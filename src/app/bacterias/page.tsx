@@ -34,6 +34,29 @@ interface ProduccionData {
   observaciones: string;
 }
 
+// Función para formatear nombres científicos según nomenclatura microbiológica
+const formatearNombreCientifico = (nombre: string): string => {
+  const correcionesNomenclatura: { [key: string]: string } = {
+    'PseudoMonas': 'Pseudomonas',
+    'AzosPirillum': 'Azospirillum', 
+    'AzotoBacter': 'Azotobacter',
+    'Siriusbacter': 'Sirius bacter',
+    'Bacillus thuringiensis': 'Bacillus thuringiensis', // Ya correcto
+    'Bacillus subtilis': 'Bacillus subtilis' // Ya correcto
+  };
+  
+  return correcionesNomenclatura[nombre] || nombre;
+};
+
+// Función para determinar si un nombre debe mostrarse en itálica (nomenclatura binomial)
+const esNombreBinomial = (nombre: string): boolean => {
+  const nombreCorregido = formatearNombreCientifico(nombre);
+  return nombreCorregido.includes('Bacillus') || 
+         nombreCorregido === 'Pseudomonas' || 
+         nombreCorregido === 'Azospirillum' || 
+         nombreCorregido === 'Azotobacter';
+};
+
 export default function BacteriasPage() {
   const { user } = useAuth();
   const [microorganismos, setMicroorganismos] = useState<Microorganismo[]>([]);
@@ -64,6 +87,16 @@ export default function BacteriasPage() {
         [key: string]: unknown;
       };
     };
+  } | null>(null);
+  const [procesoSiriusBacter, setProcesoSiriusBacter] = useState<{
+    etapas: Array<{
+      numero: number;
+      nombre: string;
+      volumen: number;
+      duracion: string | number;
+    }>;
+    microorganismosRequeridos: string[];
+    tiempoTotal: string;
   } | null>(null);
   const [produccionData, setProduccionData] = useState<ProduccionData>({
     microorganismoId: '',
@@ -172,13 +205,105 @@ export default function BacteriasPage() {
     return formInsumos;
   };
 
+  // Nueva función para manejar SiriusBacter directamente
+  const handleSiriusBacterDirecto = async (microorganismoParam?: Microorganismo) => {
+    console.log('🧬 Iniciando proceso SiriusBacter FIFO...');
+    
+    // Usar el parámetro si se proporciona, sino el selectedMicroorganismo
+    const microorganismoAUsar = microorganismoParam || selectedMicroorganismo;
+    
+    if (!user?.nombre) {
+      alert('Debes estar autenticado para iniciar producción');
+      return;
+    }
+
+    if (!microorganismoAUsar) {
+      console.error('❌ No hay microorganismo seleccionado');
+      alert('Error: No hay microorganismo seleccionado');
+      return;
+    }
+
+    console.log('🔍 Microorganismo seleccionado:', microorganismoAUsar);
+
+    // Guardar el ID antes de cerrar el modal
+    const microorganismoId = microorganismoAUsar.id;
+    
+    // Cerrar cualquier modal inmediatamente
+    setShowProduccionForm(false);
+    setSelectedMicroorganismo(null);
+    setIsSubmitting(true);
+
+    try {
+      console.log('📤 Enviando solicitud a API...');
+      
+      const requestBody = {
+        microorganismoId: microorganismoId,
+        cantidadLitros: '300', // Cambiar de cantidadObjetivo a cantidadLitros para coincidir con API
+        fechaInicio: new Date().toISOString(),
+        observaciones: 'Proceso SiriusBacter automático con lógica FIFO - Búsqueda de microorganismos terminados en 100L',
+        realizaRegistro: user.nombre
+      };
+      
+      console.log('📝 Request body:', requestBody);
+
+      const response = await fetch('/api/produccion-bacterias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('📨 Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('📊 Response data:', result);
+
+      if (result.success) {
+        alert(`✅ ¡Proceso SiriusBacter iniciado exitosamente!\n\n${result.message}`);
+        // Opcional: refrescar datos
+        // await cargarMicroorganismos();
+      } else {
+        if (result.error?.includes('no están disponibles en 100L')) {
+          const faltantes = result.faltantes || [];
+          const mensaje = `❌ No se puede iniciar el proceso SiriusBacter.\n\nMicroorganismos faltantes en 100L:\n${faltantes.join(', ')}\n\n¿Deseas ir a Almacenamiento para revisar el stock?`;
+          
+          if (confirm(mensaje)) {
+            window.location.href = '/almacenamiento';
+          }
+        } else {
+          console.error('❌ Error API:', result.error);
+          alert(`❌ Error al iniciar proceso SiriusBacter:\n\n${result.error}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error de conexión:', error);
+      alert(`❌ Error de conexión al iniciar proceso SiriusBacter\n\nDetalle: ${error}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Manejar envío del formulario de producción (mostrar modal de confirmación)
   const handleSubmitProduccion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMicroorganismo) return;
 
+    // Detectar si es SiriusBacter para ajustar validaciones
+    const esSiriusBacter = selectedMicroorganismo.nombre.toLowerCase().includes('siriusbacter');
+    
+    // Para SiriusBacter, establecer automáticamente el volumen en 300L
+    if (esSiriusBacter) {
+      setProduccionData(prev => ({...prev, cantidadObjetivo: '300'}));
+    }
+
     // Validar campos requeridos
-    if (!produccionData.cantidadObjetivo || !produccionData.fechaInicio) {
+    const volumenRequerido = esSiriusBacter ? '300' : produccionData.cantidadObjetivo;
+    if (!volumenRequerido || !produccionData.fechaInicio) {
       alert('Por favor completa todos los campos requeridos (Volumen y Fecha)');
       return;
     }
@@ -203,9 +328,26 @@ export default function BacteriasPage() {
       const insumosRequeridos = calcularInsumosBacillus(cantidadLitros);
       setInsumosCalculados(insumosRequeridos);
       console.log('🧬 Insumos calculados para Bacillus thuringiensis:', insumosRequeridos);
+    } else if (esSiriusBacter) {
+      // Para SiriusBacter, configurar información del proceso FIFO
+      setInsumosCalculados([]);
+      setProcesoSiriusBacter({
+        etapas: [
+          { numero: 1, nombre: 'Verificación FIFO', volumen: 0, duracion: 'Buscar microorganismos más antiguos' },
+          { numero: 2, nombre: 'PseudoMonas 100L', volumen: 100, duracion: 'Más antiguo disponible' },
+          { numero: 3, nombre: 'AzosPirillum 100L', volumen: 100, duracion: 'Más antiguo disponible' },
+          { numero: 4, nombre: 'AzotoBacter 100L', volumen: 100, duracion: 'Más antiguo disponible' },
+          { numero: 5, nombre: 'Registro Salida', volumen: 300, duracion: 'Registrar uso de microorganismos' },
+          { numero: 6, nombre: 'SiriusBacter Final', volumen: 300, duracion: '24h mezcla final - Listo para venta' }
+        ],
+        microorganismosRequeridos: ['PseudoMonas en 100L', 'AzosPirillum en 100L', 'AzotoBacter en 100L'],
+        tiempoTotal: '24 horas (proceso finalizado)'
+      });
+      console.log('🧬 SiriusBacter detectado - Proceso FIFO configurado');
     } else {
       setInsumosCalculados([]);
-      console.log('ℹ️ No es Bacillus thuringiensis, no se calculan insumos específicos');
+      setProcesoSiriusBacter(null);
+      console.log('ℹ️ Microorganismo estándar, no se calculan insumos específicos');
     }
 
     // Mostrar modal de confirmación
@@ -217,9 +359,13 @@ export default function BacteriasPage() {
     setShowConfirmModal(false);
     setIsSubmitting(true);
     try {
+      // Para SiriusBacter, asegurar que el volumen sea 300L
+      const esSiriusBacterConfirm = selectedMicroorganismo!.nombre.toLowerCase().includes('siriusbacter');
+      const volumenFinal = esSiriusBacterConfirm ? 300 : Number(produccionData.cantidadObjetivo);
+      
       const dataToSend = {
         microorganismoId: selectedMicroorganismo!.id,
-        cantidadLitros: Number(produccionData.cantidadObjetivo),
+        cantidadLitros: volumenFinal,
         fechaInicio: produccionData.fechaInicio,
         observaciones: produccionData.observaciones,
         realizaRegistro: user?.nombre || 'Usuario no identificado',
@@ -228,6 +374,7 @@ export default function BacteriasPage() {
       
       console.log('🧬 FRONTEND: Enviando datos de fermentación:', dataToSend);
       console.log('🧬 FRONTEND: Microorganismo seleccionado:', selectedMicroorganismo);
+      console.log('🧬 FRONTEND: Es SiriusBacter:', esSiriusBacterConfirm, 'Volumen final:', volumenFinal);
 
       const response = await fetch('/api/produccion-bacterias', {
         method: 'POST',
@@ -252,13 +399,50 @@ export default function BacteriasPage() {
         console.log('✅ [FRONTEND-DEBUG] Fecha inicio:', result.fechaInicio);
         console.log('✅ [FRONTEND-DEBUG] Fecha finalización:', result.fechaFinalizacion);
         
-        const successMsg = `🧬 ¡Fermentación iniciada exitosamente!\n\n` +
-              `📊 Volumen: ${produccionData.cantidadObjetivo}L\n` +
-              `📅 Inicio: ${new Date(result.fechaInicio).toLocaleDateString('es-CO')}\n` +
-              `📅 Finalización estimada: ${new Date(result.fechaFinalizacion).toLocaleDateString('es-CO')}\n` +
-              `🆔 ID Fermentación: ${result.fermentacionId}`;
+        let successMsg = '';
+        
+        // Verificar si es un proceso SiriusBacter multietapa
+        if (result.tipoProduccion === 'SiriusBacter Multietapa') {
+          console.log('🧬 [FRONTEND-DEBUG] ===== PROCESO SIRIUSBACTER MULTIETAPA =====');
+          successMsg = `🧬 ¡Proceso multietapa SiriusBacter iniciado exitosamente!\n\n` +
+                `🦠 Microorganismos: ${result.microorganismosUsados?.join(', ') || 'PseudoMonas, AzosPirillum, AzotoBacter'}\n` +
+                `📊 Etapas creadas: ${result.etapasCreadas || 6}\n` +
+                `📋 Registros generados: ${result.registrosCreados || 'Múltiples'}\n` +
+                `📅 Inicio: ${new Date(result.fechaInicioOriginal || result.fechaInicio).toLocaleDateString('es-CO')}\n` +
+                `📅 Finalización estimada: ${new Date(result.fechaFinEstimada || result.fechaFinalizacion).toLocaleDateString('es-CO')}\n` +
+                `🆔 ID Proceso: ${result.recordIdFinal || result.fermentacionId}\n` +
+                `🎯 Volumen final: 300L SiriusBacter`;
+        } else if (result.tipoProduccion === 'SiriusBacter Final (FIFO)') {
+          console.log('🧬 [FRONTEND-DEBUG] ===== PROCESO SIRIUSBACTER FIFO =====');
+          successMsg = `🧬 ¡SiriusBacter creado exitosamente desde microorganismos terminados!\n\n` +
+                `🦠 Microorganismos usados:\n${result.microorganismosUsados?.map((m: any) => `  • ${m.tipo} (${m.lote}) - ${m.litrosUsados}L`).join('\n') || ''}\n\n` +
+                `🆔 ID SiriusBacter: ${result.siriusBacterFinal?.id}\n` +
+                `🏷️ Código de lote: ${result.siriusBacterFinal?.codigoLote}\n` +
+                `📊 Volumen final: ${result.siriusBacterFinal?.volumenFinal}\n` +
+                `📦 Estado: ${result.estadoFinal}\n` +
+                `📅 Fecha creación: ${new Date(result.fechaCreacion).toLocaleDateString('es-CO')}\n` +
+                `⏱️ Tiempo proceso: ${result.resumenProceso?.tiempoTotal}\n` +
+                `✅ Listo para venta`;
+        } else if (result.tipoProduccion === 'Microorganismo Individual - Escalado 50ml') {
+          console.log('🧪 [FRONTEND-DEBUG] ===== MICROORGANISMO INDIVIDUAL - ESCALADO 50ML =====');
+          successMsg = `🧪 ¡Escalado de ${result.microorganismo} iniciado exitosamente!\n\n` +
+                `🦠 Microorganismo: ${result.microorganismo}\n` +
+                `🔬 Etapa: ${result.etapa}\n` +
+                `📊 Volumen: ${result.volumen}\n` +
+                `⏱️ Duración: ${result.duracion}\n` +
+                `📅 Inicio: ${new Date(result.fechaInicio).toLocaleDateString('es-CO')}\n` +
+                `📅 Finalización estimada: ${new Date(result.fechaFinalizacion).toLocaleDateString('es-CO')}\n` +
+                `🆔 ID Fermentación: ${result.fermentacionId}`;
+        } else {
+          // Proceso estándar (Bacillus thuringiensis u otros)
+          successMsg = `🧬 ¡Fermentación iniciada exitosamente!\n\n` +
+                `📊 Volumen: ${produccionData.cantidadObjetivo}L\n` +
+                `📅 Inicio: ${new Date(result.fechaInicio).toLocaleDateString('es-CO')}\n` +
+                `📅 Finalización estimada: ${new Date(result.fechaFinalizacion).toLocaleDateString('es-CO')}\n` +
+                `🆔 ID Fermentación: ${result.fermentacionId}`;
+        }
 
-        // Agregar información detallada de insumos
+        // Agregar información detallada de insumos (solo para procesos estándar)
         let insumosInfo = '';
         console.log('🔍 [FRONTEND-DEBUG] ===== PROCESANDO INFO DE INSUMOS =====');
         
@@ -303,6 +487,7 @@ export default function BacteriasPage() {
           observaciones: ''
         });
         setInsumosCalculados([]);
+        setProcesoSiriusBacter(null);
       } else {
         console.error('❌ [FRONTEND-DEBUG] ===== ERROR EN LA RESPUESTA =====');
         console.error('❌ [FRONTEND-DEBUG] result.success:', result.success);
@@ -310,7 +495,25 @@ export default function BacteriasPage() {
         console.error('❌ [FRONTEND-DEBUG] result.details:', result.details);
         console.error('❌ [FRONTEND-DEBUG] Respuesta completa:', JSON.stringify(result, null, 2));
         
-        alert(`❌ Error al iniciar fermentación:\n\n${result.error}\n\nDetalles: ${result.details || 'Sin detalles adicionales'}`);
+        // Manejo especial para SiriusBacter con microorganismos faltantes
+        if (result.redirectToAlmacenamiento && result.faltantes) {
+          const faltantesText = result.faltantes.join(', ');
+          const disponiblesText = result.microorganismosDisponibles?.join(', ') || 'Ninguno';
+          
+          const confirmGoToStorage = confirm(
+            `❌ No se puede crear SiriusBacter\n\n` +
+            `🦠 Microorganismos faltantes en 100L: ${faltantesText}\n` +
+            `✅ Microorganismos disponibles: ${disponiblesText}\n\n` +
+            `¿Deseas ir a la página de Almacenamiento para verificar el inventario?`
+          );
+          
+          if (confirmGoToStorage) {
+            window.location.href = '/almacenamiento';
+            return;
+          }
+        } else {
+          alert(`❌ Error al iniciar fermentación:\n\n${result.error}\n\nDetalles: ${result.details || 'Sin detalles adicionales'}`);
+        }
       }
     } catch (err) {
       console.error('❌ [FRONTEND-DEBUG] ===== ERROR DE CONEXIÓN =====');
@@ -329,6 +532,109 @@ export default function BacteriasPage() {
   const handleCancelProduccion = () => {
     setShowConfirmModal(false);
     setInsumosCalculados([]);
+    setProcesoSiriusBacter(null);
+  };
+
+  // Función para manejar producción directa de microorganismos individuales (PseudoMonas, AzosPirillum, AzotoBacter) y SiriusBacter
+  const handleProduccionDirecta = async (microorganismo: Microorganismo) => {
+    console.log('🔥 [PROD-DIRECTA] Función llamada con:', microorganismo.nombre);
+    
+    // Validar que el usuario esté autenticado
+    if (!user) {
+      alert('Debes estar autenticado para iniciar producción');
+      return;
+    }
+
+    // Verificar si es SiriusBacter para usar proceso FIFO
+    if (microorganismo.nombre.toLowerCase().includes('siriusbacter')) {
+      console.log('🧬 [PROD-DIRECTA] ES SIRIUSBACTER - Llamando función específica');
+      // Llamar la función específica pasando el microorganismo directamente
+      await handleSiriusBacterDirecto(microorganismo);
+      return;
+    }
+
+    // Verificar que es uno de los microorganismos individuales
+    const esIndividual = microorganismo.nombre.toLowerCase().includes('pseudomonas') ||
+                        microorganismo.nombre.toLowerCase().includes('azospirillum') ||
+                        microorganismo.nombre.toLowerCase().includes('azotobacter');
+
+    if (!esIndividual) {
+      console.log('🔄 [PROD-DIRECTA] No es individual ni SiriusBacter - Abriendo formulario');
+      // Si no es individual ni SiriusBacter, usar el flujo normal (abrir formulario)
+      setSelectedMicroorganismo(microorganismo);
+      setShowProduccionForm(true);
+      setProduccionData(prev => ({
+        ...prev,
+        microorganismoId: microorganismo.id
+      }));
+      return;
+    }
+
+    console.log('🧪 [PROD-DIRECTA] Es microorganismo individual - Procesando directamente');
+
+    // Para microorganismos individuales, ejecutar directamente
+    setIsSubmitting(true);
+    try {
+      console.log('🧪 [FRONTEND-DEBUG] ===== PRODUCCIÓN DIRECTA MICROORGANISMO INDIVIDUAL =====');
+      console.log('🧪 [FRONTEND-DEBUG] Microorganismo:', microorganismo.nombre);
+      console.log('🧪 [FRONTEND-DEBUG] Usuario:', user?.nombre);
+
+      const dataToSend = {
+        microorganismoId: microorganismo.id,
+        cantidadLitros: 0.05, // 50ml = 0.05L fijo para primera etapa
+        fechaInicio: new Date().toISOString(),
+        observaciones: `Escalado inicial automático - ${microorganismo.nombre}`,
+        realizaRegistro: user?.nombre || 'Usuario no identificado',
+        responsablesEquipo: [user?.nombre || 'Usuario no identificado']
+      };
+
+      console.log('🧪 [FRONTEND-DEBUG] Datos a enviar:', dataToSend);
+
+      const response = await fetch('/api/produccion-bacterias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataToSend)
+      });
+
+      const result = await response.json();
+      console.log('🧪 [FRONTEND-DEBUG] Respuesta del servidor:', result);
+
+      if (result.success) {
+        let successMsg = '';
+        
+        if (result.tipoProduccion === 'Microorganismo Individual - Escalado 50ml') {
+          successMsg = `🧪 ¡Escalado de ${result.microorganismo} iniciado exitosamente!\n\n` +
+                `🦠 Microorganismo: ${result.microorganismo}\n` +
+                `🔬 Etapa: ${result.etapa}\n` +
+                `📊 Volumen: ${result.volumen}\n` +
+                `⏱️ Duración: ${result.duracion}\n` +
+                `📅 Inicio: ${new Date(result.fechaInicio).toLocaleDateString('es-CO')}\n` +
+                `📅 Finalización estimada: ${new Date(result.fechaFinalizacion).toLocaleDateString('es-CO')}\n` +
+                `🆔 ID Fermentación: ${result.fermentacionId}`;
+        } else {
+          successMsg = `🧪 ¡Producción de ${microorganismo.nombre} iniciada exitosamente!\n\n` +
+                `📅 Inicio: ${new Date(result.fechaInicio).toLocaleDateString('es-CO')}\n` +
+                `📅 Finalización estimada: ${new Date(result.fechaFinalizacion).toLocaleDateString('es-CO')}\n` +
+                `🆔 ID Fermentación: ${result.fermentacionId}`;
+        }
+
+        setSuccessMessage(successMsg);
+        setResultadoFermentacion(result);
+        setShowSuccessModal(true);
+
+        console.log('✅ [FRONTEND-DEBUG] Producción directa exitosa');
+      } else {
+        console.error('❌ [FRONTEND-DEBUG] Error en producción directa:', result.error);
+        alert(`❌ Error al iniciar producción de ${microorganismo.nombre}:\n\n${result.error}`);
+      }
+    } catch (err) {
+      console.error('❌ [FRONTEND-DEBUG] Error de conexión en producción directa:', err);
+      alert(`❌ Error de conexión al iniciar producción de ${microorganismo.nombre}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Función para obtener el icono según el tipo de microorganismo (enfocado en bacterias)
@@ -469,7 +775,9 @@ export default function BacteriasPage() {
                             <div className="flex items-center space-x-3 flex-1 min-w-0">
                               <span className="text-4xl flex-shrink-0">{getIconoMicroorganismo(microorganismo.nombre, microorganismo.tipo)}</span>
                               <div className="flex-1 min-w-0">
-                                <h3 className="text-xl font-bold leading-tight mb-1">{microorganismo.nombre}</h3>
+                                <h3 className={`text-xl font-bold leading-tight mb-1 ${esNombreBinomial(microorganismo.nombre) ? 'italic' : ''}`}>
+                                  {formatearNombreCientifico(microorganismo.nombre)}
+                                </h3>
                                 <div className="flex items-center justify-between">
                                   <p className="text-sm opacity-90">{microorganismo.tipo}</p>
                                   {microorganismo.abreviatura && (
@@ -540,24 +848,25 @@ export default function BacteriasPage() {
                             <button
                               onClick={() => {
                                 if (!isSubtilis) {
-                                  setSelectedMicroorganismo(microorganismo);
-                                  setShowProduccionForm(true);
-                                  setProduccionData(prev => ({
-                                    ...prev,
-                                    microorganismoId: microorganismo.id
-                                  }));
+                                  handleProduccionDirecta(microorganismo);
                                 }
                               }}
                               className={`w-full py-3 px-4 rounded-lg font-semibold transition-all text-sm ${
                                 isSubtilis
                                   ? 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-60'
-                                  : 'bg-green-600 hover:bg-green-700 text-white hover:shadow-lg'
+                                  : isSubmitting 
+                                    ? 'bg-gray-400 text-white cursor-not-allowed'
+                                    : 'bg-green-600 hover:bg-green-700 text-white hover:shadow-lg'
                               }`}
-                              disabled={isSubtilis}
+                              disabled={isSubtilis || isSubmitting}
                             >
                               {isSubtilis 
                                 ? '⏳ Próximamente Disponible' 
-                                : '🚀 Iniciar Producción'
+                                : isSubmitting
+                                  ? '⏳ Procesando...'
+                                  : microorganismo.nombre.toLowerCase().includes('siriusbacter')
+                                    ? '🧬 Iniciar Mezcla SiriusBacter'
+                                    : '🚀 Iniciar Producción'
                               }
                             </button>
                           </div>
@@ -591,7 +900,9 @@ export default function BacteriasPage() {
                       <div className="flex items-center space-x-4">
                         <span className="text-4xl">{getIconoMicroorganismo(selectedMicroorganismo.nombre, selectedMicroorganismo.tipo)}</span>
                         <div>
-                          <h2 className="text-2xl font-bold">{selectedMicroorganismo.nombre}</h2>
+                          <h2 className={`text-2xl font-bold ${esNombreBinomial(selectedMicroorganismo.nombre) ? 'italic' : ''}`}>
+                            {formatearNombreCientifico(selectedMicroorganismo.nombre)}
+                          </h2>
                           {selectedMicroorganismo.tipo && (
                             <p className="text-lg opacity-90">{selectedMicroorganismo.tipo}</p>
                           )}
@@ -707,15 +1018,38 @@ export default function BacteriasPage() {
                 return (
                   <button
                     onClick={() => {
-                      setShowProduccionForm(true);
-                      setProduccionData(prev => ({
-                        ...prev,
-                        microorganismoId: selectedMicroorganismo.id
-                      }));
+                      console.log('🔥 BOTÓN PRESIONADO!');
+                      console.log('🔍 Microorganismo actual:', selectedMicroorganismo);
+                      console.log('🔍 Nombre:', selectedMicroorganismo.nombre);
+                      console.log('🔍 Es SiriusBacter?', selectedMicroorganismo.nombre.toLowerCase().includes('siriusbacter'));
+                      
+                      // Si es SiriusBacter, ejecutar directamente
+                      if (selectedMicroorganismo.nombre.toLowerCase().includes('siriusbacter')) {
+                        console.log('🧬 EJECUTANDO MEZCLA SIRIUSBACTER!');
+                        handleSiriusBacterDirecto(selectedMicroorganismo);
+                      } else {
+                        console.log('📋 MOSTRANDO FORMULARIO NORMAL');
+                        // Para otros microorganismos, mostrar formulario
+                        setShowProduccionForm(true);
+                        setProduccionData(prev => ({
+                          ...prev,
+                          microorganismoId: selectedMicroorganismo.id
+                        }));
+                      }
                     }}
                     className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-all"
+                    disabled={isSubmitting}
                   >
-                    Iniciar Producción
+                    {isSubmitting ? (
+                      <>
+                        <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Procesando...
+                      </>
+                    ) : (
+                      selectedMicroorganismo.nombre.toLowerCase().includes('siriusbacter') 
+                        ? 'Iniciar Mezcla SiriusBacter' 
+                        : 'Iniciar Producción'
+                    )}
                   </button>
                 );
               })()}
@@ -724,8 +1058,8 @@ export default function BacteriasPage() {
         </div>
       )}
 
-      {/* Modal para iniciar producción */}
-      {showProduccionForm && selectedMicroorganismo && (
+      {/* Modal para iniciar producción - NO mostrar para SiriusBacter */}
+      {showProduccionForm && selectedMicroorganismo && !selectedMicroorganismo.nombre.toLowerCase().includes('siriusbacter') && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{
@@ -744,11 +1078,17 @@ export default function BacteriasPage() {
               <div className="flex items-center justify-center">
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-                    🧬 Producción de Bacillus thuringiensis
+                    {selectedMicroorganismo?.nombre.toLowerCase().includes('siriusbacter') ? 
+                      '🧬 Proceso Multietapa SiriusBacter' :
+                      `🧬 Producción de ${selectedMicroorganismo?.nombre}`
+                    }
                   </h1>
                   <p className="text-lg text-gray-600 flex items-center justify-center">
                     <span className="inline-block w-2 h-2 bg-purple-500 rounded-full mr-2 animate-pulse"></span>
-                    Sistema DataLab - Control de Fermentación
+                    {selectedMicroorganismo?.nombre.toLowerCase().includes('siriusbacter') ? 
+                      'Sistema DataLab - Control Multietapa' :
+                      'Sistema DataLab - Control de Fermentación'
+                    }
                   </p>
                 </div>
               </div>
@@ -765,10 +1105,16 @@ export default function BacteriasPage() {
                   </div>
                   <div className="ml-4">
                     <h3 className="text-lg font-semibold text-blue-800 mb-2">
-                      🚀 Iniciando Producción...
+                      {selectedMicroorganismo?.nombre.toLowerCase().includes('siriusbacter') ? 
+                        '🧬 Iniciando Proceso Multietapa...' :
+                        '🚀 Iniciando Producción...'
+                      }
                     </h3>
                     <p className="text-base text-blue-700">
-                      Configurando parámetros de fermentación para Bacillus thuringiensis
+                      {selectedMicroorganismo?.nombre.toLowerCase().includes('siriusbacter') ? 
+                        'Configurando proceso multietapa para SiriusBacter (6 etapas secuenciales)' :
+                        `Configurando parámetros de fermentación para ${selectedMicroorganismo?.nombre}`
+                      }
                     </p>
                   </div>
                 </div>
@@ -782,22 +1128,42 @@ export default function BacteriasPage() {
                 {/* Cantidad objetivo */}
                 <div>
                   <label htmlFor="cantidadObjetivo" className="block text-sm font-semibold text-gray-900 mb-2">
-                    ⚗️ Volumen de Producción (Litros) *
+                    {selectedMicroorganismo?.nombre.toLowerCase().includes('siriusbacter') ? 
+                      '🧬 Volumen Final SiriusBacter (Fijo: 300L) *' :
+                      '⚗️ Volumen de Producción (Litros) *'
+                    }
                   </label>
-                  <input
-                    type="number"
-                    id="cantidadObjetivo"
-                    min="1"
-                    max="10000"
-                    value={produccionData.cantidadObjetivo}
-                    onChange={(e) => setProduccionData({...produccionData, cantidadObjetivo: e.target.value})}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 bg-white/90 text-gray-900"
-                    placeholder="Ingrese el volumen objetivo"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    💡 Rango recomendado: 100 - 5000 litros por lote
-                  </p>
+                  {selectedMicroorganismo?.nombre.toLowerCase().includes('siriusbacter') ? (
+                    <div>
+                      <input
+                        type="number"
+                        id="cantidadObjetivo"
+                        value="300"
+                        readOnly
+                        className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl bg-purple-50 text-gray-900 font-semibold"
+                      />
+                      <p className="text-xs text-purple-600 mt-1 font-medium">
+                        🧬 El proceso multietapa producirá exactamente 300L de SiriusBacter al final de las 6 etapas
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="number"
+                        id="cantidadObjetivo"
+                        min="1"
+                        max="10000"
+                        value={produccionData.cantidadObjetivo}
+                        onChange={(e) => setProduccionData({...produccionData, cantidadObjetivo: e.target.value})}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 bg-white/90 text-gray-900"
+                        placeholder="Ingrese el volumen objetivo"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        💡 Rango recomendado: 100 - 5000 litros por lote
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Fecha de inicio */}
@@ -949,6 +1315,8 @@ export default function BacteriasPage() {
                     onClick={() => {
                       setShowProduccionForm(false);
                       setSelectedMicroorganismo(null);
+                      setProcesoSiriusBacter(null);
+                      setInsumosCalculados([]);
                     }}
                     className="sm:w-auto px-8 py-4 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 font-semibold bg-white/90"
                   >
@@ -975,7 +1343,7 @@ export default function BacteriasPage() {
                   <span className="text-2xl">🧬</span>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  Confirmar Producción de {selectedMicroorganismo.nombre}
+                  Confirmar Producción de <span className={esNombreBinomial(selectedMicroorganismo.nombre) ? 'italic' : ''}>{formatearNombreCientifico(selectedMicroorganismo.nombre)}</span>
                 </h3>
                 <p className="text-gray-600">
                   Revisa los detalles antes de iniciar la fermentación
@@ -988,7 +1356,9 @@ export default function BacteriasPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className="text-sm font-medium text-gray-600">Microorganismo:</span>
-                    <p className="font-semibold text-gray-900">{selectedMicroorganismo.nombre}</p>
+                    <p className={`font-semibold text-gray-900 ${esNombreBinomial(selectedMicroorganismo.nombre) ? 'italic' : ''}`}>
+                      {formatearNombreCientifico(selectedMicroorganismo.nombre)}
+                    </p>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-600">Volumen objetivo:</span>
@@ -1095,6 +1465,98 @@ export default function BacteriasPage() {
                 </div>
               )}
 
+              {/* Información del Proceso Multietapa para SiriusBacter */}
+              {procesoSiriusBacter && (
+                <div className="bg-purple-50 rounded-xl p-4 mb-6 border border-purple-200">
+                  <h4 className="font-semibold text-purple-900 mb-3 flex items-center">
+                    <span className="mr-2">🧬</span>
+                    Proceso Multietapa - SiriusBacter (300L Final)
+                  </h4>
+                  
+                  {/* Microorganismos Requeridos */}
+                  <div className="mb-4 p-3 bg-white rounded-lg border border-purple-200">
+                    <h5 className="font-medium text-purple-800 mb-2 flex items-center">
+                      <span className="mr-2">🦠</span>
+                      Microorganismos Requeridos:
+                    </h5>
+                    <div className="flex flex-wrap gap-2">
+                      {procesoSiriusBacter.microorganismosRequeridos.map((micro, index) => (
+                        <span key={index} className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                          {micro}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Etapas del Proceso */}
+                  <div className="space-y-3 mb-4">
+                    <h5 className="font-medium text-purple-800 flex items-center">
+                      <span className="mr-2">📋</span>
+                      Etapas del Proceso:
+                    </h5>
+                    {procesoSiriusBacter.etapas.map((etapa) => (
+                      <div key={etapa.numero} className="bg-white rounded-lg p-3 border border-purple-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                              {etapa.numero}
+                            </div>
+                            <div>
+                              <h6 className="font-semibold text-purple-900">{etapa.nombre}</h6>
+                              <p className="text-sm text-purple-700">
+                                {etapa.volumen < 1 ? 
+                                  `${etapa.volumen * 1000}ml` : 
+                                  `${etapa.volumen}L`
+                                }
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg">
+                              <div className="text-sm font-medium">{etapa.duracion}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Información del Tiempo Total */}
+                  <div className="mt-4 pt-3 border-t border-purple-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-semibold text-purple-900">Tiempo total estimado:</span>
+                      <span className="bg-purple-600 text-white px-4 py-2 rounded-full font-bold text-lg">
+                        {procesoSiriusBacter.tiempoTotal}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="bg-purple-100 rounded-lg p-2">
+                        <span className="font-medium text-purple-900">Etapas totales:</span>
+                        <div className="text-purple-800">{procesoSiriusBacter.etapas.length} etapas secuenciales</div>
+                      </div>
+                      <div className="bg-purple-100 rounded-lg p-2">
+                        <span className="font-medium text-purple-900">Volumen final:</span>
+                        <div className="text-purple-800">300L de SiriusBacter</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-purple-100 rounded-lg">
+                    <p className="text-purple-800 text-sm font-medium flex items-center">
+                      <span className="mr-2">💡</span>
+                      Proceso automático: Se crearán automáticamente todos los registros de fermentación para cada etapa con sus fechas correspondientes
+                    </p>
+                  </div>
+                  
+                  <div className="mt-2 p-3 bg-blue-100 rounded-lg">
+                    <p className="text-blue-800 text-sm font-medium flex items-center">
+                      <span className="mr-2">⚙️</span>
+                      Los 3 microorganismos pasarán por escalados de 50ml → 250ml → 800ml → 12L → 100L, para finalmente combinarse en 300L
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Advertencia */}
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
                 <div className="flex items-start">
@@ -1180,10 +1642,31 @@ export default function BacteriasPage() {
                 </div>
               )}
 
+              {/* Información específica para SiriusBacter */}
+              {procesoSiriusBacter && (
+                <div className="bg-purple-50 rounded-lg p-4 mb-4 text-left">
+                  <h4 className="text-purple-900 font-semibold mb-2 flex items-center">
+                    <span className="mr-2">🧬</span>
+                    Proceso Multietapa SiriusBacter Iniciado
+                  </h4>
+                  <p className="text-purple-800 text-sm mb-2">
+                    ✅ Se han creado automáticamente todos los registros de fermentación para las 6 etapas del proceso
+                  </p>
+                  <p className="text-purple-800 text-sm mb-2">
+                    🦠 Los 3 microorganismos (PseudoMonas, AzosPirillum, AzotoBacter) comenzarán su escalado simultáneo
+                  </p>
+                  <p className="text-purple-800 text-sm">
+                    📅 El proceso completo tomará aproximadamente 10-15 días hasta obtener 300L de SiriusBacter
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={() => {
                   setShowSuccessModal(false);
                   setResultadoFermentacion(null);
+                  setProcesoSiriusBacter(null);
+                  setInsumosCalculados([]);
                 }}
                 className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300"
               >

@@ -14,6 +14,13 @@ interface FermentacionRecord {
     'Microorganismo'?: string[];
     'Fecha Inicia Fermentacion'?: string;
     'Fecha Termina Fermentacion'?: string;
+    'Fecha Inicia Escalado 50ml'?: string;
+    'Fecha Inicia Escalado 250ml'?: string;
+    'Fecha Inicia Escalado 800ml'?: string;
+    'Fecha Inicia Fermentacion 12L'?: string;
+    'Fecha Inicia Fermentacion 100L'?: string;
+    'Fecha Empacado'?: string;
+    'Etapa Produccion'?: string;
     Estado?: string;
     'Cantidad Litros'?: number;
     'Total Litros'?: number;

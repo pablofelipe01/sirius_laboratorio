@@ -48,6 +48,7 @@ export default function AlmacenamientoPage() {
   const [loadingUpdate, setLoadingUpdate] = useState<string | null>(null);
   const [loteHistorial, setLoteHistorial] = useState<LoteAlmacenamiento | null>(null);
   const [showHistorial, setShowHistorial] = useState(false);
+  const [loadingSiguienteEscalado, setLoadingSiguienteEscalado] = useState<string | null>(null);
 
   console.log('📊 ALMACENAMIENTO: Estado actual:', {
     lotesCount: lotes.length,
@@ -710,6 +711,13 @@ export default function AlmacenamientoPage() {
       'Microorganismo'?: string[];
       'Fecha Inicia Fermentacion'?: string;
       'Fecha Termina Fermentacion'?: string;
+      'Fecha Inicia Escalado 50ml'?: string;
+      'Fecha Inicia Escalado 250ml'?: string;
+      'Fecha Inicia Escalado 800ml'?: string;
+      'Fecha Inicia Fermentacion 12L'?: string;
+      'Fecha Inicia Fermentacion 100L'?: string;
+      'Fecha Empacado'?: string;
+      'Etapa Produccion'?: string;
       Estado?: string;
       'Cantidad Litros'?: number;
       'Total Litros'?: number;
@@ -742,6 +750,289 @@ export default function AlmacenamientoPage() {
   const [totalLitrosDisponibles, setTotalLitrosDisponibles] = useState(0);
   const [microorganismosBacterias, setMicroorganismosBacterias] = useState<string[]>([]);
   const [filtroMicroorganismoBacterias, setFiltroMicroorganismoBacterias] = useState('todos');
+
+  // Configuración de etapas de escalado para bacterias individuales
+  const ETAPAS_ESCALADO = {
+    'Escalado 50ml': { siguiente: 'Escalado 250ml', volumen: 0.25, duracion: 24 },
+    'Escalado 250ml': { siguiente: 'Escalado 800ml', volumen: 0.8, duracion: 24 },
+    'Escalado 800ml': { siguiente: 'Fermentacion 12L', volumen: 12, duracion: 24 },
+    'Fermentacion 12L': { 
+      siguiente: 'Fermentacion 100L', 
+      volumen: 100, 
+      getDuracion: (microorganismo: string) => {
+        if (microorganismo === 'PseudoMonas') return 12;
+        if (microorganismo === 'AzosPirillum') return 24;
+        if (microorganismo === 'AzotoBacter') return 36;
+        return 24;
+      }
+    },
+    'Fermentacion 100L': { 
+      siguiente: null, // No hay siguiente etapa, solo finalizar fermentación
+      volumen: 100, // Mantiene los 100L
+      getDuracion: (microorganismo: string) => {
+        if (microorganismo === 'PseudoMonas') return 12;
+        if (microorganismo === 'AzosPirillum') return 24;
+        if (microorganismo === 'AzotoBacter') return 36;
+        return 24;
+      }
+    },
+    'Empacado': { siguiente: null, volumen: 300, duracion: 0 } // No hay duración para empacado
+  };
+
+  // Función para obtener la duración de una etapa específica
+  const getDuracionEtapa = (etapa: string, microorganismo: string): number => {
+    const config = ETAPAS_ESCALADO[etapa as keyof typeof ETAPAS_ESCALADO];
+    if (!config) return 24; // Default 24 horas
+    
+    if ('getDuracion' in config && config.getDuracion) {
+      return config.getDuracion(microorganismo);
+    }
+    
+    if ('duracion' in config && config.duracion) {
+      return config.duracion;
+    }
+    
+    return 24; // Fallback
+  };
+
+  // Función para verificar si ya pasó el tiempo de la etapa actual
+  const puedeAvanzarEtapa = (lote: FermentacionRecord): boolean => {
+    const etapaActual = lote.fields['Etapa Produccion'];
+    const microorganismo = lote.fields['Microorganismo']?.[0];
+    
+    if (!etapaActual || !microorganismo) {
+      console.log('🚫 No se puede verificar:', { etapaActual, microorganismo });
+      return false;
+    }
+
+    // Obtener el campo de fecha específico para la etapa actual
+    const campoFechaEtapaActual = obtenerCampoFechaEscalado(etapaActual);
+    const fechaInicioEtapa = campoFechaEtapaActual ? lote.fields[campoFechaEtapaActual as keyof typeof lote.fields] : null;
+    
+    // Si no hay campo específico para esta etapa, usar fecha de fermentación como fallback
+    const fechaInicio = fechaInicioEtapa || lote.fields['Fecha Inicia Fermentacion'];
+    
+    if (!fechaInicio) {
+      console.log('🚫 No hay fecha de inicio para la etapa:', { etapaActual, campoFechaEtapaActual, fechaInicioEtapa });
+      return false;
+    }
+
+    // Obtener duración específica de la etapa actual
+    const duracionEtapaHoras = getDuracionEtapa(etapaActual, microorganismo);
+    
+    // Calcular cuándo se completará la etapa actual
+    const fechaInicioEtapaDate = new Date(fechaInicio as string);
+    const fechaCompletaEtapa = new Date(fechaInicioEtapaDate);
+    fechaCompletaEtapa.setHours(fechaCompletaEtapa.getHours() + duracionEtapaHoras);
+    
+    const ahora = new Date();
+    const puedeAvanzar = ahora >= fechaCompletaEtapa;
+    
+    console.log(`⏰ Verificación etapa ${etapaActual} - ${microorganismo}:`, {
+      campoFechaUsado: campoFechaEtapaActual || 'Fecha Inicia Fermentacion',
+      duracionEtapaHoras,
+      fechaInicioEtapa: fechaInicioEtapaDate.toISOString(),
+      fechaCompletaEtapa: fechaCompletaEtapa.toISOString(),
+      ahora: ahora.toISOString(),
+      puedeAvanzar
+    });
+    
+    return puedeAvanzar;
+  };
+
+  // Función para verificar si es bacteria individual
+  const esBacteriaIndividual = (microorganismo?: string[]) => {
+    if (!microorganismo) return false;
+    return microorganismo.some(micro => 
+      micro === 'PseudoMonas' || 
+      micro === 'AzosPirillum' || 
+      micro === 'AzotoBacter'
+    );
+  };
+
+  // Función para verificar si ya pasó el tiempo de fermentación actual
+  const puedeEscalar = (lote: FermentacionRecord) => {
+    if (!lote.fields['Fecha Termina Fermentacion']) {
+      return false; // Sin fecha de finalización, no se puede escalar
+    }
+
+    const fechaFin = new Date(lote.fields['Fecha Termina Fermentacion']);
+    const fechaActual = new Date();
+    
+    // Retorna true si ya pasó el tiempo de fermentación
+    return fechaActual >= fechaFin;
+  };
+
+  // Función para obtener tiempo restante para escalado
+  const getTiempoRestante = (lote: FermentacionRecord) => {
+    if (!lote.fields['Fecha Termina Fermentacion']) {
+      return 'Sin fecha definida';
+    }
+
+    const fechaFin = new Date(lote.fields['Fecha Termina Fermentacion']);
+    const fechaActual = new Date();
+    
+    if (fechaActual >= fechaFin) {
+      return 'Listo para escalar';
+    }
+
+    const diferencia = fechaFin.getTime() - fechaActual.getTime();
+    const horas = Math.floor(diferencia / (1000 * 60 * 60));
+    const minutos = Math.floor((diferencia % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (horas > 24) {
+      const dias = Math.floor(horas / 24);
+      const horasRestantes = horas % 24;
+      return `${dias}d ${horasRestantes}h restantes`;
+    } else if (horas > 0) {
+      return `${horas}h ${minutos}m restantes`;
+    } else {
+      return `${minutos}m restantes`;
+    }
+  };
+
+  // Función para manejar el siguiente escalado
+  const handleSiguienteEscalado = async (lote: FermentacionRecord) => {
+    const etapaActual = lote.fields['Etapa Produccion'];
+    const microorganismo = lote.fields['Microorganismo']?.[0];
+    
+    if (!etapaActual || !microorganismo) {
+      alert('Error: No se puede determinar la etapa actual o el microorganismo');
+      return;
+    }
+
+    const configuracionEtapa = ETAPAS_ESCALADO[etapaActual as keyof typeof ETAPAS_ESCALADO];
+    if (!configuracionEtapa?.siguiente) {
+      alert('Esta bacteria ya está en la etapa final');
+      return;
+    }
+
+    setLoadingSiguienteEscalado(lote.id);
+
+    try {
+      const fechaEscalado = new Date();
+
+      // Preparar las observaciones actualizadas
+      const observacionesActuales = lote.fields['Observaciones'] || '';
+      const nuevaObservacion = `Escalado de ${etapaActual} a ${configuracionEtapa.siguiente} - ${microorganismo} - Fecha: ${fechaEscalado.toLocaleString('es-CO')}`;
+      const observacionesActualizadas = observacionesActuales 
+        ? `${observacionesActuales}\n${nuevaObservacion}`
+        : nuevaObservacion;
+
+      // Determinar el campo de fecha correcto según la etapa siguiente
+      const campoFechaEscalado = obtenerCampoFechaEscalado(configuracionEtapa.siguiente);
+
+      const updateFields: any = {
+        'Etapa Produccion': configuracionEtapa.siguiente,
+        'Cantidad Litros': configuracionEtapa.volumen,
+        'Realiza Registro': user?.nombre || 'Sistema',
+        'Observaciones': observacionesActualizadas
+        // NO tocamos las fechas de fermentación existentes
+      };
+
+      // Solo agregar el campo de fecha si existe para esta etapa
+      if (campoFechaEscalado) {
+        updateFields[campoFechaEscalado] = fechaEscalado.toISOString();
+      }
+
+      const response = await fetch('/api/fermentacion', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recordId: lote.id,
+          updates: updateFields
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`¡${microorganismo} escalado exitosamente a ${configuracionEtapa.siguiente}!`);
+        await fetchFermentacion(); // Recargar datos
+      } else {
+        alert(`Error al escalar: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error escalando bacteria:', error);
+      alert('Error de conexión al escalar bacteria');
+    } finally {
+      setLoadingSiguienteEscalado(null);
+    }
+  };
+
+  // Función para finalizar fermentación (solo actualizar fecha de finalización)
+  const handleFinalizarFermentacion = async (lote: FermentacionRecord) => {
+    const microorganismo = lote.fields['Microorganismo']?.[0];
+    
+    if (!microorganismo) {
+      alert('Error: No se puede determinar el microorganismo');
+      return;
+    }
+
+    const confirmacion = confirm(`¿Finalizar la fermentación de ${microorganismo}?\n\nEsto actualizará la fecha de finalización y el microorganismo quedará disponible.`);
+    if (!confirmacion) return;
+
+    setLoadingSiguienteEscalado(lote.id);
+
+    try {
+      const fechaFinalizacion = new Date();
+
+      // Preparar las observaciones actualizadas
+      const observacionesActuales = lote.fields['Observaciones'] || '';
+      const nuevaObservacion = `Fermentación finalizada - ${microorganismo} - Fecha: ${fechaFinalizacion.toLocaleString('es-CO')} por ${user?.nombre || 'Sistema'}`;
+      const observacionesActualizadas = observacionesActuales 
+        ? `${observacionesActuales}\n${nuevaObservacion}`
+        : nuevaObservacion;
+
+      const updateFields: any = {
+        'Fecha Termina Fermentacion': fechaFinalizacion.toISOString(),
+        'Realiza Registro': user?.nombre || 'Sistema',
+        'Observaciones': observacionesActualizadas
+        // NO cambiar etapa, NO cambiar volumen, solo finalizar
+      };
+
+      const response = await fetch('/api/fermentacion', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recordId: lote.id,
+          updates: updateFields
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`¡Fermentación de ${microorganismo} finalizada exitosamente!\n\nEl microorganismo ahora está disponible.`);
+        await fetchFermentacion(); // Recargar datos
+      } else {
+        alert(`Error al finalizar fermentación: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error finalizando fermentación:', error);
+      alert('Error de conexión al finalizar fermentación');
+    } finally {
+      setLoadingSiguienteEscalado(null);
+    }
+  };
+
+  // Función auxiliar para obtener el campo de fecha correcto según la etapa
+  const obtenerCampoFechaEscalado = (etapa: string): string | null => {
+    const mapeoFechas: { [key: string]: string } = {
+      'Escalado 50ml': 'Fecha Inicia Escalado 50ml',
+      'Escalado 250ml': 'Fecha Inicia Escalado 250ml', 
+      'Escalado 800ml': 'Fecha Inicia Escalado 800ml',
+      'Fermentacion 12L': 'Fecha Inicia Fermentacion 12L',
+      'Fermentacion 100L': 'Fecha Inicia Fermentacion 100L',
+      'Empacado': 'Fecha Empacado'
+    };
+    
+    return mapeoFechas[etapa] || null;
+  };
 
   // Función para obtener datos de fermentación
   const fetchFermentacion = async () => {
@@ -1201,6 +1492,93 @@ export default function AlmacenamientoPage() {
                                   }
                                 </p>
                               </div>
+                              
+                              {/* Mostrar etapa actual para bacterias individuales */}
+                              {esBacteriaIndividual(lote.fields['Microorganismo']) && (
+                                <>
+                                  <div>
+                                    <span className="font-medium text-gray-700">Etapa Actual:</span>
+                                    <p className="text-gray-600 font-semibold">
+                                      {lote.fields['Etapa Produccion'] || 'No especificada'}
+                                    </p>
+                                  </div>
+                                  
+                                  <div>
+                                    <span className="font-medium text-gray-700">Estado Escalado:</span>
+                                    <p className={`text-sm font-medium ${puedeAvanzarEtapa(lote) ? 'text-green-600' : 'text-orange-600'}`}>
+                                      {puedeAvanzarEtapa(lote) ? '✅ Listo para escalar' : '⏰ En proceso de fermentación'}
+                                    </p>
+                                  </div>
+                                </>
+                              )}
+                              
+                              {/* Botón Siguiente Escalado para bacterias individuales */}
+                              {esBacteriaIndividual(lote.fields['Microorganismo']) && 
+                               lote.fields['Etapa Produccion'] && 
+                               lote.fields['Etapa Produccion'] !== 'Fermentacion 100L' &&
+                               ETAPAS_ESCALADO[lote.fields['Etapa Produccion'] as keyof typeof ETAPAS_ESCALADO]?.siguiente && (
+                                <div className="mt-3 pt-3 border-t border-purple-200">
+                                  <button
+                                    onClick={() => handleSiguienteEscalado(lote)}
+                                    disabled={loadingSiguienteEscalado === lote.id || !puedeAvanzarEtapa(lote)}
+                                    className={`w-full py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                                      loadingSiguienteEscalado === lote.id || !puedeAvanzarEtapa(lote)
+                                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    }`}
+                                  >
+                                    {loadingSiguienteEscalado === lote.id ? (
+                                      <>
+                                        <span className="animate-spin">⏳</span>
+                                        Escalando...
+                                      </>
+                                    ) : !puedeAvanzarEtapa(lote) ? (
+                                      <>
+                                        <span>⏰</span>
+                                        Esperando tiempo de fermentación
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span>🚀</span>
+                                        Siguiente Escalado → {ETAPAS_ESCALADO[lote.fields['Etapa Produccion'] as keyof typeof ETAPAS_ESCALADO]?.siguiente}
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Botón Finalizar Fermentación para Fermentacion 100L */}
+                              {esBacteriaIndividual(lote.fields['Microorganismo']) && 
+                               lote.fields['Etapa Produccion'] === 'Fermentacion 100L' && (
+                                <div className="mt-3 pt-3 border-t border-purple-200">
+                                  <button
+                                    onClick={() => handleFinalizarFermentacion(lote)}
+                                    disabled={loadingSiguienteEscalado === lote.id || !puedeAvanzarEtapa(lote)}
+                                    className={`w-full py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                                      loadingSiguienteEscalado === lote.id || !puedeAvanzarEtapa(lote)
+                                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                        : 'bg-green-600 hover:bg-green-700 text-white'
+                                    }`}
+                                  >
+                                    {loadingSiguienteEscalado === lote.id ? (
+                                      <>
+                                        <span className="animate-spin">⏳</span>
+                                        Finalizando...
+                                      </>
+                                    ) : !puedeAvanzarEtapa(lote) ? (
+                                      <>
+                                        <span>⏰</span>
+                                        Esperando tiempo de fermentación
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span>🏁</span>
+                                        Finalizar Fermentación
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              )}
                               
                               {/* Botón Empacar Producto Deshabilitado - Para Bacillus thuringiensis en fermentación */}
                               {lote.fields['Microorganismo']?.some(micro => micro.includes('Bacillus thuringiensis')) && (

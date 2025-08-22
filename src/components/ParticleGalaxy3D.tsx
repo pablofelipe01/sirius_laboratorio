@@ -26,85 +26,390 @@ export default function ParticleGalaxy3D({ className = '' }: ParticleGalaxy3DPro
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [microphonePermission, setMicrophonePermission] = useState<string>('prompt');
-  const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isClientMounted, setIsClientMounted] = useState(false);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [speechSynthesis, setSpeechSynthesis] = useState<SpeechSynthesis | null>(null);
 
   // Variable de tiempo global
   const timeRef = useRef(0);
 
-  // Función para solicitar permisos de micrófono
-  const requestMicrophonePermission = useCallback(async () => {
+  // Función para hacer que SIRIUS hable usando text-to-speech
+  const speakText = useCallback((text: string) => {
+    console.log('🔊 Intentando hacer hablar a SIRIUS:', text);
+    
+    if (!speechSynthesis) {
+      console.error('❌ SpeechSynthesis no está disponible');
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setMicrophonePermission('granted');
-      setShowPermissionModal(false);
+      // Detener cualquier síntesis en curso
+      speechSynthesis.cancel();
+      console.log('🛑 Síntesis anterior cancelada');
+
+      // Crear nueva instancia de speech
+      const utterance = new SpeechSynthesisUtterance(text);
       
-      const recorder = new MediaRecorder(stream);
-      setMediaRecorder(recorder);
+      // Buscar voces disponibles
+      const voices = speechSynthesis.getVoices();
+      console.log('🎭 Total de voces disponibles:', voices.length);
       
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          console.log('Audio data available:', event.data);
+      if (voices.length === 0) {
+        console.log('⏳ No hay voces cargadas, reintentando en 1 segundo...');
+        setTimeout(() => speakText(text), 1000);
+        return;
+      }
+
+      // Buscar voces en español
+      const spanishVoices = voices.filter(voice => voice.lang.startsWith('es'));
+      console.log('🎤 Voces en español encontradas:', spanishVoices.length);
+      
+      let selectedVoice = null;
+      
+      // Prioridades de voz (latinoamericanas primero)
+      const priorities = ['es-MX', 'es-US', 'es-CO', 'es-AR', 'es-CL'];
+      
+      for (const priority of priorities) {
+        selectedVoice = spanishVoices.find(voice => voice.lang.includes(priority));
+        if (selectedVoice) break;
+      }
+      
+      // Si no hay voces específicas, usar cualquier voz en español
+      if (!selectedVoice && spanishVoices.length > 0) {
+        selectedVoice = spanishVoices[0];
+      }
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        console.log('✅ Voz seleccionada:', selectedVoice.name, '-', selectedVoice.lang);
+      } else {
+        console.log('⚠️ Usando voz por defecto del sistema');
+      }
+
+      // Configuración optimizada para mejor audibilidad
+      utterance.rate = 0.9;   // Velocidad normal
+      utterance.pitch = 1.0;  // Tono normal
+      utterance.volume = 1.0; // Volumen MÁXIMO
+      utterance.lang = selectedVoice?.lang || 'es-MX'; // Asegurar idioma español
+
+      // Eventos de la síntesis
+      utterance.onstart = () => {
+        console.log('🔊 ¡SIRIUS está hablando!');
+        setIsSpeaking(true);
+      };
+
+      utterance.onend = () => {
+        console.log('✅ SIRIUS terminó de hablar');
+        setIsSpeaking(false);
+      };
+
+      utterance.onerror = (event) => {
+        console.error('❌ Error en síntesis de voz:', {
+          error: event.error || 'Error desconocido',
+          type: event.type,
+          charIndex: event.charIndex,
+          elapsedTime: event.elapsedTime
+        });
+        setIsSpeaking(false);
+        
+        // Solo mostrar alert para errores críticos, no para cancelaciones
+        if (event.error && event.error !== 'canceled' && event.error !== 'interrupted') {
+          console.warn('⚠️ Error crítico en síntesis:', event.error);
+        } else {
+          console.log('ℹ️ Síntesis cancelada o interrumpida (normal)');
         }
       };
+
+      // Log de configuración
+      console.log('⚙️ Configuración final:', {
+        voice: utterance.voice?.name || 'default',
+        rate: utterance.rate,
+        volume: utterance.volume,
+        lang: utterance.lang
+      });
+
+      // Iniciar síntesis
+      console.log('🚀 Iniciando síntesis de voz...');
+      speechSynthesis.speak(utterance);
+
+      // Verificación post-inicio
+      setTimeout(() => {
+        const isWorking = speechSynthesis.speaking || speechSynthesis.pending;
+        console.log('� Estado después de 500ms:', {
+          working: isWorking,
+          speaking: speechSynthesis.speaking,
+          pending: speechSynthesis.pending
+        });
+        
+        if (!isWorking) {
+          console.warn('⚠️ La síntesis no funcionó. Verifica el volumen del sistema.');
+        }
+      }, 500);
+
+    } catch (error) {
+      console.error('❌ Error crítico en síntesis de voz:', error);
+      setIsSpeaking(false);
+      alert(`Error crítico: ${error}`);
+    }
+  }, [speechSynthesis]);
+
+  // Función para procesar el audio y obtener respuesta de IA
+  const processAudioWithAI = useCallback(async (audioBlob: Blob) => {
+    setIsThinking(true);
+    console.log('🎤 Procesando audio REAL con OpenAI Whisper...', audioBlob.size, 'bytes');
+    
+    try {
+      // Crear FormData para enviar el audio REAL a OpenAI
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.wav');
       
-      recorder.onstop = () => {
-        setIsRecording(false);
-        setIsThinking(true);
-        setTimeout(() => {
-          setIsThinking(false);
-          setIsSpeaking(true);
-          setTimeout(() => setIsSpeaking(false), 3000);
-        }, 2000);
-      };
+      console.log('📤 Enviando audio REAL a OpenAI Whisper...');
+      
+      // Enviar a la API de audio que SÍ funciona con OpenAI
+      const response = await fetch('/api/sirius-audio', {
+        method: 'POST',
+        body: formData
+      });
+      
+      console.log('📊 Response status:', response.status);
+      console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('❌ Error en la respuesta de la API:', errorData);
+        throw new Error(`Error en la API: ${response.status} - ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Respuesta REAL de OpenAI:', data);
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Error desconocido en la API');
+      }
+      
+      setIsThinking(false);
+      
+      // Mostrar la transcripción REAL y respuesta REAL
+      console.log('📝 Transcripción REAL de Whisper:', data.transcript);
+      console.log('🤖 Respuesta REAL de GPT:', data.response);
+      
+      // Mostrar en la consola con colores
+      console.log(`%c👤 Dijiste REALMENTE: "${data.transcript}"`, 'color: #60a5fa; font-weight: bold;');
+      console.log(`%c🤖 SIRIUS responde REALMENTE: "${data.response}"`, 'color: #34d399; font-weight: bold;');
+      
+      // ¡IMPORTANTE! - Hacer que SIRIUS hable la respuesta REAL
+      console.log('🔊 Intentando que SIRIUS hable:', data.response);
+      speakText(data.response);
       
     } catch (error) {
-      console.error('Error accessing microphone:', error);
-      setMicrophonePermission('denied');
-      setShowPermissionModal(false);
+      console.error('❌ Error procesando audio:', error);
+      setIsThinking(false);
+      setIsSpeaking(false);
+      
+      // Mostrar error detallado
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      console.log(`%c❌ Error: ${errorMessage}`, 'color: #ef4444; font-weight: bold;');
+      
+      // Hacer que SIRIUS hable el error también
+      console.log('🔊 Intentando que SIRIUS hable el error');
+      speakText('Lo siento, hubo un problema procesando tu solicitud. Por favor intenta de nuevo.');
     }
-  }, []);
+  }, [speakText]);
 
   // Función para alternar grabación
-  const toggleRecording = useCallback(() => {
-    if (!mediaRecorder) return;
+  const toggleRecording = useCallback(async () => {
+    console.log('🎤 Toggle recording clicked, isRecording:', isRecording);
+    
+    // Activar speechSynthesis con la primera interacción del usuario (necesario para algunos navegadores)
+    if (speechSynthesis && speechSynthesis.getVoices().length === 0) {
+      console.log('🔄 Recargando voces después de interacción del usuario...');
+      speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        const voices = speechSynthesis.getVoices();
+        console.log('🆕 Voces recargadas después de interacción:', voices.length);
+      };
+    }
     
     if (isRecording) {
-      mediaRecorder.stop();
+      // Detener grabación
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        console.log('⏹️ Deteniendo grabación...');
+        mediaRecorder.stop();
+      }
       setIsRecording(false);
     } else {
-      mediaRecorder.start();
-      setIsRecording(true);
-      setIsSpeaking(false);
-      setIsThinking(false);
+      // Iniciar grabación
+      try {
+        console.log('🎙️ Solicitando permisos de micrófono...');
+        
+        // Configuración optimizada para Whisper
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 16000 // Optimal for Whisper
+          } 
+        });
+        
+        console.log('✅ Permisos concedidos, configurando grabador...');
+        
+        // Usar formato WAV si está disponible, sino WebM
+        const options = {
+          mimeType: 'audio/webm;codecs=opus'
+        };
+        
+        // Verificar si el navegador soporta WAV
+        if (MediaRecorder.isTypeSupported('audio/wav')) {
+          options.mimeType = 'audio/wav';
+        } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          options.mimeType = 'audio/webm;codecs=opus';
+        } else {
+          console.warn('⚠️ Usando formato de audio por defecto');
+        }
+        
+        const recorder = new MediaRecorder(stream, options);
+        const chunks: Blob[] = [];
+        
+        recorder.onstart = () => {
+          console.log('🎙️ Grabación iniciada correctamente');
+          setIsRecording(true);
+        };
+        
+        recorder.ondataavailable = (event) => {
+          console.log('📊 Audio data available:', event.data.size, 'bytes');
+          if (event.data.size > 0) {
+            chunks.push(event.data);
+          }
+        };
+        
+        recorder.onstop = () => {
+          console.log('⏹️ Grabación finalizada');
+          setIsRecording(false);
+          
+          // Crear blob del audio completo
+          const audioBlob = new Blob(chunks, { type: recorder.mimeType });
+          console.log('🎵 Audio blob creado:', audioBlob.size, 'bytes, tipo:', audioBlob.type);
+          
+          // Verificar que tenemos audio
+          if (audioBlob.size < 1000) {
+            console.warn('⚠️ Audio muy corto, puede que no se haya grabado nada');
+            alert('La grabación es muy corta. Intenta hablar más tiempo.');
+            return;
+          }
+          
+          // Procesar con IA real
+          processAudioWithAI(audioBlob);
+          
+          // Detener el stream
+          stream.getTracks().forEach(track => {
+            track.stop();
+            console.log('🔇 Track detenido:', track.kind);
+          });
+        };
+        
+        recorder.onerror = (event) => {
+          console.error('❌ Error en grabación:', event);
+          setIsRecording(false);
+        };
+        
+        setMediaRecorder(recorder);
+        setAudioChunks([]);
+        
+        console.log('🔴 Iniciando grabación...');
+        recorder.start(1000); // Grabar en chunks de 1 segundo
+        setIsRecording(true);
+        
+      } catch (error) {
+        console.error('❌ Error accessing microphone:', error);
+        alert('No se pudo acceder al micrófono. Verifica los permisos.');
+      }
     }
-  }, [mediaRecorder, isRecording]);
+  }, [isRecording, mediaRecorder, processAudioWithAI]);
 
   // Función para detener toda actividad
   const stopAllActivity = useCallback(() => {
-    if (mediaRecorder && isRecording) {
+    console.log('⏹️ Stop all activity clicked');
+    
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      console.log('🛑 Deteniendo grabación...');
       mediaRecorder.stop();
     }
+    
+    // Detener síntesis de voz si está activa
+    if (speechSynthesis) {
+      try {
+        if (speechSynthesis.speaking || speechSynthesis.pending) {
+          console.log('🔇 Cancelando síntesis de voz...');
+          speechSynthesis.cancel();
+          console.log('✅ Síntesis de voz cancelada');
+        }
+      } catch (error) {
+        console.warn('⚠️ Error al cancelar síntesis de voz:', error);
+      }
+    }
+    
     setIsRecording(false);
     setIsSpeaking(false);
     setIsThinking(false);
-  }, [mediaRecorder, isRecording]);
+    
+    console.log('✅ Todas las actividades detenidas');
+  }, [mediaRecorder, speechSynthesis]);
 
-  // Efecto para verificar permisos al cargar
+  // Efecto para verificar que estamos en el cliente
   useEffect(() => {
     // Solo ejecutar en el cliente
     if (typeof window === 'undefined') return;
     
     setIsClientMounted(true);
     
-    navigator.permissions?.query({ name: 'microphone' as PermissionName }).then((permission) => {
-      setMicrophonePermission(permission.state);
-      if (permission.state === 'prompt') {
-        setShowPermissionModal(true);
-      }
-    });
+    // Inicializar síntesis de voz
+    if ('speechSynthesis' in window) {
+      console.log('🔊 Inicializando síntesis de voz...');
+      setSpeechSynthesis(window.speechSynthesis);
+      console.log('✅ Síntesis de voz disponible');
+      
+      // Cargar voces disponibles con mejor manejo de errores
+      const loadVoices = () => {
+        try {
+          const voices = window.speechSynthesis.getVoices();
+          console.log('🎙️ Intentando cargar voces... Total encontradas:', voices.length);
+          
+          let spanishVoicesFound = 0;
+          voices.forEach(voice => {
+            if (voice.lang.startsWith('es')) {
+              spanishVoicesFound++;
+              console.log(`✅ Voz en español encontrada: ${voice.name} (${voice.lang})`);
+            }
+          });
+          
+          if (spanishVoicesFound === 0) {
+            console.warn('⚠️ No se encontraron voces en español');
+          } else {
+            console.log(`🎯 Total de voces en español: ${spanishVoicesFound}`);
+          }
+          
+        } catch (error) {
+          console.error('❌ Error al cargar voces:', error);
+        }
+      };
+      
+      // Las voces pueden no estar cargadas inmediatamente
+      setTimeout(() => {
+        console.log('⏰ Verificando voces después de delay...');
+        if (window.speechSynthesis.getVoices().length === 0) {
+          console.log('📢 Voces no cargadas, esperando evento onvoiceschanged...');
+          window.speechSynthesis.onvoiceschanged = loadVoices;
+        } else {
+          console.log('📢 Voces ya disponibles, cargando directamente...');
+          loadVoices();
+        }
+      }, 100); // Pequeño delay para asegurar que speechSynthesis esté listo
+      
+    } else {
+      console.error('❌ Síntesis de voz NO disponible en este navegador');
+    }
   }, []);
 
   // Efecto principal para inicializar la escena 3D
@@ -332,9 +637,24 @@ export default function ParticleGalaxy3D({ className = '' }: ParticleGalaxy3DPro
       if (!sceneRef.current) return;
       
       // Calcular intensidad y reactividad basada en los estados actuales
-      // Accedemos directamente a los estados sin usar refs problemáticas
-      const currentIntensity = 0.2; // Intensidad base para que siempre se mueva
-      const currentReactivity = 0.5; // Reactividad base
+      let currentIntensity = 0.2; // Intensidad base
+      let currentReactivity = 0.5; // Reactividad base
+      let colorShift = 0; // Cambio de color
+      
+      // Ajustar efectos según el estado de SIRIUS
+      if (isRecording) {
+        currentIntensity = 0.8;
+        currentReactivity = 1.2;
+        colorShift = 0.1; // Tono rojizo para grabación
+      } else if (isThinking) {
+        currentIntensity = 0.6;
+        currentReactivity = 0.8;
+        colorShift = 0.15; // Tono amarillento para pensamiento
+      } else if (isSpeaking) {
+        currentIntensity = 1.0;
+        currentReactivity = 1.5;
+        colorShift = 0.3; // Tono verdoso para hablar
+      }
       
       // Actualizar uniforms
       const coreMaterial = sceneRef.current.coreSphere.material as THREE.ShaderMaterial;
@@ -446,6 +766,36 @@ export default function ParticleGalaxy3D({ className = '' }: ParticleGalaxy3DPro
       
       {/* Overlay con controles */}
       <div className="fixed inset-0 z-50 pointer-events-none">
+        {/* Indicador de estado de SIRIUS */}
+        <div className="absolute top-8 left-8 pointer-events-none">
+          <div className="bg-black/70 backdrop-blur-sm rounded-lg p-4 text-white border border-cyan-500/30">
+            <div className="flex items-center gap-3">
+              <div className={`w-4 h-4 rounded-full ${
+                isRecording ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50' :
+                isThinking ? 'bg-yellow-500 animate-pulse shadow-lg shadow-yellow-500/50' :
+                isSpeaking ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' :
+                'bg-gray-400'
+              }`}></div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-cyan-400">SIRIUS</span>
+                <span className="text-xs">
+                  {isRecording ? '🎤 Escuchando tu voz...' :
+                   isThinking ? '🧠 Procesando con IA...' :
+                   isSpeaking ? '� Hablando...' :
+                   '⏸️ En espera - Presiona el micrófono'}
+                </span>
+              </div>
+            </div>
+            {(isThinking || isSpeaking) && (
+              <div className="mt-2 w-full bg-gray-700 rounded-full h-1">
+                <div className={`h-1 rounded-full ${
+                  isThinking ? 'bg-yellow-500 animate-pulse' : 'bg-green-500 animate-pulse'
+                } transition-all duration-300`} style={{ width: '100%' }}></div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Botón de cierre en la esquina superior derecha */}
         <div className="absolute top-8 right-8 pointer-events-auto">
           <motion.button
@@ -462,61 +812,32 @@ export default function ParticleGalaxy3D({ className = '' }: ParticleGalaxy3DPro
         </div>
 
         {/* Controles principales centrados en la parte inferior */}
-        {microphonePermission === 'granted' && (
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 pointer-events-auto">
-            <motion.div 
-              className="flex flex-row gap-6 items-center justify-center"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 pointer-events-auto">
+          <div className="flex flex-row gap-6 items-center justify-center">
+            {/* Botón de grabación */}
+            <button
+              onClick={toggleRecording}
+              className={`w-16 h-16 rounded-full border-2 transition-all duration-300 ${
+                isRecording 
+                  ? 'bg-red-500 border-red-400 text-white' 
+                  : 'bg-blue-500 border-blue-400 text-white hover:bg-blue-600'
+              } flex items-center justify-center text-2xl`}
+              title={isRecording ? 'Detener grabación' : 'Grabar audio'}
             >
-              {/* Botón de grabación */}
-              <motion.button
-                onClick={toggleRecording}
-                className={`w-16 h-16 rounded-full border-2 backdrop-blur-sm transition-all duration-300 ${
-                  isRecording 
-                    ? 'bg-red-500/30 border-red-400 shadow-red-400/50' 
-                    : 'bg-cyan-500/20 border-cyan-400 hover:bg-cyan-500/30 shadow-cyan-400/30'
-                } shadow-lg flex items-center justify-center text-2xl`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                title={isRecording ? 'Detener grabación' : 'Grabar audio'}
-              >
-                🎤
-              </motion.button>
-              
-              {/* Botón de parar */}
-              <motion.button
-                onClick={stopAllActivity}
-                disabled={!isSpeaking && !isThinking && !isRecording}
-                className="w-16 h-16 rounded-full border-2 border-orange-400 bg-orange-500/20 backdrop-blur-sm 
-                           hover:bg-orange-500/30 shadow-lg shadow-orange-400/30 flex items-center justify-center text-2xl
-                           disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                title="Detener SIRIUS"
-              >
-                ⏹️
-              </motion.button>
-              
-              {/* Botón de efectos especiales */}
-              <motion.button
-                onClick={() => {
-                  setIsSpeaking(true);
-                  setTimeout(() => setIsSpeaking(false), 3000);
-                }}
-                className="w-16 h-16 rounded-full border-2 border-purple-400 bg-purple-500/20 backdrop-blur-sm 
-                           hover:bg-purple-500/30 shadow-lg shadow-purple-400/30 flex items-center justify-center text-2xl
-                           transition-all duration-300"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                title="Activar efectos especiales"
-              >
-                ✨
-              </motion.button>
-            </motion.div>
+              🎤
+            </button>
+            
+            {/* Botón de parar */}
+            <button
+              onClick={stopAllActivity}
+              className="w-16 h-16 rounded-full border-2 border-orange-400 bg-orange-500 text-white
+                         hover:bg-orange-600 flex items-center justify-center text-2xl transition-all duration-300"
+              title="Detener SIRIUS"
+            >
+              ⏹️
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Estados de actividad */}
@@ -548,46 +869,6 @@ export default function ParticleGalaxy3D({ className = '' }: ParticleGalaxy3DPro
                   <span>SIRIUS está hablando...</span>
                 </div>
               )}
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Modal de permisos */}
-      {showPermissionModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
-          <motion.div
-            className="bg-gray-900/90 backdrop-blur-sm border border-cyan-400/30 rounded-xl p-8 max-w-md mx-4"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="text-center">
-              <div className="text-6xl mb-4">✨</div>
-              <h3 className="text-xl font-bold text-white mb-4">
-                Permisos de Micrófono Requeridos
-              </h3>
-              <p className="text-gray-300 mb-6">
-                SIRIUS necesita acceso a tu micrófono para poder escuchar tus comandos de voz y funcionar correctamente.
-              </p>
-              <div className="flex gap-4 justify-center">
-                <motion.button
-                  onClick={requestMicrophonePermission}
-                  className="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-medium transition-colors"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Permitir Acceso al Micrófono
-                </motion.button>
-                <motion.button
-                  onClick={() => setShowPermissionModal(false)}
-                  className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Cancelar
-                </motion.button>
-              </div>
             </div>
           </motion.div>
         </div>

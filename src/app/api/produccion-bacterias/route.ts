@@ -10,7 +10,6 @@ const BACILLUS_FORMULA: { [key: string]: number } = {
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-// Usando el ID de tabla proporcionado
 const AIRTABLE_TABLE_MICROORGANISMOS = process.env.AIRTABLE_TABLE_MICROORGANISMOS;
 
 // Función para buscar insumos por nombre en la tabla de Insumos Laboratorio
@@ -88,6 +87,442 @@ async function buscarInsumosPorNombre(nombresInsumos: string[]) {
   } catch (error) {
     console.error('❌ ERROR AL BUSCAR INSUMOS:', error);
     return [];
+  }
+}
+
+// Función para buscar microorganismos por nombre para SiriusBacter
+async function buscarMicroorganismosPorNombre(nombres: string[]) {
+  try {
+    console.log('🔍 [SIRIUSBACTER] ===== BUSCANDO MICROORGANISMOS =====');
+    console.log('🔍 [SIRIUSBACTER] Microorganismos a buscar:', nombres);
+    
+    const microorganismosEncontrados = [];
+    
+    for (const nombre of nombres) {
+      console.log(`🔎 [SIRIUSBACTER] Buscando microorganismo: "${nombre}"`);
+      
+      const filterFormula = `SEARCH(UPPER("${nombre}"), UPPER({Microorganismo}))`;
+      const encodedFilter = encodeURIComponent(filterFormula);
+      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_MICROORGANISMOS}?filterByFormula=${encodedFilter}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.records && data.records.length > 0) {
+          const microorganismo = data.records[0];
+          microorganismosEncontrados.push({
+            id: microorganismo.id,
+            nombre: microorganismo.fields.Microorganismo,
+            abreviatura: microorganismo.fields.Abreviaturas,
+            encontrado: true
+          });
+          console.log(`✅ [SIRIUSBACTER] Microorganismo encontrado: ${nombre} -> ${microorganismo.id}`);
+        } else {
+          console.log(`❌ [SIRIUSBACTER] Microorganismo NO encontrado: ${nombre}`);
+          microorganismosEncontrados.push({
+            id: null,
+            nombre: nombre,
+            abreviatura: null,
+            encontrado: false
+          });
+        }
+      }
+    }
+    
+    return microorganismosEncontrados;
+  } catch (error) {
+    console.error('❌ [SIRIUSBACTER] ERROR AL BUSCAR MICROORGANISMOS:', error);
+    return [];
+  }
+}
+
+// Nueva función para buscar microorganismos terminados en 100L usando lógica FIFO
+async function buscarMicroorganismosTerminados100L() {
+  try {
+    console.log('🔍 [SIRIUSBACTER-FIFO] ===== BUSCANDO MICROORGANISMOS TERMINADOS 100L =====');
+    
+    const AIRTABLE_TABLE_FERMENTACION = process.env.AIRTABLE_TABLE_FERMENTACION;
+    
+    if (!AIRTABLE_TABLE_FERMENTACION) {
+      console.error('❌ [SIRIUSBACTER-FIFO] AIRTABLE_TABLE_FERMENTACION no configurado');
+      return { success: false, microorganismos: [], faltantes: ['PseudoMonas', 'AzosPirillum', 'AzotoBacter'] };
+    }
+    
+    // Buscar microorganismos en estado "Disponible" en etapa "Fermentacion 100L"
+    const filterFormula = encodeURIComponent(
+      `AND({Estado} = 'Disponible', {Etapa Produccion} = 'Fermentacion 100L', {Total Litros} > 0)`
+    );
+    
+    const response = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_FERMENTACION}?filterByFormula=${filterFormula}&sort[0][field]=Fecha Termina Fermentacion&sort[0][direction]=asc`,
+      {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      console.error('❌ [SIRIUSBACTER-FIFO] Error consultando fermentación:', response.status);
+      return { success: false, microorganismos: [], faltantes: ['PseudoMonas', 'AzosPirillum', 'AzotoBacter'] };
+    }
+    
+    const data = await response.json();
+    console.log('📊 [SIRIUSBACTER-FIFO] Registros encontrados:', data.records.length);
+    
+    // Agrupar por tipo de microorganismo y ordenar por fecha (FIFO)
+    const microorganismosPorTipo: { [key: string]: any[] } = {
+      'PseudoMonas': [],
+      'AzosPirillum': [],
+      'AzotoBacter': []
+    };
+    
+    data.records.forEach((record: any) => {
+      const microorganismo = record.fields['Microorganismo']?.[0]; // Es un array
+      if (microorganismo && microorganismosPorTipo[microorganismo]) {
+        microorganismosPorTipo[microorganismo].push({
+          recordId: record.id,
+          microorganismo: microorganismo,
+          codigoLote: record.fields['Codigo Lote'],
+          totalLitros: record.fields['Total Litros'],
+          fechaTermina: record.fields['Fecha Termina Fermentacion'],
+          fechaCreada: record.fields['Creada']
+        });
+      }
+    });
+    
+    // Verificar disponibilidad y seleccionar el más antiguo de cada tipo
+    const microorganismosSeleccionados = [];
+    const faltantes = [];
+    
+    for (const tipoMicroorganismo of ['PseudoMonas', 'AzosPirillum', 'AzotoBacter']) {
+      if (microorganismosPorTipo[tipoMicroorganismo].length > 0) {
+        // Tomar el más antiguo (FIFO - ya ordenado por fecha)
+        const seleccionado = microorganismosPorTipo[tipoMicroorganismo][0];
+        microorganismosSeleccionados.push(seleccionado);
+        console.log(`✅ [SIRIUSBACTER-FIFO] ${tipoMicroorganismo} disponible: ${seleccionado.codigoLote} (${seleccionado.totalLitros}L)`);
+      } else {
+        faltantes.push(tipoMicroorganismo);
+        console.log(`❌ [SIRIUSBACTER-FIFO] ${tipoMicroorganismo} NO disponible en 100L`);
+      }
+    }
+    
+    return {
+      success: faltantes.length === 0,
+      microorganismos: microorganismosSeleccionados,
+      faltantes: faltantes
+    };
+    
+  } catch (error) {
+    console.error('❌ [SIRIUSBACTER-FIFO] ERROR AL BUSCAR MICROORGANISMOS TERMINADOS:', error);
+    return { success: false, microorganismos: [], faltantes: ['PseudoMonas', 'AzosPirillum', 'AzotoBacter'] };
+  }
+}
+
+// Nueva función para registrar salida de fermentación
+async function registrarSalidaFermentacion(microorganismosUsados: any[], cantidadPorMicroorganismo: number = 100) {
+  try {
+    console.log('📦 [SALIDA-FERMENTACION] ===== REGISTRANDO SALIDAS =====');
+    
+    const AIRTABLE_TABLE_SALIDA_FERMENTACION = 'tbljasiyO9KCPCSRQ'; // ID de la tabla según documentación
+    
+    const registrosSalida = [];
+    
+    for (const microorganismo of microorganismosUsados) {
+      const registroSalida = {
+        fields: {
+          'Fecha Evento': new Date().toISOString().split('T')[0], // Solo fecha YYYY-MM-DD
+          'Cantidad Litros': cantidadPorMicroorganismo,
+          'Lote Bacteria Alterada': [microorganismo.recordId] // Link al registro de fermentación
+        }
+      };
+      
+      console.log(`📦 [SALIDA-FERMENTACION] Registrando salida ${microorganismo.microorganismo}:`, registroSalida);
+      
+      const response = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_SALIDA_FERMENTACION}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            records: [registroSalida],
+            typecast: true
+          })
+        }
+      );
+      
+      if (response.ok) {
+        const result = await response.json();
+        registrosSalida.push(result.records[0]);
+        console.log(`✅ [SALIDA-FERMENTACION] Salida registrada: ${result.records[0].id}`);
+      } else {
+        const error = await response.json();
+        console.error(`❌ [SALIDA-FERMENTACION] Error registrando salida:`, error);
+        throw new Error(`Error registrando salida para ${microorganismo.microorganismo}`);
+      }
+    }
+    
+    return registrosSalida;
+    
+  } catch (error) {
+    console.error('❌ [SALIDA-FERMENTACION] ERROR REGISTRANDO SALIDAS:', error);
+    throw error;
+  }
+}
+
+// Nueva función para actualizar fecha de empacado de microorganismos
+async function actualizarFechaEmpacado(microorganismos: any[], realizaRegistro: string) {
+  try {
+    console.log('📦 [EMPACADO] ===== ACTUALIZANDO FECHA DE EMPACADO =====');
+    
+    const AIRTABLE_TABLE_FERMENTACION = process.env.AIRTABLE_TABLE_FERMENTACION;
+    
+    if (!AIRTABLE_TABLE_FERMENTACION) {
+      throw new Error('AIRTABLE_TABLE_FERMENTACION no configurado');
+    }
+
+    const ahora = new Date();
+    const microorganismosEmpacados = [];
+    
+    // Actualizar cada microorganismo para marcarlo como empacado
+    for (const micro of microorganismos) {
+      console.log(`📦 [EMPACADO] Empacando ${micro.microorganismo} (${micro.codigoLote})`);
+      
+      const updateData = {
+        fields: {
+          'Fecha Empacado': ahora.toISOString(),
+          'Etapa Produccion': 'Empacado',
+          'Observaciones': `${micro.observaciones || ''}\n\nEmpacado para SiriusBacter - ${ahora.toLocaleDateString()} por ${realizaRegistro}`.trim()
+        }
+      };
+      
+      console.log(`📦 [EMPACADO] Actualizando registro ${micro.recordId}:`, updateData);
+      
+      const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_FERMENTACION}/${micro.recordId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
+      
+      if (!response.ok) {
+        console.error(`❌ [EMPACADO] Error al empacar ${micro.microorganismo}:`, response.status);
+        continue;
+      }
+      
+      const updatedRecord = await response.json();
+      console.log(`✅ [EMPACADO] ${micro.microorganismo} empacado exitosamente`);
+      
+      microorganismosEmpacados.push({
+        id: updatedRecord.id,
+        microorganismo: micro.microorganismo,
+        codigoLote: micro.codigoLote,
+        fechaEmpacado: ahora.toISOString()
+      });
+    }
+    
+    return microorganismosEmpacados;
+    
+  } catch (error) {
+    console.error('❌ [EMPACADO] Error:', error);
+    throw error;
+  }
+}
+
+// Nueva función para finalizar fermentación de microorganismos (actualizar fecha finalización)
+async function finalizarFermentacionMicroorganismos(microorganismos: any[], realizaRegistro: string) {
+  try {
+    console.log('🏁 [FINALIZAR-FERMENTACION] ===== FINALIZANDO FERMENTACIÓN DE MICROORGANISMOS =====');
+    
+    const AIRTABLE_TABLE_FERMENTACION = process.env.AIRTABLE_TABLE_FERMENTACION;
+    
+    if (!AIRTABLE_TABLE_FERMENTACION) {
+      throw new Error('AIRTABLE_TABLE_FERMENTACION no configurado');
+    }
+
+    const ahora = new Date();
+    const microorganismosFinalizados = [];
+    
+    // Actualizar cada microorganismo para finalizar su fermentación
+    for (const micro of microorganismos) {
+      console.log(`🏁 [FINALIZAR-FERMENTACION] Finalizando ${micro.microorganismo} (${micro.codigoLote})`);
+      
+      const updateData = {
+        fields: {
+          'Fecha Termina Fermentacion': ahora.toISOString(),
+          'Observaciones': `${micro.observaciones || ''}\n\nFermentación finalizada para SiriusBacter - ${ahora.toLocaleDateString()} por ${realizaRegistro}`.trim()
+        }
+      };
+      
+      console.log(`📦 [FINALIZAR-FERMENTACION] Actualizando registro ${micro.recordId}:`, updateData);
+      
+      const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_FERMENTACION}/${micro.recordId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
+      
+      if (!response.ok) {
+        console.error(`❌ [FINALIZAR-FERMENTACION] Error al actualizar ${micro.microorganismo}:`, response.status);
+        continue;
+      }
+      
+      const updatedRecord = await response.json();
+      console.log(`✅ [FINALIZAR-FERMENTACION] ${micro.microorganismo} finalizado exitosamente`);
+      
+      microorganismosFinalizados.push({
+        id: updatedRecord.id,
+        microorganismo: micro.microorganismo,
+        codigoLote: micro.codigoLote,
+        fechaFinalizada: ahora.toISOString()
+      });
+    }
+    
+    return microorganismosFinalizados;
+    
+  } catch (error) {
+    console.error('❌ [FINALIZAR-FERMENTACION] Error:', error);
+    throw error;
+  }
+}
+
+// Nueva función para buscar microorganismo por nombre
+async function buscarMicroorganismoPorNombre(nombreMicroorganismo: string) {
+  try {
+    console.log(`🔍 [BUSCAR-MICROORGANISMO] Buscando: "${nombreMicroorganismo}"`);
+    
+    if (!AIRTABLE_TABLE_MICROORGANISMOS) {
+      throw new Error('AIRTABLE_TABLE_MICROORGANISMOS no configurado');
+    }
+    
+    const filterFormula = encodeURIComponent(`SEARCH(UPPER("${nombreMicroorganismo}"), UPPER({Microorganismo}))`);
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_MICROORGANISMOS}?filterByFormula=${filterFormula}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.records && data.records.length > 0) {
+        const microorganismo = data.records[0];
+        console.log(`✅ [BUSCAR-MICROORGANISMO] Encontrado: ${nombreMicroorganismo} -> ${microorganismo.id}`);
+        return microorganismo.id;
+      } else {
+        console.log(`❌ [BUSCAR-MICROORGANISMO] NO encontrado: ${nombreMicroorganismo}`);
+        return null;
+      }
+    } else {
+      console.error(`❌ [BUSCAR-MICROORGANISMO] Error en API:`, response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ [BUSCAR-MICROORGANISMO] Error buscando ${nombreMicroorganismo}:`, error);
+    return null;
+  }
+}
+
+// Nueva función para crear Sirius Bacter finalizado
+async function crearSiriusBacterFinalizado(microorganismosUsados: any[], observaciones: string, realizaRegistro: string, responsablesEquipo: string[], registrosSalida: any[] = []) {
+  try {
+    console.log('🧬 [SIRIUSBACTER-FINAL] ===== CREANDO SIRIUS BACTER FINALIZADO =====');
+    
+    const AIRTABLE_TABLE_FERMENTACION = process.env.AIRTABLE_TABLE_FERMENTACION;
+    
+    if (!AIRTABLE_TABLE_FERMENTACION) {
+      throw new Error('AIRTABLE_TABLE_FERMENTACION no configurado');
+    }
+    
+    // Buscar el ID de SiriusBacter dinámicamente
+    const siriusBacterID = await buscarMicroorganismoPorNombre('Siriusbacter');
+    if (!siriusBacterID) {
+      throw new Error('No se pudo encontrar el microorganismo SiriusBacter en la base de datos');
+    }
+    
+    // Solo el SiriusBacter ID en Microorganismos (para generar código "SB")
+    const microorganismosIds = [siriusBacterID]; // SiriusBacter encontrado dinámicamente
+    
+    // Los IDs de los registros de fermentación originales para el campo Fermentacion
+    const fermentacionIds = microorganismosUsados.map(micro => micro.recordId);
+    console.log('🔗 [SIRIUSBACTER-FINAL] IDs de fermentación originales:', fermentacionIds);
+    
+    // Para SiriusBacter: todas las fechas son iguales (momento de habilitación del producto)
+    const fechaHabilitacion = new Date();
+    
+    // Crear referencias a las salidas de fermentación para logging (NO se enlazarán al registro)
+    const salidaFermentacionIds = registrosSalida.map(salida => salida.id);
+    
+    const recordDataFinal = {
+      fields: {
+        'Fecha Inicia Fermentacion': fechaHabilitacion.toISOString(),
+        'Fecha Termina Fermentacion': fechaHabilitacion.toISOString(), // Misma fecha
+        'Fecha Empacado': fechaHabilitacion.toISOString(), // Misma fecha
+        'Cantidad Litros': 300, // 300L finales de SiriusBacter
+        'Etapa Produccion': 'Empacado', // Producto listo para venta
+        'Observaciones': `${observaciones} - SIRIUS BACTER FINALIZADO - Mezcla de: ${microorganismosUsados.map(m => `${m.microorganismo}(${m.codigoLote})`).join(', ')} - Salidas procesadas: ${salidaFermentacionIds.join(', ')}`,
+        'Realiza Registro': realizaRegistro,
+        'Microorganismos': microorganismosIds, // Solo SiriusBacter para código "SB"
+        'Responsables': responsablesEquipo,
+        'Fermentacion': fermentacionIds // Enlazar los registros de fermentación originales
+        // NOTA: NO incluir 'Salida Fermentacion' para mantener Total Litros = 300
+      }
+    };
+    
+    console.log('📦 [SIRIUSBACTER-FINAL] Creando registro final:', JSON.stringify(recordDataFinal, null, 2));
+    console.log('🔗 [SIRIUSBACTER-FINAL] Registros de fermentación vinculados:', fermentacionIds);
+    console.log('� [SIRIUSBACTER-FINAL] Salidas procesadas (NO enlazadas):', salidaFermentacionIds);
+    console.log('🏷️ [SIRIUSBACTER-FINAL] Etapa: Empacado (producto habilitado)');
+    console.log('📅 [SIRIUSBACTER-FINAL] Fecha habilitación:', fechaHabilitacion.toISOString());
+    
+    const response = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_FERMENTACION}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          records: [recordDataFinal],
+          typecast: true
+        })
+      }
+    );
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`✅ [SIRIUSBACTER-FINAL] Sirius Bacter creado: ${result.records[0].id}`);
+      console.log(`🔗 [SIRIUSBACTER-FINAL] Vinculado con fermentaciones: ${fermentacionIds.join(', ')}`);
+      console.log(`🏷️ [SIRIUSBACTER-FINAL] Código de lote: Solo "SB"`);
+      console.log(`📊 [SIRIUSBACTER-FINAL] Total Litros esperado: 300L (sin descuentos)`);
+      console.log(`🎯 [SIRIUSBACTER-FINAL] Estado: Empacado y disponible para venta`);
+      return result.records[0];
+    } else {
+      const error = await response.json();
+      console.error(`❌ [SIRIUSBACTER-FINAL] Error creando Sirius Bacter final:`, error);
+      throw new Error('Error creando Sirius Bacter final');
+    }
+    
+  } catch (error) {
+    console.error('❌ [SIRIUSBACTER-FINAL] ERROR CREANDO SIRIUS BACTER:', error);
+    throw error;
   }
 }
 
@@ -223,11 +658,26 @@ export async function POST(request: Request) {
     // Calcular fechas - Mantener la fecha exacta sin conversión de zona horaria
     let fechaInicioDate: Date;
     if (fechaInicio) {
-      // Crear fecha local sin conversión de zona horaria
-      const [year, month, day] = fechaInicio.split('-').map(Number);
-      fechaInicioDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
+      // Si la fecha viene en formato ISO (como desde el frontend directo), usarla directamente
+      if (fechaInicio.includes('T')) {
+        fechaInicioDate = new Date(fechaInicio);
+      } else {
+        // Si viene en formato YYYY-MM-DD (como del formulario), procesarla localmente
+        const [year, month, day] = fechaInicio.split('-').map(Number);
+        fechaInicioDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
+      }
     } else {
       fechaInicioDate = new Date();
+    }
+    
+    // Validar que la fecha es válida
+    if (isNaN(fechaInicioDate.getTime())) {
+      console.error('❌ [PROD-DEBUG] Fecha de inicio inválida:', fechaInicio);
+      return NextResponse.json({
+        success: false,
+        error: 'Fecha de inicio inválida',
+        details: `Fecha recibida: ${fechaInicio}`
+      }, { status: 400 });
     }
     
     const fechaFinalizacion = new Date(fechaInicioDate);
@@ -323,9 +773,256 @@ export async function POST(request: Request) {
           });
           
           console.log('📊 [PROD-DEBUG] INSUMOS CALCULADOS FINAL:', JSON.stringify(insumosCalculados, null, 2));
+        } else if (nombreMicroorganismo === 'SiriusBacter' || nombreMicroorganismo === 'Siriusbacter') {
+          console.log('🧬 [SIRIUSBACTER-FIFO] ===== ES SIRIUSBACTER - INICIANDO PROCESO FIFO =====');
+          
+          // Para SiriusBacter, buscar microorganismos terminados en 100L usando lógica FIFO
+          try {
+            // Buscar microorganismos terminados en 100L disponibles
+            const resultadoBusqueda = await buscarMicroorganismosTerminados100L();
+            console.log('🧬 [SIRIUSBACTER-FIFO] Resultado búsqueda:', resultadoBusqueda);
+            
+            if (!resultadoBusqueda.success) {
+              console.error('❌ [SIRIUSBACTER-FIFO] Microorganismos faltantes:', resultadoBusqueda.faltantes);
+              
+              return NextResponse.json({
+                success: false,
+                error: 'Microorganismos requeridos no están disponibles en 100L para producir SiriusBacter',
+                details: `Microorganismos faltantes en 100L: ${resultadoBusqueda.faltantes.join(', ')}`,
+                microorganismosRequeridos: ['PseudoMonas', 'AzosPirillum', 'AzotoBacter'],
+                microorganismosDisponibles: resultadoBusqueda.microorganismos.map(m => m.microorganismo),
+                faltantes: resultadoBusqueda.faltantes,
+                accion: 'Ir a almacenamiento para verificar disponibilidad',
+                redirectToAlmacenamiento: true
+              }, { status: 200 });
+            }
+            
+            console.log('✅ [SIRIUSBACTER-FIFO] Todos los microorganismos disponibles. Iniciando proceso...');
+            
+            // 1. Actualizar fecha de empacado de los microorganismos usados
+            const microorganismosEmpacados = await actualizarFechaEmpacado(
+              resultadoBusqueda.microorganismos,
+              realizaRegistro || 'Sistema'
+            );
+            console.log('📦 [SIRIUSBACTER-FIFO] Microorganismos empacados:', microorganismosEmpacados.length);
+            
+            // 2. Registrar salida de fermentación de los microorganismos usados
+            const registrosSalida = await registrarSalidaFermentacion(resultadoBusqueda.microorganismos, 100);
+            console.log('📦 [SIRIUSBACTER-FIFO] Salidas registradas:', registrosSalida.length);
+            
+            // 3. Crear el registro final de SiriusBacter
+            const siriusBacterFinal = await crearSiriusBacterFinalizado(
+              resultadoBusqueda.microorganismos,
+              observaciones || 'Producción SiriusBacter desde microorganismos terminados 100L',
+              realizaRegistro || 'Sistema',
+              responsablesEquipo || [],
+              registrosSalida // Pasar los registros de salida para enlazar
+            );
+            
+            console.log('🎉 [SIRIUSBACTER-FIFO] PROCESO COMPLETADO:', siriusBacterFinal.id);
+            
+            // Retornar respuesta específica para SiriusBacter FIFO
+            return NextResponse.json({
+              success: true,
+              message: `SiriusBacter creado exitosamente desde ${microorganismosEmpacados.length} microorganismos`,
+              tipoProduccion: 'SiriusBacter Final (FIFO)',
+              siriusBacterFinal: {
+                id: siriusBacterFinal.id,
+                codigoLote: siriusBacterFinal.fields['Codigo Lote'],
+                volumenFinal: '300L',
+                etapa: 'Fermentacion'
+              },
+              microorganismosUsados: resultadoBusqueda.microorganismos.map(m => ({
+                tipo: m.microorganismo,
+                lote: m.codigoLote,
+                litrosUsados: 100,
+                fechaEmpacado: new Date().toISOString()
+              })),
+              registrosSalida: registrosSalida.map(r => r.id),
+              fechaCreacion: new Date().toISOString(),
+              estadoFinal: 'SiriusBacter disponible para venta',
+              resumenProceso: {
+                descripcion: 'SiriusBacter creado mezclando los 3 microorganismos más antiguos disponibles en 100L',
+                tiempoTotal: '24 horas (mezcla final)',
+                volumenFinal: '300L',
+                microorganismosOriginales: resultadoBusqueda.microorganismos.map((m: any) => `${m.microorganismo} (${m.codigoLote})`)
+              }
+            });
+            
+          } catch (siriusBacterError) {
+            console.error('❌ [SIRIUSBACTER-FIFO] ERROR EN PROCESO:', siriusBacterError);
+            return NextResponse.json({
+              success: false,
+              error: 'Error al crear SiriusBacter desde microorganismos terminados',
+              details: siriusBacterError instanceof Error ? siriusBacterError.message : 'Error desconocido',
+              tipoProduccion: 'SiriusBacter Final (FIFO)'
+            }, { status: 500 });
+          }
+        } else if (nombreMicroorganismo === 'PseudoMonas' || 
+                   nombreMicroorganismo === 'AzosPirillum' || 
+                   nombreMicroorganismo === 'AzotoBacter') {
+          console.log(`🧪 [MICROORGANISMO-INDIVIDUAL] ===== ES ${nombreMicroorganismo} - ESCALADO 50ML =====`);
+          
+          // Para microorganismos individuales, crear registro directo en Escalado 50ml
+          const AIRTABLE_TABLE_FERMENTACION = process.env.AIRTABLE_TABLE_FERMENTACION;
+          const AIRTABLE_TABLE_USUARIOS = process.env.AIRTABLE_TABLE_EQUIPO_LABORATORIO;
+          
+          if (!AIRTABLE_TABLE_FERMENTACION) {
+            console.error('❌ AIRTABLE_TABLE_FERMENTACION no configurado');
+            return NextResponse.json({
+              success: false,
+              error: 'Tabla de fermentación no configurada'
+            }, { status: 500 });
+          }
+
+          // Buscar record IDs de los responsables por nombre
+          const responsablesIds: string[] = [];
+          if (responsablesEquipo && responsablesEquipo.length > 0 && AIRTABLE_TABLE_USUARIOS) {
+            console.log(`🔍 [${nombreMicroorganismo}] Buscando responsables:`, responsablesEquipo);
+            
+            try {
+              for (const nombreResponsable of responsablesEquipo) {
+                const usuarioResponse = await fetch(
+                  `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_USUARIOS}?filterByFormula=SEARCH("${nombreResponsable}",{Nombre})`,
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                    }
+                  }
+                );
+                
+                if (usuarioResponse.ok) {
+                  const usuarioData = await usuarioResponse.json();
+                  if (usuarioData.records && usuarioData.records.length > 0) {
+                    responsablesIds.push(usuarioData.records[0].id);
+                    console.log(`✅ [${nombreMicroorganismo}] Usuario encontrado: ${nombreResponsable} -> ${usuarioData.records[0].id}`);
+                  } else {
+                    console.warn(`⚠️ [${nombreMicroorganismo}] Usuario no encontrado: ${nombreResponsable}`);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error(`❌ [${nombreMicroorganismo}] Error buscando responsables:`, error);
+            }
+          }
+          
+          // Calcular fechas para 24 horas (escalado 50ml)
+          let fechaInicioDate: Date;
+          if (fechaInicio) {
+            // Si la fecha viene en formato ISO (como desde el frontend directo), usarla directamente
+            if (fechaInicio.includes('T')) {
+              fechaInicioDate = new Date(fechaInicio);
+            } else {
+              // Si viene en formato YYYY-MM-DD (como del formulario), procesarla localmente
+              const [year, month, day] = fechaInicio.split('-').map(Number);
+              fechaInicioDate = new Date(year, month - 1, day);
+            }
+          } else {
+            fechaInicioDate = new Date();
+          }
+          
+          // Validar que la fecha es válida
+          if (isNaN(fechaInicioDate.getTime())) {
+            console.error(`❌ [${nombreMicroorganismo}] Fecha de inicio inválida:`, fechaInicio);
+            return NextResponse.json({
+              success: false,
+              error: 'Fecha de inicio inválida para microorganismo individual',
+              details: `Fecha recibida: ${fechaInicio}`
+            }, { status: 400 });
+          }
+          
+          const fechaFinalizacion = new Date(fechaInicioDate);
+          
+          // Calcular duración total del proceso completo para el microorganismo individual
+          let duracionTotalHoras = 0;
+          
+          // Etapas de escalado (aplican a todos): 50ml + 250ml + 800ml = 72 horas
+          duracionTotalHoras += 24 + 24 + 24; // 72 horas de escalado
+          
+          // Fermentaciones específicas por microorganismo
+          if (nombreMicroorganismo === 'PseudoMonas') {
+            duracionTotalHoras += 12 + 12 + 72; // 12L + 100L + Final = 96 horas
+          } else if (nombreMicroorganismo === 'AzosPirillum') {
+            duracionTotalHoras += 24 + 24 + 72; // 12L + 100L + Final = 120 horas
+          } else if (nombreMicroorganismo === 'AzotoBacter') {
+            duracionTotalHoras += 36 + 36 + 72; // 12L + 100L + Final = 144 horas
+          }
+          
+          // Sumar las horas totales a la fecha de inicio
+          fechaFinalizacion.setHours(fechaFinalizacion.getHours() + duracionTotalHoras);
+          
+          console.log(`📅 [${nombreMicroorganismo}] Fecha inicio:`, fechaInicioDate.toISOString());
+          console.log(`📅 [${nombreMicroorganismo}] Duración total: ${duracionTotalHoras} horas (${Math.round(duracionTotalHoras/24*10)/10} días)`);
+          console.log(`📅 [${nombreMicroorganismo}] Fecha fin estimada:`, fechaFinalizacion.toISOString());
+
+          // Preparar datos para el registro de Escalado 50ml
+          const recordData = {
+            fields: {
+              'Fecha Inicia Fermentacion': fechaInicioDate.toISOString(),
+              'Fecha Termina Fermentacion': fechaFinalizacion.toISOString(),
+              'Fecha Inicia Escalado 50ml': fechaInicioDate.toISOString(),
+              'Cantidad Litros': 0.05, // 50ml = 0.05L
+              'Etapa Produccion': 'Escalado 50ml',
+              'Observaciones': `${observaciones || ''} - Escalado inicial ${nombreMicroorganismo} (50ml) - Proceso completo estimado: ${Math.round(duracionTotalHoras/24*10)/10} días`,
+              'Realiza Registro': realizaRegistro || 'Sistema',
+              'Microorganismos': [microorganismoId],
+              'Responsables': responsablesIds.length > 0 ? responsablesIds : []
+            }
+          };          console.log(`📦 [${nombreMicroorganismo}] Datos para Airtable:`, JSON.stringify(recordData, null, 2));
+          console.log(`👥 [${nombreMicroorganismo}] Responsables IDs encontrados:`, responsablesIds);
+          
+          // Crear registro en Airtable
+          const airtableResponse = await fetch(
+            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_FERMENTACION}`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                records: [recordData],
+                typecast: true
+              })
+            }
+          );
+          
+          const airtableResult = await airtableResponse.json();
+          console.log(`📊 [${nombreMicroorganismo}] Respuesta de Airtable:`, JSON.stringify(airtableResult, null, 2));
+          
+          if (!airtableResponse.ok) {
+            console.error(`❌ [${nombreMicroorganismo}] Error de Airtable:`, airtableResult);
+            return NextResponse.json({
+              success: false,
+              error: `Error al crear registro de escalado para ${nombreMicroorganismo}`,
+              details: airtableResult
+            }, { status: 500 });
+          }
+          
+          const createdRecord = airtableResult.records[0];
+          console.log(`✅ [${nombreMicroorganismo}] Registro creado exitosamente:`, createdRecord.id);
+          
+          // Retornar respuesta específica para microorganismo individual
+          return NextResponse.json({
+            success: true,
+            message: `Escalado de ${nombreMicroorganismo} iniciado exitosamente`,
+            tipoProduccion: 'Microorganismo Individual - Escalado 50ml',
+            microorganismo: nombreMicroorganismo,
+            fermentacionId: createdRecord.id,
+            fechaInicio: fechaInicioDate.toISOString(),
+            fechaFinalizacion: fechaFinalizacion.toISOString(),
+            volumen: '50ml (0.05L)',
+            etapa: 'Escalado 50ml',
+            duracion: `${duracionTotalHoras} horas (${Math.round(duracionTotalHoras/24*10)/10} días proceso completo)`,
+            duracionCompleta: `${Math.round(duracionTotalHoras/24*10)/10} días`,
+            cantidadLitros: 0.05,
+            observaciones: observaciones || '',
+            realizaRegistro: realizaRegistro || 'Sistema'
+          });
+          
         } else {
-          console.log('❌ [PROD-DEBUG] NO ES BACILLUS THURINGIENSIS - No se calcularán insumos automáticos');
-          console.log('🔍 [PROD-DEBUG] Nombre esperado: "Bacillus thuringiensis"');
+          console.log('❌ [PROD-DEBUG] MICROORGANISMO NO RECONOCIDO - Proceso estándar');
+          console.log('🔍 [PROD-DEBUG] Nombres esperados: "Bacillus thuringiensis", "Siriusbacter", "PseudoMonas", "AzosPirillum", "AzotoBacter"');
           console.log('🔍 [PROD-DEBUG] Nombre recibido: "' + nombreMicroorganismo + '"');
         }
       }
