@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "gen:acta": "node scripts/generate-acta.js --numero ACTA-001 --lugar 'Por definir'"
   },
   "dependencies": {
     "@react-three/drei": "^10.6.1",
@@ -15,6 +16,7 @@
     "airtable": "^0.12.2",
     "bcryptjs": "^3.0.2",
     "crypto-js": "^4.2.0",
+    "docx": "^8.5.0",
     "framer-motion": "^12.23.12",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
