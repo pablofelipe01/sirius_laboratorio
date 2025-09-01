@@ -543,7 +543,7 @@ export default function AlmacenamientoPage() {
                           return (
                             <div className="mt-2 pt-2 border-t border-orange-100">
                               <div className="flex justify-between text-xs">
-                                <span className="text-green-600 font-medium">💰 Ganancia Potencial:</span>
+                                <span className="text-green-600 font-medium">💰 Potencial Revenue:</span>
                                 <span className="font-bold text-green-700">
                                   ${gananciaTotal.toLocaleString('es-CO')} COP
                                 </span>
