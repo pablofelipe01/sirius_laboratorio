@@ -43,6 +43,8 @@ next-env.d.ts
 # documentación interna sensible
 docs/formulas-internas.md
 
-# generator and generated Word documents
-/scripts/generate-acta.js
-/docs/actas/
+# archivos de actas y generación de documentos
+docs/actas/
+docs/README-Acta-Generator.md
+scripts/generate-acta.js
+scripts/open-acta.js
