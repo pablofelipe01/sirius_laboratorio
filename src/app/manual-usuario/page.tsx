@@ -211,31 +211,108 @@ export default function ManualUsuario() {
 
             {/* Acceso */}
             <section id="acceso" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
-              <div className="flex items-center mb-6">
+              <div className="flex items-center mb-8">
                 <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
                   <span className="text-white text-2xl">🔐</span>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-[#3C4858]">Acceso</h2>
-                  <p className="text-gray-600">Cómo ingresar al sistema</p>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Acceso al Sistema</h2>
+                  <p className="text-gray-600">Proceso de ingreso a la plataforma DataLab</p>
                 </div>
               </div>
-              <div className="prose prose-gray max-w-none">
-                <p className="text-gray-700 mb-4">Para acceder al sistema:</p>
-                <ol className="space-y-3">
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-3 mt-0.5">1</span>
-                    <span className="text-gray-700">Abra la aplicación en su dispositivo.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-3 mt-0.5">2</span>
-                    <span className="text-gray-700">Ingrese su usuario y contraseña.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-3 mt-0.5">3</span>
-                    <span className="text-gray-700">Haga clic en "Iniciar Sesión".</span>
-                  </li>
-                </ol>
+
+              {/* Explicación del proceso */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">1</span>
+                  Creación de Usuario
+                </h3>
+                <p className="text-gray-700 mb-4">
+                  El ingeniero de desarrollo debe crear el usuario en el sistema usando su número de cédula.
+                </p>
+
+                <h3 className="text-lg font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">2</span>
+                  Acceso a la Aplicación
+                </h3>
+                <p className="text-gray-700 mb-4">
+                  Una vez confirmado el usuario, diríjase a la aplicación.
+                </p>
+              </div>
+
+              {/* Pasos para acceder */}
+              <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-6 border border-gray-200 mb-8">
+                <h3 className="text-lg font-semibold text-[#3C4858] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-white">📋</span>
+                  Pasos para acceder
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex items-start">
+                    <span className="flex-shrink-0 w-8 h-8 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-4 mt-0.5">1</span>
+                    <div>
+                      <p className="text-gray-700 font-medium">Botón de acceso</p>
+                      <p className="text-gray-600 text-sm">En el landing page encontrará un botón que dice "Acceder a la plataforma". Haga clic ahí.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start">
+                    <span className="flex-shrink-0 w-8 h-8 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-4 mt-0.5">2</span>
+                    <div>
+                      <p className="text-gray-700 font-medium">Ingrese su número de cédula</p>
+                      <ul className="text-gray-600 text-sm mt-2 space-y-1 ml-4">
+                        <li>• <strong>Primera vez:</strong> Aparecerá la opción de crear una nueva contraseña</li>
+                        <li>• <strong>Usuario recurrente:</strong> Solo debe ingresar su contraseña</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start">
+                    <span className="flex-shrink-0 w-8 h-8 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-4 mt-0.5">3</span>
+                    <div>
+                      <p className="text-gray-700 font-medium">Cambio de contraseña</p>
+                      <p className="text-gray-600 text-sm">Si necesita cambiar la contraseña, deberá acercarse al equipo de soporte.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Video Tutorial */}
+              <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-blue-100 p-6">
+                <h3 className="text-lg font-semibold text-[#3C4858] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-white">🎥</span>
+                  Video Tutorial
+                </h3>
+
+                <div className="mb-4">
+                  <video
+                    className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                    controls
+                    preload="metadata"
+                  >
+                    <source src="/Tutorial Acceder DataLab - PC.mp4" type="video/mp4" />
+                    Tu navegador no soporta el elemento de video.
+                  </video>
+                </div>
+
+                <p className="text-sm text-gray-600">
+                  Siga los pasos mostrados en el video para completar el proceso de acceso.
+                </p>
+              </div>
+
+              {/* Información adicional */}
+              <div className="mt-8 bg-amber-50/90 backdrop-blur-sm rounded-lg p-6 border border-amber-200">
+                <div className="flex items-start">
+                  <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center mr-3 mt-0.5">
+                    <span className="text-sm">⚠️</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#3C4858] mb-2">¿Tiene problemas?</h4>
+                    <p className="text-sm text-gray-700">
+                      Si aparece algún error durante el proceso de acceso, comuníquese inmediatamente con el equipo de soporte técnico.
+                    </p>
+                  </div>
+                </div>
               </div>
             </section>
 
