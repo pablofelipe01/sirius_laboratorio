@@ -128,31 +128,84 @@ export default function ManualUsuario() {
           <main className="flex-1 space-y-6">
             {/* Instalación */}
             <section id="instalacion" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
-              <div className="flex items-center mb-6">
+              <div className="flex items-center mb-8">
                 <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
                   <span className="text-white text-2xl">📥</span>
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-[#3C4858]">Instalación</h2>
-                  <p className="text-gray-600">Primeros pasos para configurar la aplicación</p>
+                  <p className="text-gray-600">Tutoriales paso a paso para instalar DataLab</p>
                 </div>
               </div>
-              <div className="prose prose-gray max-w-none">
-                <p className="text-gray-700 mb-4">Siga estos pasos para instalar la aplicación:</p>
-                <ol className="space-y-3">
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-3 mt-0.5">1</span>
-                    <span className="text-gray-700">Descargue el instalador desde el enlace proporcionado.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-3 mt-0.5">2</span>
-                    <span className="text-gray-700">Ejecute el archivo y siga las instrucciones en pantalla.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center text-sm font-medium mr-3 mt-0.5">3</span>
-                    <span className="text-gray-700">Complete la configuración inicial con sus credenciales.</span>
-                  </li>
-                </ol>
+
+              <div className="grid gap-8 md:grid-cols-2">
+                {/* Instalación en Móvil */}
+                <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-blue-100 p-6">
+                  <div className="flex items-center mb-4">
+                    <div className="w-10 h-10 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3">
+                      <span className="text-white text-lg">📱</span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#3C4858]">Instalación en Móvil</h3>
+                      <p className="text-sm text-gray-600">Para teléfonos y tablets</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <video
+                      className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src="/Tutorial Instalar DataLab - Movil.mp4" type="video/mp4" />
+                      Tu navegador no soporta el elemento de video.
+                    </video>
+                  </div>
+
+                </div>
+
+                {/* Instalación en PC */}
+                <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-blue-100 p-6">
+                  <div className="flex items-center mb-4">
+                    <div className="w-10 h-10 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3">
+                      <span className="text-white text-lg">💻</span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#3C4858]">Instalación en PC</h3>
+                      <p className="text-sm text-gray-600">Para computadoras Windows</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <video
+                      className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src="/Tutorial Instalar DataLab - PC.mp4" type="video/mp4" />
+                      Tu navegador no soporta el elemento de video.
+                    </video>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Información adicional */}
+              <div className="mt-8 bg-gray-50/90 backdrop-blur-sm rounded-lg p-6 border border-gray-200">
+                <div className="flex items-start">
+                  <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center mr-3 mt-0.5">
+                    <span className="text-sm">ℹ️</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#3C4858] mb-2">Información Importante</h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Asegúrate de tener conexión a internet durante la instalación</li>
+                      <li>• La aplicación requiere permisos de micrófono que debes conceder para que funcione adecuadamente</li>
+                      <li>• Si tienes problemas, contacta al equipo de soporte</li>
+                      <li>• Para tener acceso debes haber realizado previamente la solicitud de creación de perfil al equipo de tecnología</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </section>
 
