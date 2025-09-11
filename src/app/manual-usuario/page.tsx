@@ -318,31 +318,190 @@ export default function ManualUsuario() {
 
             {/* Navegación */}
             <section id="navegacion" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
-              <div className="flex items-center mb-6">
+              <div className="flex items-center mb-8">
                 <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
                   <span className="text-white text-2xl">🧭</span>
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-[#3C4858]">Navegación</h2>
-                  <p className="text-gray-600">Cómo moverse por la aplicación</p>
+                  <p className="text-gray-600">Menú principal y funciones de la aplicación</p>
                 </div>
               </div>
-              <div className="prose prose-gray max-w-none">
-                <p className="text-gray-700 mb-4">Use el menú principal para moverse entre secciones:</p>
-                <ul className="space-y-3">
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-2 h-2 bg-[#0154AC] rounded-full mr-3 mt-2"></span>
-                    <span className="text-gray-700">Haga clic en las pestañas para abrir módulos.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-2 h-2 bg-[#0154AC] rounded-full mr-3 mt-2"></span>
-                    <span className="text-gray-700">Use los botones de retroceso para volver.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-2 h-2 bg-[#0154AC] rounded-full mr-3 mt-2"></span>
-                    <span className="text-gray-700">Busque funciones con la barra de búsqueda.</span>
-                  </li>
-                </ul>
+
+              <div className="mb-8">
+                <p className="text-gray-700 text-lg mb-6">
+                  Cuando ingresa a la aplicación, el menú de opciones está en la parte superior. Estas son las categorías y funciones disponibles:
+                </p>
+              </div>
+
+              {/* Procesos */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-white">⚗️</span>
+                  Procesos
+                </h3>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-blue-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🧬</span>
+                      <h4 className="font-semibold text-[#3C4858]">Inoculación</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Registro de actividades de inoculación por el equipo de producción de biológicos.</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-blue-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🧪</span>
+                      <h4 className="font-semibold text-[#3C4858]">Cepas</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Registro de actividades de inoculación de cepas.</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-blue-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🌾</span>
+                      <h4 className="font-semibold text-[#3C4858]">Cosecha</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Formulario para registrar cosechas de manera eficiente.</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-blue-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🦠</span>
+                      <h4 className="font-semibold text-[#3C4858]">Bacterias</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Panel de producción de bacterias.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gestión */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-white">📋</span>
+                  Gestión
+                </h3>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gradient-to-br from-green-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-green-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">📦</span>
+                      <h4 className="font-semibold text-[#3C4858]">Almacenamiento</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Inventario en tiempo real de biológicos, hongos y bacterias, incluyendo refrigeradores y cuartos de incubación.</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-red-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-red-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🗑️</span>
+                      <h4 className="font-semibold text-[#3C4858]">Descartes</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Registro de bolsas en mal estado (cepas y producción).</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-yellow-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-yellow-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">📋</span>
+                      <h4 className="font-semibold text-[#3C4858]">Stock Insumos</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Inventario de insumos del laboratorio (ingresar, sacar y registrar insumos).</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-purple-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🛒</span>
+                      <h4 className="font-semibold text-[#3C4858]">Clientes</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">(En desarrollo)</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-indigo-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-indigo-100 p-4 md:col-span-2">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">📝</span>
+                      <h4 className="font-semibold text-[#3C4858]">Bitácora</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Registro de anomalías durante la jornada laboral.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Inteligencia Artificial */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-white">🤖</span>
+                  Inteligencia Artificial
+                </h3>
+
+                <div className="bg-gradient-to-br from-purple-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-purple-100 p-4">
+                  <div className="flex items-center mb-2">
+                    <span className="text-lg mr-3">🤖</span>
+                    <h4 className="font-semibold text-[#3C4858]">SIRIUS</h4>
+                  </div>
+                  <p className="text-gray-700 text-sm">Asistente conversacional enfocado en laboratorios.</p>
+                </div>
+              </div>
+
+              {/* Centro de Ayuda */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-white">❓</span>
+                  Centro de Ayuda
+                </h3>
+
+                <div className="bg-gradient-to-br from-orange-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-orange-100 p-4">
+                  <div className="flex items-center mb-2">
+                    <span className="text-lg mr-3">📖</span>
+                    <h4 className="font-semibold text-[#3C4858]">Manual de Usuario</h4>
+                  </div>
+                  <p className="text-gray-700 text-sm">Capacitación para nuevos usuarios de la plataforma DataLab.</p>
+                </div>
+              </div>
+
+              {/* Video Tutorial de Navegación */}
+              <div className="bg-gradient-to-br from-gray-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-[#3C4858] mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-white">🎥</span>
+                  Video Tutorial de Navegación
+                </h3>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Video Móvil */}
+                  <div>
+                    <h4 className="font-semibold text-[#3C4858] mb-3 flex items-center">
+                      <span className="w-6 h-6 bg-[#0154AC] rounded-lg flex items-center justify-center mr-2 text-white text-sm">📱</span>
+                      Navegación Móvil
+                    </h4>
+                    <video
+                      className="w-full h-48 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src="/Navegacion DataLab - Movil.mp4" type="video/mp4" />
+                      Tu navegador no soporta el elemento de video.
+                    </video>
+                  </div>
+
+                  {/* Video PC */}
+                  <div>
+                    <h4 className="font-semibold text-[#3C4858] mb-3 flex items-center">
+                      <span className="w-6 h-6 bg-[#0154AC] rounded-lg flex items-center justify-center mr-2 text-white text-sm">💻</span>
+                      Navegación PC
+                    </h4>
+                    <video
+                      className="w-full h-48 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src="/Navegacion DataLab - PC.mp4" type="video/mp4" />
+                      Tu navegador no soporta el elemento de video.
+                    </video>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-600 mt-4">
+                  Vea estos tutoriales para aprender a navegar eficientemente por todas las secciones de la aplicación.
+                </p>
               </div>
             </section>
 
