@@ -186,8 +186,17 @@ const Navbar: React.FC = () => {
                     <span className="text-lg">✨</span>
                     <span>SIRIUS</span>
                   </Link>
-                  
-                  {/* User Info & Logout */}
+
+                  {/* Manual de Usuario */}
+                  <Link 
+                    href="/manual-usuario" 
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-white/10 ${
+                      isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white'
+                    }`}
+                  >
+                    <span className="text-lg">📖</span>
+                    <span>Manual</span>
+                  </Link>
                   <div className="flex items-center gap-3 ml-6">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -302,7 +311,7 @@ const Navbar: React.FC = () => {
           <div className="flex flex-col h-full overflow-y-auto">
             <div className="flex-1 px-4 py-6 space-y-6">
               {isAuthenticated ? (
-                <>
+                <div>
                   {/* User Info */}
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-4">
                     <div className="flex items-center gap-3">
@@ -465,8 +474,28 @@ const Navbar: React.FC = () => {
                         </Link>
                       </div>
                     </div>
+
+                    {/* Manual de Usuario */}
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 px-2 text-gray-500 dark:text-gray-400">
+                        📖 Ayuda
+                      </h3>
+                      <div className="space-y-1">
+                        <Link
+                          href="/manual-usuario"
+                          onClick={closeMobileMenu}
+                          className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-white"
+                        >
+                          <span className="text-xl">📖</span>
+                          <span className="font-medium">Manual de Usuario</span>
+                          <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                      </div>
+                    </div>
                   </div>
-                </>
+                </div>
               ) : (
                 <div className="space-y-4">
                   <div className="text-center">
