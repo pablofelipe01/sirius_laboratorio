@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export default function ManualUsuario() {
+  // Estados para controlar la expansión de las secciones
+  const [procesosExpanded, setProcesosExpanded] = useState(true);
+  const [gestionExpanded, setGestionExpanded] = useState(true);
+  
   useEffect(() => {
     const handleAnchorClick = (e: Event) => {
       const target = e.target as HTMLAnchorElement;
@@ -97,76 +101,96 @@ export default function ManualUsuario() {
                   🆘 Reporte de Problemas
                 </a>
                 <div className="pt-2">
-                  <p className="text-xs font-medium text-[#3C4858] uppercase tracking-wider mb-2 px-3">Procesos</p>
-                  <a
-                    href="#procesos"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                  <button
+                    onClick={() => setProcesosExpanded(!procesosExpanded)}
+                    className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-[#3C4858] uppercase tracking-wider hover:text-[#0154AC] transition-colors duration-200"
                   >
-                    ⚗️ Procesos
-                  </a>
-                  <a
-                    href="#inoculacion"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    📊 Inoculación
-                  </a>
-                  <a
-                    href="#cepas"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    🦠 Cepas
-                  </a>
-                  <a
-                    href="#cosecha"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    🧪 Cosecha
-                  </a>
-                  <a
-                    href="#bacterias"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    🦠 Bacterias
-                  </a>
+                    <span>Procesos</span>
+                    <span className={`transform transition-transform duration-200 ${procesosExpanded ? 'rotate-90' : ''}`}>
+                      ▶
+                    </span>
+                  </button>
+                  <div className={`transition-all duration-300 overflow-hidden ${procesosExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <a
+                      href="#procesos"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                    >
+                      ⚗️ Procesos
+                    </a>
+                    <a
+                      href="#inoculacion"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      📊 Inoculación
+                    </a>
+                    <a
+                      href="#cepas"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      🦠 Cepas
+                    </a>
+                    <a
+                      href="#cosecha"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      🧪 Cosecha
+                    </a>
+                    <a
+                      href="#bacterias"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      🦠 Bacterias
+                    </a>
+                  </div>
                 </div>
                 <div className="pt-2">
-                  <p className="text-xs font-medium text-[#3C4858] uppercase tracking-wider mb-2 px-3">Gestión</p>
-                  <a
-                    href="#gestion"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                  <button
+                    onClick={() => setGestionExpanded(!gestionExpanded)}
+                    className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-[#3C4858] uppercase tracking-wider hover:text-[#0154AC] transition-colors duration-200"
                   >
-                    📋 Gestión
-                  </a>
-                  <a
-                    href="#almacenamiento"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    📦 Almacenamiento
-                  </a>
-                  <a
-                    href="#descartes"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    🗑️ Descartes
-                  </a>
-                  <a
-                    href="#stock-insumos"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    📋 Stock Insumos
-                  </a>
-                  <a
-                    href="#clientes"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    🛒 Clientes
-                  </a>
-                  <a
-                    href="#bitacora"
-                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
-                  >
-                    📝 Bitácora
-                  </a>
+                    <span>Gestión</span>
+                    <span className={`transform transition-transform duration-200 ${gestionExpanded ? 'rotate-90' : ''}`}>
+                      ▶
+                    </span>
+                  </button>
+                  <div className={`transition-all duration-300 overflow-hidden ${gestionExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <a
+                      href="#gestion"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                    >
+                      📋 Gestión
+                    </a>
+                    <a
+                      href="#almacenamiento"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      📦 Almacenamiento
+                    </a>
+                    <a
+                      href="#descartes"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      🗑️ Descartes
+                    </a>
+                    <a
+                      href="#stock-insumos"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      📋 Stock Insumos
+                    </a>
+                    <a
+                      href="#clientes"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      🛒 Clientes
+                    </a>
+                    <a
+                      href="#bitacora"
+                      className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                    >
+                      📝 Bitácora
+                    </a>
+                  </div>
                 </div>
                 <a
                   href="#sirius"
@@ -1214,135 +1238,285 @@ export default function ManualUsuario() {
                 </div>
               </div>
 
-              {/* ¿Qué es esta herramienta? */}
+              {/* ¿Qué es la página de Almacenamiento? */}
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
-                  ¿Qué es esta herramienta?
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🤔</span>
+                  ¿Qué es la página de Almacenamiento?
                 </h3>
                 <p className="text-gray-700 leading-relaxed">
-                  Es un sistema completo para gestionar el inventario de muestras biológicas del laboratorio. Permite controlar el almacenamiento de cepas, lotes de producción, bacterias y hongos en diferentes condiciones (refrigeración, congelación, incubación) con seguimiento en tiempo real de ubicaciones y condiciones de almacenamiento.
+                  Imagina que tienes un gran refrigerador industrial donde guardas todos tus microorganismos (hongos y bacterias) después de cultivarlos. Esta página es como el "inventario inteligente" de ese refrigerador. Te muestra exactamente qué tienes, dónde está cada cosa, y en qué estado se encuentra.
                 </p>
               </div>
 
-              {/* Tipos de almacenamiento */}
+              {/* ¿Para qué sirve? */}
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🏭</span>
-                  Tipos de almacenamiento gestionados
-                </h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">🧊</span>
-                      Refrigeración (4°C)
-                    </h4>
-                    <p className="text-gray-700 text-sm">Almacenamiento de cepas activas y cultivos madre.</p>
-                  </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">❄️</span>
-                      Congelación (-20°C/-80°C)
-                    </h4>
-                    <p className="text-gray-700 text-sm">Conservación a largo plazo de cepas y muestras.</p>
-                  </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">🌡️</span>
-                      Incubación
-                    </h4>
-                    <p className="text-gray-700 text-sm">Control de temperatura para cultivos en crecimiento.</p>
-                  </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">📦</span>
-                      Almacén general
-                    </h4>
-                    <p className="text-gray-700 text-sm">Productos terminados y materiales de referencia.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Funcionalidades principales */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⚙️</span>
-                  Funcionalidades principales
-                </h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">📥</span>
-                      Registro de entradas
-                    </h4>
-                    <p className="text-gray-700 text-sm">Documentar nuevos lotes con ubicación específica y condiciones.</p>
-                  </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">📤</span>
-                      Control de salidas
-                    </h4>
-                    <p className="text-gray-700 text-sm">Registrar retiros para uso en producción o análisis.</p>
-                  </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">🔍</span>
-                      Búsqueda y localización
-                    </h4>
-                    <p className="text-gray-700 text-sm">Encontrar rápidamente cualquier muestra por código o nombre.</p>
-                  </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">📊</span>
-                      Reportes de inventario
-                    </h4>
-                    <p className="text-gray-700 text-sm">Vista completa del estado actual de todas las muestras.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* ¿Cómo gestionar el almacenamiento? */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📋</span>
-                  ¿Cómo gestionar el almacenamiento?
-                </h3>
-                <ol className="list-decimal list-inside space-y-3 text-gray-700">
-                  <li><strong>🏷️ Etiqueta correctamente:</strong> Asigna códigos únicos a cada lote o muestra.</li>
-                  <li><strong>📍 Registra ubicaciones:</strong> Especifica estante, refrigerador y posición exacta.</li>
-                  <li><strong>🌡️ Verifica condiciones:</strong> Confirma temperaturas y condiciones de almacenamiento.</li>
-                  <li><strong>📅 Monitorea fechas:</strong> Controla fechas de caducidad y vencimiento.</li>
-                  <li><strong>🔄 Actualiza movimientos:</strong> Registra todas las entradas y salidas inmediatamente.</li>
-                  <li><strong>🧹 Mantén organización:</strong> Realiza limpiezas periódicas y reorganizaciones.</li>
-                </ol>
-              </div>
-
-              {/* Alertas y notificaciones */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🚨</span>
-                  Alertas y notificaciones
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎯</span>
+                  ¿Para qué sirve?
                 </h3>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  El sistema incluye alertas automáticas para:
+                  Esta página sirve principalmente para <strong>tres cosas importantes</strong>:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-gray-700">
-                  <li>Muestras próximas a caducar (7 días de anticipación)</li>
-                  <li>Condiciones de temperatura fuera de rango</li>
-                  <li>Niveles bajos de stock crítico</li>
-                  <li>Movimientos inusuales o errores en el registro</li>
+                  <li><strong>Saber qué tienes disponible para vender</strong> - Antes de que un cliente pida algo, puedes ver exactamente cuánto hay de cada microorganismo.</li>
+                  <li><strong>Controlar el proceso de maduración</strong> - Los microorganismos pasan por etapas (incubación, refrigeración, fermentación) y aquí ves cuándo están listos.</li>
+                  <li><strong>Organizar el trabajo diario</strong> - Muestra qué lotes necesitan atención, cuáles están listos y cuáles deben moverse de lugar.</li>
                 </ul>
               </div>
 
-              {/* Importancia del control de almacenamiento */}
+              {/* Cómo funciona paso a paso */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📱</span>
+                  Cómo funciona paso a paso
+                </h3>
+
+                {/* Paso 1 */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-[#3C4858] mb-3 flex items-center">
+                    <span className="w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center mr-3 text-sm font-bold">1</span>
+                    Elegir qué tipo de microorganismo quieres ver
+                  </h4>
+                  <div className="grid gap-4 md:grid-cols-2 ml-9">
+                    <div className="bg-orange-50/90 backdrop-blur-sm rounded-lg p-4 border border-orange-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">🍄</span>
+                        <h5 className="font-semibold text-orange-800">HONGOS</h5>
+                      </div>
+                      <p className="text-orange-700 text-sm">Setas, champiñones, etc.</p>
+                    </div>
+                    <div className="bg-purple-50/90 backdrop-blur-sm rounded-lg p-4 border border-purple-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">�</span>
+                        <h5 className="font-semibold text-purple-800">BACTERIAS</h5>
+                      </div>
+                      <p className="text-purple-700 text-sm">Para biocontrol</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Paso 2 */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-[#3C4858] mb-3 flex items-center">
+                    <span className="w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center mr-3 text-sm font-bold">2</span>
+                    Ver el resumen de inventario
+                  </h4>
+                  <div className="ml-9">
+                    <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <h5 className="font-semibold text-[#3C4858] mb-2">🍄 Hongos:</h5>
+                          <ul className="text-sm text-gray-700 space-y-1">
+                            <li>• Número de bolsas disponibles</li>
+                            <li>• Litros equivalentes</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h5 className="font-semibold text-[#3C4858] mb-2">🦠 Bacterias:</h5>
+                          <ul className="text-sm text-gray-700 space-y-1">
+                            <li>• Litros en stock</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Paso 3 */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-[#3C4858] mb-3 flex items-center">
+                    <span className="w-6 h-6 bg-[#0154AC] text-white rounded-full flex items-center justify-center mr-3 text-sm font-bold">3</span>
+                    El dashboard principal
+                  </h4>
+                  <div className="ml-9 space-y-4">
+
+                    {/* Si elegiste Hongos */}
+                    <div className="bg-orange-50/90 backdrop-blur-sm rounded-lg p-4 border border-orange-200">
+                      <h5 className="font-semibold text-orange-800 mb-3 flex items-center">
+                        <span className="text-lg mr-2">🍄</span>
+                        Si elegiste Hongos:
+                      </h5>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="bg-white/90 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">🌡️</span>
+                            <h6 className="font-semibold text-green-800">Incubación</h6>
+                          </div>
+                          <ul className="text-sm text-gray-700 space-y-1">
+                            <li>• Código del lote</li>
+                            <li>• Tipo de hongo</li>
+                            <li>• Número de bolsas</li>
+                            <li>• Responsable</li>
+                            <li>• Fecha de creación</li>
+                          </ul>
+                        </div>
+                        <div className="bg-white/90 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">❄️</span>
+                            <h6 className="font-semibold text-blue-800">Refrigeración</h6>
+                          </div>
+                          <p className="text-sm text-gray-700">Lotes maduros con botón "Ver Historial del Lote"</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Si elegiste Bacterias */}
+                    <div className="bg-purple-50/90 backdrop-blur-sm rounded-lg p-4 border border-purple-200">
+                      <h5 className="font-semibold text-purple-800 mb-3 flex items-center">
+                        <span className="text-lg mr-2">🦠</span>
+                        Si elegiste Bacterias:
+                      </h5>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="bg-white/90 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">🧪</span>
+                            <h6 className="font-semibold text-purple-800">Fermentación</h6>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-2">Muestra etapas de escalado:</p>
+                          <div className="text-xs bg-purple-100 rounded p-2">
+                            50ml → 250ml → 800ml → 12L → 100L
+                          </div>
+                        </div>
+                        <div className="bg-white/90 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">✅</span>
+                            <h6 className="font-semibold text-green-800">Disponibles</h6>
+                          </div>
+                          <p className="text-sm text-gray-700">Bacterias listas para usar o vender</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Funciones especiales */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🔍</span>
+                  Funciones especiales
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🎯</span>
+                      Filtro por tipo específico
+                    </h4>
+                    <p className="text-gray-700 text-sm">Ver solo un hongo o bacteria concreta</p>
+                  </div>
+                 
+                </div>
+              </div>
+
+              {/* Acciones que puedes hacer */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎮</span>
+                  Acciones que puedes hacer
+                </h3>
+
+                {/* Hongos */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-orange-800 mb-3 flex items-center">
+                    <span className="text-lg mr-2">🍄</span>
+                    Hongos:
+                  </h4>
+                  <div className="ml-9 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600">❄️</span>
+                      <span className="text-gray-700">Mover de incubación a refrigeración</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600">📋</span>
+                      <span className="text-gray-700">Ver detalles completos de un lote</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bacterias */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-purple-800 mb-3 flex items-center">
+                    <span className="text-lg mr-2">🦠</span>
+                    Bacterias:
+                  </h4>
+                  <div className="ml-9 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600">🚀</span>
+                      <span className="text-gray-700">Siguiente escalado</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600">�</span>
+                      <span className="text-gray-700">Finalizar fermentación</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-purple-600">📦</span>
+                      <span className="text-gray-700">Empaquetar producto (ej. Bacillus thuringiensis)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Consejos útiles */}
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
                   <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
-                  Importancia del control de almacenamiento
+                  Consejos útiles
                 </h3>
-                <p className="text-gray-700 leading-relaxed">
-                  Un control preciso del almacenamiento es fundamental para mantener la viabilidad de las muestras biológicas, garantizar la trazabilidad completa, cumplir con normativas de calidad y seguridad, y optimizar el uso del espacio y recursos del laboratorio.
-                </p>
+                <div className="bg-yellow-50/90 backdrop-blur-sm rounded-lg p-4 border border-yellow-200">
+                  <ul className="list-disc list-inside space-y-2 text-gray-700">
+                    <li><strong>🔄 Actualiza siempre el dashboard</strong> antes de decidir</li>
+                    <li><strong>📊 Revisa estadísticas rápidas</strong> al inicio</li>
+                    <li><strong>🎯 Usa filtros</strong> para ahorrar tiempo</li>
+                    <li><strong>📖 Consulta historial</strong> antes de vender o usar un lote</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Colores de estado */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎨</span>
+                  Colores de estado
+                </h3>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="bg-green-50/90 backdrop-blur-sm rounded-lg p-3 border border-green-200 text-center">
+                    <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-2"></div>
+                    <p className="text-sm font-semibold text-green-800">Verde</p>
+                    <p className="text-xs text-green-700">Incubación/Fermentación (creciendo)</p>
+                  </div>
+                  <div className="bg-blue-50/90 backdrop-blur-sm rounded-lg p-3 border border-blue-200 text-center">
+                    <div className="w-4 h-4 bg-blue-500 rounded-full mx-auto mb-2"></div>
+                    <p className="text-sm font-semibold text-blue-800">Azul</p>
+                    <p className="text-xs text-blue-700">Refrigeración/Disponible (listo)</p>
+                  </div>
+                  <div className="bg-red-50/90 backdrop-blur-sm rounded-lg p-3 border border-red-200 text-center">
+                    <div className="w-4 h-4 bg-red-500 rounded-full mx-auto mb-2"></div>
+                    <p className="text-sm font-semibold text-red-800">Rojo</p>
+                    <p className="text-xs text-red-700">Problema o alerta</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Video de navegación */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎥</span>
+                  Video de navegación de la página
+                </h3>
+                <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                  <video
+                    className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                    controls
+                    preload="metadata"
+                  >
+                    <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757692090/Grabaci%C3%B3n_de_pantalla_2025-09-12_104604_jbrunk.mp4" type="video/mp4" />
+                    Tu navegador no soporta el elemento de video.
+                  </video>
+                  <p className="text-sm text-gray-600 mt-2 text-center">
+                    Video tutorial completo de cómo navegar en la página de Almacenamiento
+                  </p>
+                </div>
               </div>
             </section>
 
