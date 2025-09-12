@@ -1528,60 +1528,270 @@ export default function ManualUsuario() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-[#3C4858]">Descartes</h2>
-                  <p className="text-gray-600">Registro de descartes de materiales del laboratorio</p>
+                  <p className="text-gray-600">Sistema de gestión de descartes de lotes</p>
                 </div>
               </div>
 
-              {/* ¿Qué es esta herramienta? */}
+              {/* Video demostrativo */}
+              <div className="mb-8">
+                <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-blue-100 p-6">
+                  <div className="flex items-center mb-4">
+                    <div className="w-10 h-10 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3">
+                      <span className="text-white text-lg">🎥</span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#3C4858]">Video demostrativo</h3>
+                      <p className="text-sm text-gray-600">Tutorial completo de la sección Descartes</p>
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <video
+                      className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757693601/Grabaci%C3%B3n_de_pantalla_2025-09-12_111130_pzqy4s.mp4" type="video/mp4" />
+                      Tu navegador no soporta el elemento de video.
+                    </video>
+                  </div>
+                </div>
+              </div>
+
+              {/* ¿Qué es? */}
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
-                  ¿Qué es esta herramienta?
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">❓</span>
+                  ¿Qué es?
                 </h3>
-                <p className="text-gray-700 leading-relaxed">
-                  Es un formulario digital para registrar todos los descartes de materiales en el laboratorio. Permite documentar qué materiales se desechan, por qué razón y quién autoriza el descarte, manteniendo un registro completo y trazable.
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  Es una página completa de una aplicación web que permite registrar descartes de lotes de microorganismos en un sistema de laboratorio.
+                  Se trata de un formulario interactivo con interfaz moderna, que gestiona el proceso completo de registro de descartes.
                 </p>
               </div>
 
-              {/* ¿Cómo usarla correctamente? */}
+              {/* ¿Para qué funciona? */}
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🗑️</span>
-                  ¿Cómo usarla correctamente?
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🔬</span>
+                  ¿Para qué funciona?
                 </h3>
-                <ol className="list-decimal list-inside space-y-3 text-gray-700">
-                  <li><strong>📅 Selecciona la fecha del descarte:</strong> Elige la fecha en que se realiza el descarte.</li>
-                  <li><strong>🔬 Elige el tipo de material:</strong> Selecciona si es insumo, cepa, lote de producción, etc.</li>
-                  <li><strong>📦 Especifica el material concreto:</strong> El sistema te mostrará las opciones disponibles según el tipo seleccionado.</li>
-                  <li><strong>📏 Ingresa la cantidad:</strong> Especifica cuánto material se va a desechar.</li>
-                  <li><strong>📝 Documenta la razón:</strong> Explica por qué se desecha (caducidad, contaminación, fin de experimento, etc.).</li>
-                  <li><strong>👥 Selecciona responsables:</strong> Elige quién realiza el descarte y quién lo autoriza.</li>
-                </ol>
-              </div>
-
-              {/* ¿Qué pasa al registrar un descarte? */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">✅</span>
-                  ¿Qué pasa al registrar un descarte?
-                </h3>
-                <ul className="list-disc list-inside space-y-2 text-gray-700">
-                  <li>Se registra el descarte en la base de datos con toda la información.</li>
-                  <li>Se actualiza automáticamente el inventario descontando el material descartado.</li>
-                  <li>Se genera un registro de trazabilidad completo para auditorías.</li>
-                  <li>El sistema valida que todos los campos obligatorios estén completos.</li>
-                </ul>
-              </div>
-
-              {/* Importancia del registro */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
-                  ¿Por qué es importante registrar los descartes?
-                </h3>
-                <p className="text-gray-700 leading-relaxed">
-                  Mantener un registro detallado de descartes es crucial para el control de inventario, cumplimiento normativo, reducción de desperdicios y optimización de recursos. Permite identificar patrones de desperdicio y tomar decisiones informadas para mejorar la eficiencia del laboratorio.
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  Esta página está diseñada para gestionar el descarte controlado de lotes en un laboratorio de microbiología.
+                  Permite a los usuarios registrar cuándo y por qué se desechan lotes de:
                 </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center mb-2">
+                      <span className="text-2xl mr-3">🧪</span>
+                      <span className="font-semibold text-blue-900">Cepas madre</span>
+                    </div>
+                    <p className="text-sm text-blue-800">Cultivos originales de microorganismos</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-50 to-green-100/50 p-4 rounded-lg border border-green-200">
+                    <div className="flex items-center mb-2">
+                      <span className="text-2xl mr-3">🍄</span>
+                      <span className="font-semibold text-green-900">Lotes de producción</span>
+                    </div>
+                    <p className="text-sm text-green-800">Bolsas inoculadas listas para uso</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Funciones principales */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⚙️</span>
+                  Funciones principales
+                </h3>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Selección de Tipo de Descarte */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-2 text-xs">🎯</span>
+                      Selección de Tipo de Descarte
+                    </h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Botones grandes con emojis intuitivos</li>
+                      <li>• Opciones: Cepas madre o Lotes de Producción</li>
+                      <li>• Interfaz visual clara y moderna</li>
+                    </ul>
+                  </div>
+
+                  {/* Gestión de Microorganismos */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="w-6 h-6 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mr-2 text-xs">🔬</span>
+                      Gestión de Microorganismos
+                    </h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Carga automática desde el sistema</li>
+                      <li>• Selector desplegable con estados de carga</li>
+                      <li>• Mejor experiencia de usuario</li>
+                    </ul>
+                  </div>
+
+                  {/* Selección de Lotes Disponibles */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="w-6 h-6 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mr-2 text-xs">📦</span>
+                      Selección de Lotes Disponibles
+                    </h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Carga dinámica según tipo y microorganismo</li>
+                      <li>• Solo muestra lotes con cantidad disponible</li>
+                      <li>• Información clara: código + cantidad</li>
+                    </ul>
+                  </div>
+
+                  {/* Control de Cantidad */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="w-6 h-6 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mr-2 text-xs">🔢</span>
+                      Control de Cantidad
+                    </h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Campo numérico con validaciones automáticas</li>
+                      <li>• Límite máximo según disponibilidad real</li>
+                      <li>• Prevención de valores inválidos</li>
+                    </ul>
+                  </div>
+
+                  {/* Motivo del Descarte */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="w-6 h-6 bg-red-100 text-red-600 rounded-lg flex items-center justify-center mr-2 text-xs">🎤</span>
+                      Motivo del Descarte
+                    </h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Grabación de audio integrada</li>
+                      <li>• Transcripción automática de voz</li>
+                      <li>• Opción de escribir manualmente</li>
+                      <li>• Campo obligatorio para trazabilidad</li>
+                    </ul>
+                  </div>
+
+                  {/* Resumen y Validación */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="w-6 h-6 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center mr-2 text-xs">📋</span>
+                      Resumen y Validación
+                    </h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Muestra todos los datos antes de enviar</li>
+                      <li>• Validaciones en tiempo real</li>
+                      <li>• Mensajes de error claros y útiles</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Envío y Registro */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📤</span>
+                  Envío y Registro
+                </h3>
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <h4 className="font-semibold text-blue-900 mb-2">📊 Datos que se registran:</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        <li>• Tipo de descarte seleccionado</li>
+                        <li>• Microorganismo específico</li>
+                        <li>• Lote y cantidad exacta</li>
+                        <li>• Motivo detallado del descarte</li>
+                        <li>• Usuario que registra</li>
+                        <li>• Fecha del registro</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-blue-900 mb-2">⚡ Acciones automáticas:</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        <li>• ✅ Actualización automática de inventarios</li>
+                        <li>• 📝 Generación de registro de trazabilidad</li>
+                        <li>• 🔄 Refresco de cantidades disponibles</li>
+                        <li>• 💬 Mensajes de éxito/error en pantalla</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Características Técnicas */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🔧</span>
+                  Características Técnicas
+                </h3>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">⚛️ Tecnología</h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Estados React avanzados</li>
+                      <li>• useState y useEffect</li>
+                      <li>• Interfaz moderna con Tailwind</li>
+                    </ul>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">🛡️ Seguridad</h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Manejo robusto de errores</li>
+                      <li>• Validaciones en tiempo real</li>
+                      <li>• Control de permisos</li>
+                    </ul>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">🔗 Integración</h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• Contexto de autenticación</li>
+                      <li>• Componentes compartidos</li>
+                      <li>• APIs del sistema</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Flujo de Uso Típico */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">�</span>
+                  Flujo de Uso Típico
+                </h3>
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">1️⃣</div>
+                      <h4 className="font-semibold text-green-900 mb-2">Seleccionar Tipo</h4>
+                      <p className="text-sm text-green-800">Elige entre cepas madre o lotes de producción</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">2️⃣</div>
+                      <h4 className="font-semibold text-green-900 mb-2">Elegir Microorganismo</h4>
+                      <p className="text-sm text-green-800">Selecciona de la lista cargada automáticamente</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">3️⃣</div>
+                      <h4 className="font-semibold text-green-900 mb-2">Seleccionar Lote</h4>
+                      <p className="text-sm text-green-800">Elige el lote disponible con cantidad suficiente</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">4️⃣</div>
+                      <h4 className="font-semibold text-blue-900 mb-2">Ingresar Cantidad</h4>
+                      <p className="text-sm text-blue-800">Especifica la cantidad con validación automática</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">5️⃣</div>
+                      <h4 className="font-semibold text-blue-900 mb-2">Grabar Motivo</h4>
+                      <p className="text-sm text-blue-800">Usa audio o escribe el motivo del descarte</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">6️⃣</div>
+                      <h4 className="font-semibold text-purple-900 mb-2">Confirmar y Enviar</h4>
+                      <p className="text-sm text-purple-800">Revisa el resumen y registra el descarte</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
 
