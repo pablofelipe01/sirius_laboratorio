@@ -943,6 +943,185 @@ export default function ManualUsuario() {
               </div>
             </section>
 
+            {/* Bacterias */}
+            <section id="bacterias" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-6">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">🦠</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Bacterias</h2>
+                  <p className="text-gray-600">Actualizado al September 12, 2025</p>
+                </div>
+              </div>
+
+              {/* Advertencia de desarrollo */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center">
+                  <span className="text-2xl mr-3">⚠️</span>
+                  <div>
+                    <h3 className="font-semibold text-yellow-800">Esta sección está en desarrollo</h3>
+                    <p className="text-yellow-700 text-sm">El proceso aún falta por definirse completamente.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Introducción */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
+                  Introducción
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Esta página funciona como menú principal de bacterias disponibles en el laboratorio y se conecta en tiempo real con la base de datos (Airtable). Permite gestionar la producción de diferentes tipos de bacterias de manera eficiente y organizada.
+                </p>
+              </div>
+
+              {/* Estructura de la página */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🏗️</span>
+                  Estructura de la página
+                </h3>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="w-6 h-6 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-2 text-sm">📋</span>
+                      Vista general
+                    </h4>
+                    <p className="text-gray-700 text-sm">Cuadrícula de tarjetas con bacterias disponibles, mostrando información clave de cada una.</p>
+                  </div>
+
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="w-6 h-6 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-2 text-sm">📝</span>
+                      Formularios emergentes
+                    </h4>
+                    <p className="text-gray-700 text-sm">Configuración y confirmación de producción con validaciones automáticas.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tipos de bacterias documentados */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🧫</span>
+                  Tipos de bacterias documentados
+                </h3>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🦠</span>
+                      Bacillus thuringiensis
+                    </h4>
+                    <p className="text-gray-700 text-sm">Fórmula con insumos específicos para producción controlada.</p>
+                  </div>
+
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🌱</span>
+                      SiriusBacter
+                    </h4>
+                    <p className="text-gray-700 text-sm">Mezcla de PseudoMonas, AzosPirillum y AzotoBacter. Proceso de 6 etapas inteligente.</p>
+                  </div>
+
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🧬</span>
+                      Bacterias individuales
+                    </h4>
+                    <p className="text-gray-700 text-sm">PseudoMonas, AzosPirillum, AzotoBacter disponibles por separado.</p>
+                  </div>
+
+                  <div className="bg-yellow-50/90 backdrop-blur-sm rounded-lg p-4 border border-yellow-200">
+                    <h4 className="font-semibold text-yellow-800 mb-2 flex items-center">
+                      <span className="text-lg mr-2">🚧</span>
+                      Bacillus subtilis
+                    </h4>
+                    <p className="text-yellow-700 text-sm">En desarrollo, aún no habilitada para producción.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cómo usar la página */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📋</span>
+                  Cómo usar la página (paso a paso)
+                </h3>
+
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <ol className="list-decimal list-inside text-sm text-gray-700 space-y-2">
+                    <li><strong>👀 Visualizar bacterias disponibles:</strong> Revisa la cuadrícula de tarjetas para ver qué bacterias están listas para producción.</li>
+                    <li><strong>🎯 Seleccionar acción:</strong> Elige entre producción rápida (automática) o personalizada (configuración manual).</li>
+                    <li><strong>⚙️ Revisar y confirmar detalles:</strong> Verifica insumos necesarios, cantidades y parámetros antes de proceder.</li>
+                    <li><strong>▶️ Inicio del proceso:</strong> Confirma para crear registros y actualizar automáticamente el inventario.</li>
+                  </ol>
+                </div>
+              </div>
+
+              {/* Características destacadas */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⭐</span>
+                  Características destacadas
+                </h3>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">🧮</span>
+                    <div>
+                      <span className="font-medium text-[#0154AC]">Cálculos automáticos de insumos</span>
+                      <p className="text-sm text-gray-600">Ej. fórmula precisa de Bacillus thuringiensis.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">🤖</span>
+                    <div>
+                      <span className="font-medium text-[#0154AC]">Proceso inteligente de SiriusBacter</span>
+                      <p className="text-sm text-gray-600">6 etapas automatizadas para mezcla perfecta.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">📊</span>
+                    <div>
+                      <span className="font-medium text-[#0154AC]">Mensajes claros con estados visuales</span>
+                      <p className="text-sm text-gray-600">✅ Verde para éxito, ❌ Rojo para errores, ⏳ Amarillo para procesos en curso.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">🔗</span>
+                    <div>
+                      <span className="font-medium text-[#0154AC]">Integración completa</span>
+                      <p className="text-sm text-gray-600">Conectado con inventario, equipo y registros de laboratorio.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Consejos prácticos */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  Consejos prácticos
+                </h3>
+
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-2">
+                    <li><strong>Revisar insumos antes de producir:</strong> Asegúrate de tener todos los materiales necesarios disponibles.</li>
+                    <li><strong>Confirmar disponibilidad de bacterias base:</strong> Para SiriusBacter, verifica que PseudoMonas, AzosPirillum y AzotoBacter estén en stock.</li>
+                    <li><strong>Aprovechar entrada por voz:</strong> Usa el micrófono para agregar observaciones de manera rápida.</li>
+                    <li><strong>Verificar mensajes de error:</strong> Si algo falla, revisa los detalles en rojo para corregir el problema.</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
             {/* Gestión */}
             <section id="gestion" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
               <div className="flex items-center mb-6">
@@ -989,140 +1168,6 @@ export default function ManualUsuario() {
                     Bitácora
                   </h3>
                   <p className="text-gray-700">Registra actividades diarias. Consulta historial.</p>
-                </div>
-              </div>
-            </section>
-
-            {/* Bacterias */}
-            <section id="bacterias" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
-              <div className="flex items-center mb-8">
-                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
-                  <span className="text-white text-2xl">🦠</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-[#3C4858]">Bacterias</h2>
-                  <p className="text-gray-600">Actualizado al September 12, 2025</p>
-                  <p className="text-sm text-amber-600 mt-2 flex items-center">
-                    <span className="w-4 h-4 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mr-2 text-xs">⚠️</span>
-                    Esta sección está en desarrollo. El proceso aún falta por definirse completamente.
-                  </p>
-                </div>
-              </div>
-
-              {/* Introducción */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
-                  Introducción
-                </h3>
-                <p className="text-gray-700 leading-relaxed">
-                  Esta página funciona como menú principal de bacterias disponibles en el laboratorio y se conecta en tiempo real con la base de datos (Airtable). Permite gestionar la producción de diferentes tipos de bacterias de manera eficiente y organizada.
-                </p>
-              </div>
-
-              {/* Estructura de la página */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🏗️</span>
-                  Estructura de la página
-                </h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-blue-100 p-4">
-                    <div className="flex items-center mb-2">
-                      <span className="text-lg mr-3">📋</span>
-                      <h4 className="font-semibold text-[#3C4858]">Vista general</h4>
-                    </div>
-                    <p className="text-gray-700 text-sm">Cuadrícula de tarjetas con bacterias disponibles, mostrando información clave de cada una.</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-green-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-green-100 p-4">
-                    <div className="flex items-center mb-2">
-                      <span className="text-lg mr-3">📝</span>
-                      <h4 className="font-semibold text-[#3C4858]">Formularios emergentes</h4>
-                    </div>
-                    <p className="text-gray-700 text-sm">Configuración y confirmación de producción con validaciones automáticas.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tipos de bacterias documentados */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🧫</span>
-                  Tipos de bacterias documentados
-                </h3>
-                <div className="space-y-4">
-                  <div className="bg-gradient-to-r from-blue-50/90 to-white/95 backdrop-blur-sm rounded-lg p-4 border border-blue-100">
-                    <div className="flex items-center mb-2">
-                      <span className="text-lg mr-3">🦠</span>
-                      <h4 className="font-semibold text-[#3C4858]">Bacillus thuringiensis</h4>
-                    </div>
-                    <p className="text-gray-700 text-sm">Fórmula con insumos específicos para producción controlada.</p>
-                  </div>
-                  <div className="bg-gradient-to-r from-green-50/90 to-white/95 backdrop-blur-sm rounded-lg p-4 border border-green-100">
-                    <div className="flex items-center mb-2">
-                      <span className="text-lg mr-3">🌱</span>
-                      <h4 className="font-semibold text-[#3C4858]">SiriusBacter</h4>
-                    </div>
-                    <p className="text-gray-700 text-sm">Mezcla de PseudoMonas, AzosPirillum y AzotoBacter. Proceso de 6 etapas inteligente.</p>
-                  </div>
-                  <div className="bg-gradient-to-r from-purple-50/90 to-white/95 backdrop-blur-sm rounded-lg p-4 border border-purple-100">
-                    <div className="flex items-center mb-2">
-                      <span className="text-lg mr-3">🧬</span>
-                      <h4 className="font-semibold text-[#3C4858]">Bacterias individuales</h4>
-                    </div>
-                    <p className="text-gray-700 text-sm">PseudoMonas, AzosPirillum, AzotoBacter disponibles por separado.</p>
-                  </div>
-                  <div className="bg-gradient-to-r from-orange-50/90 to-white/95 backdrop-blur-sm rounded-lg p-4 border border-orange-100">
-                    <div className="flex items-center mb-2">
-                      <span className="text-lg mr-3">🚧</span>
-                      <h4 className="font-semibold text-[#3C4858]">Bacillus subtilis</h4>
-                    </div>
-                    <p className="text-gray-700 text-sm">En desarrollo, aún no habilitada para producción.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cómo usar la página (paso a paso) */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📋</span>
-                  Cómo usar la página (paso a paso)
-                </h3>
-                <ol className="list-decimal list-inside space-y-3 text-gray-700">
-                  <li><strong>👀 Visualizar bacterias disponibles:</strong> Revisa la cuadrícula de tarjetas para ver qué bacterias están listas para producción.</li>
-                  <li><strong>🎯 Seleccionar acción:</strong> Elige entre producción rápida (automática) o personalizada (configuración manual).</li>
-                  <li><strong>⚙️ Revisar y confirmar detalles:</strong> Verifica insumos necesarios, cantidades y parámetros antes de proceder.</li>
-                  <li><strong>▶️ Inicio del proceso:</strong> Confirma para crear registros y actualizar automáticamente el inventario.</li>
-                </ol>
-              </div>
-
-              {/* Características destacadas */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⭐</span>
-                  Características destacadas
-                </h3>
-                <ul className="list-disc list-inside space-y-2 text-gray-700">
-                  <li><strong>Cálculos automáticos de insumos:</strong> Ej. fórmula precisa de Bacillus thuringiensis.</li>
-                  <li><strong>Proceso inteligente de SiriusBacter:</strong> 6 etapas automatizadas para mezcla perfecta.</li>
-                  <li><strong>Mensajes claros con estados visuales:</strong> ✅ Verde para éxito, ❌ Rojo para errores, ⏳ Amarillo para procesos en curso.</li>
-                  <li><strong>Integración completa:</strong> Conectado con inventario, equipo y registros de laboratorio.</li>
-                </ul>
-              </div>
-
-              {/* Consejos prácticos */}
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
-                  Consejos prácticos
-                </h3>
-                <div className="bg-blue-50/90 backdrop-blur-sm rounded-lg p-6 border border-blue-200">
-                  <ul className="list-disc list-inside space-y-2 text-gray-700">
-                    <li><strong>Revisar insumos antes de producir:</strong> Asegúrate de tener todos los materiales necesarios disponibles.</li>
-                    <li><strong>Confirmar disponibilidad de bacterias base:</strong> Para SiriusBacter, verifica que PseudoMonas, AzosPirillum y AzotoBacter estén en stock.</li>
-                    <li><strong>Aprovechar entrada por voz:</strong> Usa el micrófono para agregar observaciones de manera rápida.</li>
-                    <li><strong>Verificar mensajes de error:</strong> Si algo falla, revisa los detalles en rojo para corregir el problema.</li>
-                  </ul>
                 </div>
               </div>
             </section>
