@@ -137,6 +137,36 @@ export default function ManualUsuario() {
                   >
                     📋 Gestión
                   </a>
+                  <a
+                    href="#almacenamiento"
+                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                  >
+                    📦 Almacenamiento
+                  </a>
+                  <a
+                    href="#descartes"
+                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                  >
+                    🗑️ Descartes
+                  </a>
+                  <a
+                    href="#stock-insumos"
+                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                  >
+                    📋 Stock Insumos
+                  </a>
+                  <a
+                    href="#clientes"
+                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                  >
+                    🛒 Clientes
+                  </a>
+                  <a
+                    href="#bitacora"
+                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                  >
+                    📝 Bitácora
+                  </a>
                 </div>
                 <a
                   href="#sirius"
@@ -1169,6 +1199,478 @@ export default function ManualUsuario() {
                   </h3>
                   <p className="text-gray-700">Registra actividades diarias. Consulta historial.</p>
                 </div>
+              </div>
+            </section>
+
+            {/* Almacenamiento */}
+            <section id="almacenamiento" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-8">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">📦</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Almacenamiento</h2>
+                  <p className="text-gray-600">Gestión del inventario de muestras biológicas</p>
+                </div>
+              </div>
+
+              {/* ¿Qué es esta herramienta? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
+                  ¿Qué es esta herramienta?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Es un sistema completo para gestionar el inventario de muestras biológicas del laboratorio. Permite controlar el almacenamiento de cepas, lotes de producción, bacterias y hongos en diferentes condiciones (refrigeración, congelación, incubación) con seguimiento en tiempo real de ubicaciones y condiciones de almacenamiento.
+                </p>
+              </div>
+
+              {/* Tipos de almacenamiento */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🏭</span>
+                  Tipos de almacenamiento gestionados
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🧊</span>
+                      Refrigeración (4°C)
+                    </h4>
+                    <p className="text-gray-700 text-sm">Almacenamiento de cepas activas y cultivos madre.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">❄️</span>
+                      Congelación (-20°C/-80°C)
+                    </h4>
+                    <p className="text-gray-700 text-sm">Conservación a largo plazo de cepas y muestras.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🌡️</span>
+                      Incubación
+                    </h4>
+                    <p className="text-gray-700 text-sm">Control de temperatura para cultivos en crecimiento.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📦</span>
+                      Almacén general
+                    </h4>
+                    <p className="text-gray-700 text-sm">Productos terminados y materiales de referencia.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Funcionalidades principales */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⚙️</span>
+                  Funcionalidades principales
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📥</span>
+                      Registro de entradas
+                    </h4>
+                    <p className="text-gray-700 text-sm">Documentar nuevos lotes con ubicación específica y condiciones.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📤</span>
+                      Control de salidas
+                    </h4>
+                    <p className="text-gray-700 text-sm">Registrar retiros para uso en producción o análisis.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🔍</span>
+                      Búsqueda y localización
+                    </h4>
+                    <p className="text-gray-700 text-sm">Encontrar rápidamente cualquier muestra por código o nombre.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📊</span>
+                      Reportes de inventario
+                    </h4>
+                    <p className="text-gray-700 text-sm">Vista completa del estado actual de todas las muestras.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ¿Cómo gestionar el almacenamiento? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📋</span>
+                  ¿Cómo gestionar el almacenamiento?
+                </h3>
+                <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                  <li><strong>🏷️ Etiqueta correctamente:</strong> Asigna códigos únicos a cada lote o muestra.</li>
+                  <li><strong>📍 Registra ubicaciones:</strong> Especifica estante, refrigerador y posición exacta.</li>
+                  <li><strong>🌡️ Verifica condiciones:</strong> Confirma temperaturas y condiciones de almacenamiento.</li>
+                  <li><strong>📅 Monitorea fechas:</strong> Controla fechas de caducidad y vencimiento.</li>
+                  <li><strong>🔄 Actualiza movimientos:</strong> Registra todas las entradas y salidas inmediatamente.</li>
+                  <li><strong>🧹 Mantén organización:</strong> Realiza limpiezas periódicas y reorganizaciones.</li>
+                </ol>
+              </div>
+
+              {/* Alertas y notificaciones */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🚨</span>
+                  Alertas y notificaciones
+                </h3>
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  El sistema incluye alertas automáticas para:
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-gray-700">
+                  <li>Muestras próximas a caducar (7 días de anticipación)</li>
+                  <li>Condiciones de temperatura fuera de rango</li>
+                  <li>Niveles bajos de stock crítico</li>
+                  <li>Movimientos inusuales o errores en el registro</li>
+                </ul>
+              </div>
+
+              {/* Importancia del control de almacenamiento */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  Importancia del control de almacenamiento
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Un control preciso del almacenamiento es fundamental para mantener la viabilidad de las muestras biológicas, garantizar la trazabilidad completa, cumplir con normativas de calidad y seguridad, y optimizar el uso del espacio y recursos del laboratorio.
+                </p>
+              </div>
+            </section>
+
+            {/* Descartes */}
+            <section id="descartes" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-8">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">🗑️</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Descartes</h2>
+                  <p className="text-gray-600">Registro de descartes de materiales del laboratorio</p>
+                </div>
+              </div>
+
+              {/* ¿Qué es esta herramienta? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
+                  ¿Qué es esta herramienta?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Es un formulario digital para registrar todos los descartes de materiales en el laboratorio. Permite documentar qué materiales se desechan, por qué razón y quién autoriza el descarte, manteniendo un registro completo y trazable.
+                </p>
+              </div>
+
+              {/* ¿Cómo usarla correctamente? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🗑️</span>
+                  ¿Cómo usarla correctamente?
+                </h3>
+                <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                  <li><strong>📅 Selecciona la fecha del descarte:</strong> Elige la fecha en que se realiza el descarte.</li>
+                  <li><strong>🔬 Elige el tipo de material:</strong> Selecciona si es insumo, cepa, lote de producción, etc.</li>
+                  <li><strong>📦 Especifica el material concreto:</strong> El sistema te mostrará las opciones disponibles según el tipo seleccionado.</li>
+                  <li><strong>📏 Ingresa la cantidad:</strong> Especifica cuánto material se va a desechar.</li>
+                  <li><strong>📝 Documenta la razón:</strong> Explica por qué se desecha (caducidad, contaminación, fin de experimento, etc.).</li>
+                  <li><strong>👥 Selecciona responsables:</strong> Elige quién realiza el descarte y quién lo autoriza.</li>
+                </ol>
+              </div>
+
+              {/* ¿Qué pasa al registrar un descarte? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">✅</span>
+                  ¿Qué pasa al registrar un descarte?
+                </h3>
+                <ul className="list-disc list-inside space-y-2 text-gray-700">
+                  <li>Se registra el descarte en la base de datos con toda la información.</li>
+                  <li>Se actualiza automáticamente el inventario descontando el material descartado.</li>
+                  <li>Se genera un registro de trazabilidad completo para auditorías.</li>
+                  <li>El sistema valida que todos los campos obligatorios estén completos.</li>
+                </ul>
+              </div>
+
+              {/* Importancia del registro */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  ¿Por qué es importante registrar los descartes?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Mantener un registro detallado de descartes es crucial para el control de inventario, cumplimiento normativo, reducción de desperdicios y optimización de recursos. Permite identificar patrones de desperdicio y tomar decisiones informadas para mejorar la eficiencia del laboratorio.
+                </p>
+              </div>
+            </section>
+
+            {/* Stock Insumos */}
+            <section id="stock-insumos" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-8">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">📋</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Stock Insumos</h2>
+                  <p className="text-gray-600">Control y gestión del inventario de insumos</p>
+                </div>
+              </div>
+
+              {/* ¿Qué es esta herramienta? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
+                  ¿Qué es esta herramienta?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Es un sistema completo para gestionar el inventario de insumos del laboratorio. Permite visualizar niveles de stock en tiempo real, registrar entradas y salidas, configurar alertas de reposición y mantener un control preciso de todos los materiales utilizados en los procesos de producción.
+                </p>
+              </div>
+
+              {/* Funcionalidades principales */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⚙️</span>
+                  Funcionalidades principales
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📈</span>
+                      Visualización de stock
+                    </h4>
+                    <p className="text-gray-700 text-sm">Vista completa de todos los insumos con niveles actuales, mínimos y máximos.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📥</span>
+                      Registro de entradas
+                    </h4>
+                    <p className="text-gray-700 text-sm">Documentar nuevas adquisiciones de insumos con proveedores y fechas.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📤</span>
+                      Control de salidas
+                    </h4>
+                    <p className="text-gray-700 text-sm">Registrar consumo de insumos en procesos de producción.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🚨</span>
+                      Alertas automáticas
+                    </h4>
+                    <p className="text-gray-700 text-sm">Notificaciones cuando los niveles bajan de los umbrales mínimos.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ¿Cómo mantener el inventario actualizado? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🔄</span>
+                  ¿Cómo mantener el inventario actualizado?
+                </h3>
+                <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                  <li><strong>📝 Registra todas las entradas:</strong> Cada vez que llegue un nuevo insumo, regístralo inmediatamente.</li>
+                  <li><strong>📊 Actualiza consumos automáticamente:</strong> El sistema descuenta automáticamente cuando se usan insumos en procesos.</li>
+                  <li><strong>🔍 Revisa niveles regularmente:</strong> Monitorea los niveles de stock y atiende las alertas de reposición.</li>
+                  <li><strong>📅 Programa revisiones periódicas:</strong> Realiza conteos físicos periódicos para verificar la precisión del sistema.</li>
+                </ol>
+              </div>
+
+              {/* Beneficios del control de inventario */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  Beneficios del control de inventario
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Un control preciso del inventario evita faltantes de materiales durante la producción, reduce costos por almacenamiento excesivo, facilita la planificación de compras y asegura el cumplimiento de estándares de calidad y normativos.
+                </p>
+              </div>
+            </section>
+
+            {/* Clientes */}
+            <section id="clientes" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-8">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">🛒</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Clientes</h2>
+                  <p className="text-gray-600">Administración de información de clientes y pedidos</p>
+                </div>
+              </div>
+
+              {/* ¿Qué es esta herramienta? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
+                  ¿Qué es esta herramienta?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Es un sistema completo para gestionar toda la información relacionada con los clientes del laboratorio. Permite mantener perfiles detallados, registrar pedidos, hacer seguimiento de entregas y mantener un historial completo de todas las transacciones comerciales.
+                </p>
+              </div>
+
+              {/* Funcionalidades principales */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">👥</span>
+                  Funcionalidades principales
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📝</span>
+                      Registro de clientes
+                    </h4>
+                    <p className="text-gray-700 text-sm">Crear y mantener perfiles completos de clientes con información de contacto, dirección y preferencias.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🛒</span>
+                      Gestión de pedidos
+                    </h4>
+                    <p className="text-gray-700 text-sm">Registrar pedidos, especificar productos, cantidades y fechas de entrega.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🚚</span>
+                      Seguimiento de entregas
+                    </h4>
+                    <p className="text-gray-700 text-sm">Monitorear el estado de los pedidos desde producción hasta entrega final.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">📊</span>
+                      Historial de transacciones
+                    </h4>
+                    <p className="text-gray-700 text-sm">Mantener registro completo de todas las compras, entregas y comunicaciones.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ¿Cómo gestionar clientes efectivamente? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎯</span>
+                  ¿Cómo gestionar clientes efectivamente?
+                </h3>
+                <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                  <li><strong>📝 Completa perfiles de clientes:</strong> Registra toda la información relevante al crear un nuevo cliente.</li>
+                  <li><strong>📞 Mantén comunicación activa:</strong> Actualiza datos de contacto y registra todas las interacciones.</li>
+                  <li><strong>📋 Registra pedidos claramente:</strong> Especifica productos, cantidades, precios y fechas de entrega.</li>
+                  <li><strong>🔍 Haz seguimiento continuo:</strong> Actualiza el estado de pedidos y notifica cambios importantes.</li>
+                  <li><strong>📊 Revisa historial regularmente:</strong> Analiza patrones de compra para mejorar el servicio.</li>
+                </ol>
+              </div>
+
+              {/* Importancia de la gestión de clientes */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  Importancia de la gestión de clientes
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Una buena gestión de clientes es fundamental para el éxito comercial del laboratorio. Permite mantener relaciones sólidas, anticipar necesidades, mejorar la satisfacción del cliente y optimizar los procesos de venta y entrega de productos biológicos.
+                </p>
+              </div>
+            </section>
+
+            {/* Bitácora */}
+            <section id="bitacora" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-8">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">📝</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Bitácora</h2>
+                  <p className="text-gray-600">Registro diario de actividades del laboratorio</p>
+                </div>
+              </div>
+
+              {/* ¿Qué es la bitácora? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
+                  ¿Qué es la bitácora?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Es un registro digital diario de todas las actividades realizadas en el laboratorio. Funciona como un diario oficial que documenta procesos, observaciones, incidentes, mantenimiento y cualquier evento relevante para mantener un registro completo y trazable de las operaciones.
+                </p>
+              </div>
+
+              {/* Tipos de registros en la bitácora */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📝</span>
+                  Tipos de registros en la bitácora
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🔬</span>
+                      Registros de procesos
+                    </h4>
+                    <p className="text-gray-700 text-sm">Inicio y fin de procesos de producción, parámetros utilizados, resultados obtenidos.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">⚠️</span>
+                      Incidentes y observaciones
+                    </h4>
+                    <p className="text-gray-700 text-sm">Problemas encontrados, desviaciones del proceso, observaciones importantes.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">🔧</span>
+                      Mantenimiento y calibración
+                    </h4>
+                    <p className="text-gray-700 text-sm">Mantenimiento de equipos, calibraciones, limpieza y sanitización.</p>
+                  </div>
+                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
+                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
+                      <span className="text-lg mr-2">👥</span>
+                      Cambios de turno
+                    </h4>
+                    <p className="text-gray-700 text-sm">Entrega de información entre turnos, pendientes y observaciones importantes.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ¿Cómo usar la bitácora correctamente? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📝</span>
+                  ¿Cómo usar la bitácora correctamente?
+                </h3>
+                <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                  <li><strong>⏰ Registra en tiempo real:</strong> Anota las actividades inmediatamente después de realizarlas.</li>
+                  <li><strong>📝 Sé específico y claro:</strong> Describe con detalle qué se hizo, cómo se hizo y qué resultados se obtuvieron.</li>
+                  <li><strong>⚠️ Reporta incidentes:</strong> Documenta cualquier problema, desviación o evento inusual.</li>
+                  <li><strong>📊 Incluye datos relevantes:</strong> Registra temperaturas, tiempos, cantidades y otros parámetros importantes.</li>
+                  <li><strong>👥 Identifica responsables:</strong> Especifica quién realizó cada actividad.</li>
+                </ol>
+              </div>
+
+              {/* Importancia de mantener la bitácora */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  Importancia de mantener la bitácora
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  La bitácora es un documento oficial que sirve para trazabilidad, cumplimiento normativo, resolución de problemas, mejora continua de procesos y como evidencia legal de las actividades realizadas en el laboratorio. Un registro completo y preciso es esencial para la calidad y confiabilidad del trabajo.
+                </p>
               </div>
             </section>
 
