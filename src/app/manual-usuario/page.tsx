@@ -1803,82 +1803,308 @@ export default function ManualUsuario() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-[#3C4858]">Stock Insumos</h2>
-                  <p className="text-gray-600">Control y gestión del inventario de insumos</p>
+                  <p className="text-gray-600">Sistema de control de inventario de laboratorio</p>
                 </div>
               </div>
 
-              {/* ¿Qué es esta herramienta? */}
+              {/* Video demostrativo */}
+              <div className="mb-8">
+                <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-blue-100 p-6">
+                  <div className="flex items-center mb-4">
+                    <div className="w-10 h-10 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3">
+                      <span className="text-white text-lg">🎥</span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#3C4858]">Video demostrativo</h3>
+                      <p className="text-sm text-gray-600">Tutorial completo de navegación en Stock de Insumos</p>
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <video
+                      className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757697496/Navegacion_en_stock_de_insumos_ejj0uq.mp4" type="video/mp4" />
+                      Tu navegador no soporta el elemento de video.
+                    </video>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🤔 ¿Qué es esta página? */}
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
-                  ¿Qué es esta herramienta?
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🤔</span>
+                  ¿Qué es esta página?
                 </h3>
                 <p className="text-gray-700 leading-relaxed">
-                  Es un sistema completo para gestionar el inventario de insumos del laboratorio. Permite visualizar niveles de stock en tiempo real, registrar entradas y salidas, configurar alertas de reposición y mantener un control preciso de todos los materiales utilizados en los procesos de producción.
+                  Es como un <strong>almacén digital inteligente</strong> para tu laboratorio. Imagínate que tienes una bodega donde guardas todos los materiales, químicos, equipos y suministros que usas en el lab. Esta página es como tener un asistente que te ayuda a organizar todo eso de manera perfecta.
                 </p>
               </div>
 
-              {/* Funcionalidades principales */}
+              {/* 🎯 ¿Para qué funciona? */}
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⚙️</span>
-                  Funcionalidades principales
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎯</span>
+                  ¿Para qué funciona?
                 </h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">📈</span>
-                      Visualización de stock
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  Esta página está hecha para <strong>controlar todo el inventario</strong> de tu laboratorio. Es como tener un registro digital de:
+                </p>
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                  <ul className="space-y-2 text-blue-800">
+                    <li className="flex items-start space-x-2">
+                      <span className="text-blue-600 font-bold">•</span>
+                      <span>Todos los insumos que tienes (químicos, materiales, equipos de protección, etc.)</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-blue-600 font-bold">•</span>
+                      <span>Cuánto tienes de cada cosa</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-blue-600 font-bold">•</span>
+                      <span>Cuándo entra nuevo material</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-blue-600 font-bold">•</span>
+                      <span>Cuándo sale material para usarse</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-blue-600 font-bold">•</span>
+                      <span>Fechas de vencimiento</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-blue-600 font-bold">•</span>
+                      <span>Quién registra cada movimiento</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* ⚙️ ¿Qué cosas hace esta página? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⚙️</span>
+                  ¿Qué cosas hace esta página?
+                </h3>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* 1. Mostrar tu inventario completo */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-5">
+                    <h4 className="font-semibold text-green-900 mb-3 flex items-center">
+                      <span className="text-lg mr-2">1️⃣</span>
+                      Mostrar tu inventario completo
                     </h4>
-                    <p className="text-gray-700 text-sm">Vista completa de todos los insumos con niveles actuales, mínimos y máximos.</p>
+                    <ul className="text-sm text-green-800 space-y-1">
+                      <li>• Te muestra una tabla con todos tus insumos</li>
+                      <li>• Cada fila te dice: nombre, categoría, unidades, cuánto tienes, estado</li>
+                      <li>• Los colores te ayudan: <span className="text-green-600 font-bold">verde = disponible</span>, <span className="text-red-600 font-bold">rojo = agotado</span></li>
+                    </ul>
                   </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">📥</span>
-                      Registro de entradas
+
+                  {/* 2. Buscar y filtrar */}
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-5">
+                    <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                      <span className="text-lg mr-2">2️⃣</span>
+                      Buscar y filtrar
                     </h4>
-                    <p className="text-gray-700 text-sm">Documentar nuevas adquisiciones de insumos con proveedores y fechas.</p>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• Puedes buscar por nombre, categoría o descripción</li>
+                      <li>• Tiene un micrófono para buscar hablando (¡muy práctico!)</li>
+                      <li>• Puedes filtrar por categorías específicas</li>
+                    </ul>
                   </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">📤</span>
-                      Control de salidas
+
+                  {/* 3. Tres operaciones principales */}
+                  <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-5 md:col-span-2">
+                    <h4 className="font-semibold text-purple-900 mb-3 flex items-center">
+                      <span className="text-lg mr-2">3️⃣</span>
+                      Tres operaciones principales
                     </h4>
-                    <p className="text-gray-700 text-sm">Registrar consumo de insumos en procesos de producción.</p>
-                  </div>
-                  <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 border border-gray-200">
-                    <h4 className="font-semibold text-[#3C4858] mb-2 flex items-center">
-                      <span className="text-lg mr-2">🚨</span>
-                      Alertas automáticas
-                    </h4>
-                    <p className="text-gray-700 text-sm">Notificaciones cuando los niveles bajan de los umbrales mínimos.</p>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="bg-white/80 rounded-lg p-3">
+                        <h5 className="font-medium text-purple-900 mb-2 flex items-center">
+                          <span className="text-base mr-2">📦</span>
+                          Registrar nuevos insumos
+                        </h5>
+                        <ul className="text-xs text-purple-800 space-y-1">
+                          <li>• Agregar materiales nuevos al inventario</li>
+                          <li>• Pones nombre, categoría, unidades, descripción</li>
+                          <li>• Puedes agregar varios insumos a la vez</li>
+                        </ul>
+                      </div>
+                      <div className="bg-white/80 rounded-lg p-3">
+                        <h5 className="font-medium text-purple-900 mb-2 flex items-center">
+                          <span className="text-base mr-2">📤</span>
+                          Sacar del inventario
+                        </h5>
+                        <ul className="text-xs text-purple-800 space-y-1">
+                          <li>• Cuando usas materiales en tus experimentos</li>
+                          <li>• Seleccionas qué insumo y cuánto vas a usar</li>
+                          <li>• El sistema automáticamente descuenta del stock</li>
+                        </ul>
+                      </div>
+                      <div className="bg-white/80 rounded-lg p-3">
+                        <h5 className="font-medium text-purple-900 mb-2 flex items-center">
+                          <span className="text-base mr-2">📥</span>
+                          Recibir pedidos
+                        </h5>
+                        <ul className="text-xs text-purple-800 space-y-1">
+                          <li>• Cuando llega nuevo material al laboratorio</li>
+                          <li>• Registras qué llegó y cuánto</li>
+                          <li>• Puedes poner fecha de vencimiento</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* ¿Cómo mantener el inventario actualizado? */}
+              {/* 📋 ¿Cómo usarla correctamente? Paso a paso: */}
               <div className="mb-8">
-                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🔄</span>
-                  ¿Cómo mantener el inventario actualizado?
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📋</span>
+                  ¿Cómo usarla correctamente? Paso a paso:
                 </h3>
-                <ol className="list-decimal list-inside space-y-3 text-gray-700">
-                  <li><strong>📝 Registra todas las entradas:</strong> Cada vez que llegue un nuevo insumo, regístralo inmediatamente.</li>
-                  <li><strong>📊 Actualiza consumos automáticamente:</strong> El sistema descuenta automáticamente cuando se usan insumos en procesos.</li>
-                  <li><strong>🔍 Revisa niveles regularmente:</strong> Monitorea los niveles de stock y atiende las alertas de reposición.</li>
-                  <li><strong>📅 Programa revisiones periódicas:</strong> Realiza conteos físicos periódicos para verificar la precisión del sistema.</li>
-                </ol>
+
+                <div className="space-y-6">
+                  {/* Para ver tu inventario */}
+                  <div className="bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200 rounded-lg p-5">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="text-lg mr-2">👁️</span>
+                      Para ver tu inventario:
+                    </h4>
+                    <ul className="text-sm text-gray-700 space-y-1 ml-6">
+                      <li>• Entra a la página y verás todos tus insumos en una tabla</li>
+                      <li>• Si quieres buscar algo específico, escribe en la barra de búsqueda o habla al micrófono</li>
+                      <li>• Usa los botones de filtro para ver solo ciertas categorías</li>
+                    </ul>
+                  </div>
+
+                  {/* Para agregar un insumo nuevo */}
+                  <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg p-5">
+                    <h4 className="font-semibold text-emerald-900 mb-3 flex items-center">
+                      <span className="text-lg mr-2">➕</span>
+                      Para agregar un insumo nuevo:
+                    </h4>
+                    <ol className="text-sm text-emerald-800 space-y-2 ml-6">
+                      <li><strong>Haz clic en "Registrar Insumo Nuevo"</strong></li>
+                      <li><strong>Llena estos datos básicos:</strong></li>
+                      <ul className="ml-6 space-y-1">
+                        <li>• <strong>Nombre:</strong> Cómo se llama (ej: "Guantes de nitrilo")</li>
+                        <li>• <strong>Categoría:</strong> Qué tipo es (ej: "Equipo de Protección Personal")</li>
+                        <li>• <strong>Unidad:</strong> Cómo se mide (ej: "CAJA 100UND")</li>
+                        <li>• <strong>Descripción:</strong> Detalles adicionales</li>
+                        <li>• <strong>Cantidad inicial:</strong> Cuántos tienes ahora</li>
+                      </ul>
+                      <li><strong>Si quieres agregar más insumos, haz clic en "Agregar Otro Insumo"</strong></li>
+                      <li><strong>Presiona "Crear Insumo" y listo</strong></li>
+                    </ol>
+                  </div>
+
+                  {/* Para sacar material del inventario */}
+                  <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-5">
+                    <h4 className="font-semibold text-orange-900 mb-3 flex items-center">
+                      <span className="text-lg mr-2">📤</span>
+                      Para sacar material del inventario:
+                    </h4>
+                    <ul className="text-sm text-orange-800 space-y-1 ml-6">
+                      <li>• Haz clic en "Sacar de Inventario"</li>
+                      <li>• Selecciona el insumo que vas a usar</li>
+                      <li>• Elige de qué lote específico (si tienes varios)</li>
+                      <li>• Escribe cuánto vas a usar</li>
+                      <li>• Confirma y el sistema descontará automáticamente</li>
+                    </ul>
+                  </div>
+
+                  {/* Para recibir un pedido nuevo */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5">
+                    <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                      <span className="text-lg mr-2">📥</span>
+                      Para recibir un pedido nuevo:
+                    </h4>
+                    <ul className="text-sm text-blue-800 space-y-1 ml-6">
+                      <li>• Haz clic en "Recibir Pedidos"</li>
+                      <li>• Busca el insumo que llegó (puedes escribir o usar el micrófono)</li>
+                      <li>• Escribe cuánto llegó</li>
+                      <li>• Si tiene fecha de vencimiento, la agregas</li>
+                      <li>• Confirma y se sumará a tu inventario</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
 
-              {/* Beneficios del control de inventario */}
+              {/* 💡 Consejos importantes */}
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
                   <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
-                  Beneficios del control de inventario
+                  Consejos importantes
                 </h3>
-                <p className="text-gray-700 leading-relaxed">
-                  Un control preciso del inventario evita faltantes de materiales durante la producción, reduce costos por almacenamiento excesivo, facilita la planificación de compras y asegura el cumplimiento de estándares de calidad y normativos.
-                </p>
+                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-lg p-5">
+                  <ul className="space-y-3 text-yellow-800">
+                    <li className="flex items-start space-x-2">
+                      <span className="text-yellow-600 font-bold">✅</span>
+                      <span><strong>Siempre verifica las cantidades</strong> antes de confirmar</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-yellow-600 font-bold">🎤</span>
+                      <span><strong>Usa el micrófono</strong> para buscar más rápido</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-yellow-600 font-bold">📅</span>
+                      <span><strong>Revisa las fechas de vencimiento</strong> cuando saques material</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-yellow-600 font-bold">❌</span>
+                      <span><strong>Si algo sale mal, puedes cancelar</strong> cualquier operación</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-yellow-600 font-bold">🚨</span>
+                      <span><strong>El sistema te avisa</strong> si intentas sacar más de lo que tienes</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* 🎨 Características especiales */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎨</span>
+                  Características especiales
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 text-center">
+                    <div className="text-2xl mb-2">🟢</div>
+                    <h4 className="font-semibold text-green-900 mb-1">Colores intuitivos</h4>
+                    <p className="text-xs text-green-800">Verde para disponible, rojo para agotado</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4 text-center">
+                    <div className="text-2xl mb-2">🎤</div>
+                    <h4 className="font-semibold text-blue-900 mb-1">Búsqueda por voz</h4>
+                    <p className="text-xs text-blue-800">Habla para encontrar lo que buscas</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-4 text-center">
+                    <div className="text-2xl mb-2">🎯</div>
+                    <h4 className="font-semibold text-purple-900 mb-1">Filtros inteligentes</h4>
+                    <p className="text-xs text-purple-800">Ve solo lo que necesitas</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-orange-50 to-red-50 border border-orange-200 rounded-lg p-4 text-center">
+                    <div className="text-2xl mb-2">❓</div>
+                    <h4 className="font-semibold text-orange-900 mb-1">Confirmaciones</h4>
+                    <p className="text-xs text-orange-800">Siempre pregunta antes de hacer cambios</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-lg p-4 text-center">
+                    <div className="text-2xl mb-2">💬</div>
+                    <h4 className="font-semibold text-teal-900 mb-1">Mensajes claros</h4>
+                    <p className="text-xs text-teal-800">Te dice exactamente qué está pasando</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-200 rounded-lg p-4 text-center">
+                    <div className="text-2xl mb-2">⚡</div>
+                    <h4 className="font-semibold text-pink-900 mb-1">Actualización automática</h4>
+                    <p className="text-xs text-pink-800">Los cambios se reflejan inmediatamente</p>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -1891,6 +2117,33 @@ export default function ManualUsuario() {
                 <div>
                   <h2 className="text-2xl font-bold text-[#3C4858]">Clientes</h2>
                   <p className="text-gray-600">Administración de información de clientes y pedidos</p>
+                </div>
+              </div>
+
+              {/* Banner de desarrollo */}
+              <div className="mb-8">
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-6 shadow-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <span className="text-2xl">🚧</span>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-yellow-800 mb-2">
+                        🔄 Sección en Desarrollo
+                      </h3>
+                      <p className="text-yellow-700 leading-relaxed">
+                        Esta sección del módulo de Clientes está actualmente en desarrollo. 
+                        Las funcionalidades descritas a continuación estarán disponibles próximamente. 
+                        Te mantendremos informado sobre las actualizaciones.
+                      </p>
+                      <div className="mt-3 flex items-center space-x-2">
+                        <span className="inline-block w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                        <span className="text-sm text-yellow-600 font-medium">Próximamente disponible</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1979,6 +2232,96 @@ export default function ManualUsuario() {
                 <div>
                   <h2 className="text-2xl font-bold text-[#3C4858]">Bitácora</h2>
                   <p className="text-gray-600">Registro diario de actividades del laboratorio</p>
+                </div>
+              </div>
+
+              {/* Videos demostrativos de uso correcto e incorrecto */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎥</span>
+                  Videos demostrativos: Uso correcto vs incorrecto
+                </h3>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Video de uso correcto */}
+                  <div className="bg-gradient-to-br from-green-50/90 to-emerald-50/90 backdrop-blur-sm rounded-xl shadow-lg border border-green-200 p-6">
+                    <div className="flex items-center mb-4">
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-white text-lg">✅</span>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-semibold text-green-900">Uso Correcto de la Bitácora</h4>
+                        <p className="text-sm text-green-700">Cómo registrar actividades correctamente</p>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <video
+                        className="w-full h-48 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                        controls
+                        preload="metadata"
+                      >
+                        <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757697869/Correcto_Bitacora_DataLab_aw0pxg.mp4" type="video/mp4" />
+                        Tu navegador no soporta el elemento de video.
+                      </video>
+                    </div>
+                    <div className="bg-green-100 border border-green-200 rounded-lg p-3">
+                      <h5 className="text-sm font-semibold text-green-800 mb-1">💡 Lo que hace bien:</h5>
+                      <ul className="text-xs text-green-700 space-y-1">
+                        <li>• Registra inmediatamente después de actividades</li>
+                        <li>• Describe con detalle qué se hizo</li>
+                        <li>• Incluye datos específicos y mediciones</li>
+                        <li>• Identifica responsables claramente</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Video de uso incorrecto */}
+                  <div className="bg-gradient-to-br from-red-50/90 to-pink-50/90 backdrop-blur-sm rounded-xl shadow-lg border border-red-200 p-6">
+                    <div className="flex items-center mb-4">
+                      <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-white text-lg">❌</span>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-semibold text-red-900">Uso Incorrecto de la Bitácora</h4>
+                        <p className="text-sm text-red-700">Errores comunes que evitar</p>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <video
+                        className="w-full h-48 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                        controls
+                        preload="metadata"
+                      >
+                        <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757698009/Incorrecto_Bitacora_DataLab_ujtmmr.mp4" type="video/mp4" />
+                        Tu navegador no soporta el elemento de video.
+                      </video>
+                    </div>
+                    <div className="bg-red-100 border border-red-200 rounded-lg p-3">
+                      <h5 className="text-sm font-semibold text-red-800 mb-1">⚠️ Errores comunes:</h5>
+                      <ul className="text-xs text-red-700 space-y-1">
+                        <li>• Registros tardíos o incompletos</li>
+                        <li>• Descripciones vagas sin detalles</li>
+                        <li>• Falta de datos específicos</li>
+                        <li>• No identificar responsables</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nota importante */}
+                <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <span className="text-2xl">📋</span>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-blue-900 mb-1">Importante:</h4>
+                      <p className="text-sm text-blue-800">
+                        Compara ambos videos para entender la diferencia entre un registro de calidad y uno deficiente.
+                        La bitácora es un documento oficial que puede ser requerido para auditorías y cumplimiento normativo.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
