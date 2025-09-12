@@ -116,6 +116,18 @@ export default function ManualUsuario() {
                   >
                     🦠 Cepas
                   </a>
+                  <a
+                    href="#cosecha"
+                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                  >
+                    🧪 Cosecha
+                  </a>
+                  <a
+                    href="#bacterias"
+                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                  >
+                    🦠 Bacterias
+                  </a>
                 </div>
                 <div className="pt-2">
                   <p className="text-xs font-medium text-[#3C4858] uppercase tracking-wider mb-2 px-3">Gestión</p>
@@ -851,6 +863,86 @@ export default function ManualUsuario() {
               </div>
             </section>
 
+            {/* Cosecha */}
+            <section id="cosecha" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-8">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">🧪</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Cosecha</h2>
+                  <p className="text-gray-600">Registro digital para cosechas de hongos en el laboratorio</p>
+                </div>
+              </div>
+
+              {/* ¿Qué es este formulario? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📋</span>
+                  ¿Qué es este formulario?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Es la pantalla donde registras toda la información necesaria de un proceso de cosecha: tiempos, cliente, microorganismo, cantidades, lotes, cepas y responsables. Digitaliza el proceso y asegura validaciones automáticas.
+                </p>
+              </div>
+
+              {/* ¿Cómo usarla correctamente (paso a paso)? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🧪</span>
+                  ¿Cómo usarla correctamente (paso a paso)?
+                </h3>
+                <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                  <li><strong>⏱️ Información General:</strong> Hora de inicio (campo obligatorio). Hora de fin (campo obligatorio). Propósito: medir duración y productividad.</li>
+                  <li><strong>🧑‍🤝‍🧑 Información del Cliente:</strong> Selecciona un cliente de la lista. Si no existe, elige ➕ Crear nuevo cliente e ingresa nombre y NIT. El sistema lo registrará automáticamente para futuros usos.</li>
+                  <li><strong>🍄 Información del Hongo:</strong> Selecciona el hongo a cosechar. Automáticamente se cargan lotes y cepas disponibles. Si no hay disponibilidad, se muestra un mensaje informativo.</li>
+                  <li><strong>💧 Datos de Cosecha:</strong> Ingresa cantidad de litros cosechados (obligatorio). El sistema calcula automáticamente el equivalente en bidones de 20L (solo lectura).</li>
+                  <li><strong>🧪 Lotes de Inoculación:</strong> Aparecen dinámicamente tras elegir hongo. Selecciona un lote con código, cantidades y fecha. Ingresa la cantidad a cosechar sin exceder lo disponible. Puedes elegir múltiples lotes, con opción de eliminar.</li>
+                  <li><strong>🧬 Cepas Disponibles:</strong> Similar a los lotes, pero registrando variedades específicas de hongos. Selecciona una o varias cepas y asigna cantidades válidas.</li>
+                  <li><strong>👤 Responsable de Cosecha:</strong> Selecciona el responsable del equipo que realizó o supervisó el proceso.</li>
+                  <li><strong>📋 Registro de la Cosecha:</strong> Haz clic en "Registrar Cosecha". Validaciones automáticas aseguran que todos los campos obligatorios estén completos. El sistema muestra estados claros: ✅ Verde: éxito y reinicio automático del formulario. ❌ Rojo: error con detalles. ⏳ Cargando: "Registrando..." mientras procesa.</li>
+                </ol>
+              </div>
+
+              {/* ¿Por qué es útil? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  ¿Por qué es útil?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Asegura trazabilidad completa de cada cosecha, evita errores de registro, facilita cálculos automáticos (bidones y materiales), mantiene un historial confiable y organiza la información para análisis de productividad y logística.
+                </p>
+              </div>
+
+              {/* Ejemplo en video */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎥</span>
+                  Ejemplo en video
+                </h3>
+                <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-blue-100 p-6">
+                  <div className="flex items-center mb-4">
+                    <div className="w-10 h-10 bg-[#0154AC] rounded-lg flex items-center justify-center mr-3">
+                      <span className="text-white text-lg">📹</span>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-[#3C4858]">Video Tutorial de Cosecha</h4>
+                      <p className="text-sm text-gray-600">Cómo registrar una cosecha correctamente</p>
+                    </div>
+                  </div>
+                  <video
+                    className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                    controls
+                    preload="metadata"
+                  >
+                    <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757689765/Correcto_Cosecha_DataLab_PC_otmdhg.mp4" type="video/mp4" />
+                    Tu navegador no soporta el elemento de video.
+                  </video>
+                </div>
+              </div>
+            </section>
+
             {/* Gestión */}
             <section id="gestion" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
               <div className="flex items-center mb-6">
@@ -897,6 +989,140 @@ export default function ManualUsuario() {
                     Bitácora
                   </h3>
                   <p className="text-gray-700">Registra actividades diarias. Consulta historial.</p>
+                </div>
+              </div>
+            </section>
+
+            {/* Bacterias */}
+            <section id="bacterias" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-8">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">🦠</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Bacterias</h2>
+                  <p className="text-gray-600">Actualizado al September 12, 2025</p>
+                  <p className="text-sm text-amber-600 mt-2 flex items-center">
+                    <span className="w-4 h-4 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mr-2 text-xs">⚠️</span>
+                    Esta sección está en desarrollo. El proceso aún falta por definirse completamente.
+                  </p>
+                </div>
+              </div>
+
+              {/* Introducción */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
+                  Introducción
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Esta página funciona como menú principal de bacterias disponibles en el laboratorio y se conecta en tiempo real con la base de datos (Airtable). Permite gestionar la producción de diferentes tipos de bacterias de manera eficiente y organizada.
+                </p>
+              </div>
+
+              {/* Estructura de la página */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🏗️</span>
+                  Estructura de la página
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-gradient-to-br from-blue-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-blue-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">📋</span>
+                      <h4 className="font-semibold text-[#3C4858]">Vista general</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Cuadrícula de tarjetas con bacterias disponibles, mostrando información clave de cada una.</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-50/90 to-white/95 backdrop-blur-sm rounded-lg shadow-md border border-green-100 p-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">📝</span>
+                      <h4 className="font-semibold text-[#3C4858]">Formularios emergentes</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Configuración y confirmación de producción con validaciones automáticas.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tipos de bacterias documentados */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🧫</span>
+                  Tipos de bacterias documentados
+                </h3>
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-r from-blue-50/90 to-white/95 backdrop-blur-sm rounded-lg p-4 border border-blue-100">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🦠</span>
+                      <h4 className="font-semibold text-[#3C4858]">Bacillus thuringiensis</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Fórmula con insumos específicos para producción controlada.</p>
+                  </div>
+                  <div className="bg-gradient-to-r from-green-50/90 to-white/95 backdrop-blur-sm rounded-lg p-4 border border-green-100">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🌱</span>
+                      <h4 className="font-semibold text-[#3C4858]">SiriusBacter</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">Mezcla de PseudoMonas, AzosPirillum y AzotoBacter. Proceso de 6 etapas inteligente.</p>
+                  </div>
+                  <div className="bg-gradient-to-r from-purple-50/90 to-white/95 backdrop-blur-sm rounded-lg p-4 border border-purple-100">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🧬</span>
+                      <h4 className="font-semibold text-[#3C4858]">Bacterias individuales</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">PseudoMonas, AzosPirillum, AzotoBacter disponibles por separado.</p>
+                  </div>
+                  <div className="bg-gradient-to-r from-orange-50/90 to-white/95 backdrop-blur-sm rounded-lg p-4 border border-orange-100">
+                    <div className="flex items-center mb-2">
+                      <span className="text-lg mr-3">🚧</span>
+                      <h4 className="font-semibold text-[#3C4858]">Bacillus subtilis</h4>
+                    </div>
+                    <p className="text-gray-700 text-sm">En desarrollo, aún no habilitada para producción.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cómo usar la página (paso a paso) */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📋</span>
+                  Cómo usar la página (paso a paso)
+                </h3>
+                <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                  <li><strong>👀 Visualizar bacterias disponibles:</strong> Revisa la cuadrícula de tarjetas para ver qué bacterias están listas para producción.</li>
+                  <li><strong>🎯 Seleccionar acción:</strong> Elige entre producción rápida (automática) o personalizada (configuración manual).</li>
+                  <li><strong>⚙️ Revisar y confirmar detalles:</strong> Verifica insumos necesarios, cantidades y parámetros antes de proceder.</li>
+                  <li><strong>▶️ Inicio del proceso:</strong> Confirma para crear registros y actualizar automáticamente el inventario.</li>
+                </ol>
+              </div>
+
+              {/* Características destacadas */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">⭐</span>
+                  Características destacadas
+                </h3>
+                <ul className="list-disc list-inside space-y-2 text-gray-700">
+                  <li><strong>Cálculos automáticos de insumos:</strong> Ej. fórmula precisa de Bacillus thuringiensis.</li>
+                  <li><strong>Proceso inteligente de SiriusBacter:</strong> 6 etapas automatizadas para mezcla perfecta.</li>
+                  <li><strong>Mensajes claros con estados visuales:</strong> ✅ Verde para éxito, ❌ Rojo para errores, ⏳ Amarillo para procesos en curso.</li>
+                  <li><strong>Integración completa:</strong> Conectado con inventario, equipo y registros de laboratorio.</li>
+                </ul>
+              </div>
+
+              {/* Consejos prácticos */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  Consejos prácticos
+                </h3>
+                <div className="bg-blue-50/90 backdrop-blur-sm rounded-lg p-6 border border-blue-200">
+                  <ul className="list-disc list-inside space-y-2 text-gray-700">
+                    <li><strong>Revisar insumos antes de producir:</strong> Asegúrate de tener todos los materiales necesarios disponibles.</li>
+                    <li><strong>Confirmar disponibilidad de bacterias base:</strong> Para SiriusBacter, verifica que PseudoMonas, AzosPirillum y AzotoBacter estén en stock.</li>
+                    <li><strong>Aprovechar entrada por voz:</strong> Usa el micrófono para agregar observaciones de manera rápida.</li>
+                    <li><strong>Verificar mensajes de error:</strong> Si algo falla, revisa los detalles en rojo para corregir el problema.</li>
+                  </ul>
                 </div>
               </div>
             </section>
