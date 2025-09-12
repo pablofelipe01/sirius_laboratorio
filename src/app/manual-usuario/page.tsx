@@ -110,6 +110,12 @@ export default function ManualUsuario() {
                   >
                     📊 Inoculación
                   </a>
+                  <a
+                    href="#cepas"
+                    className="block px-3 py-2 text-sm text-gray-600 hover:text-[#0154AC] hover:bg-blue-50 rounded-lg transition-colors duration-200 ml-4"
+                  >
+                    🦠 Cepas
+                  </a>
                 </div>
                 <div className="pt-2">
                   <p className="text-xs font-medium text-[#3C4858] uppercase tracking-wider mb-2 px-3">Gestión</p>
@@ -693,6 +699,151 @@ export default function ManualUsuario() {
                       preload="metadata"
                     >
                       <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757685136/Incorrecto_Inoculacion_DataLab_-_PC_crjohr.mp4" type="video/mp4" />
+                      Tu navegador no soporta el elemento de video.
+                    </video>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Cepas */}
+            <section id="cepas" className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+              <div className="flex items-center mb-8">
+                <div className="w-12 h-12 bg-[#0154AC] rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-white text-2xl">🦠</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[#3C4858]">Cepas</h2>
+                  <p className="text-gray-600">Registro digital de cepas de hongos y bacterias</p>
+                </div>
+              </div>
+
+              {/* ¿Qué hace esta página? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">📊</span>
+                  ¿Qué hace esta página?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Es un formulario digital que permite registrar nuevas cepas en el laboratorio, tanto hongos como bacterias. Es la versión moderna de los registros en papel, con validaciones automáticas y campos obligatorios.
+                </p>
+              </div>
+
+              {/* ¿Cómo usarla correctamente (paso a paso)? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🧬</span>
+                  ¿Cómo usarla correctamente (paso a paso)?
+                </h3>
+                <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                  <li><strong>📅 Selecciona la fecha de creación:</strong> Usa el calendario para elegir el día en que se produjo o llegó la cepa al laboratorio. Ejemplo: Si llegó ayer, selecciona esa fecha exacta.</li>
+                  <li><strong>🔬 Elige el tipo de registro:</strong> Opciones disponibles: 🧬 Cepa producida por inoculación, 🛒 Cepa adquirida por compra, 📦 Cepa convertida desde lote de producción. Selecciona según el origen de la cepa.</li>
+                  <li><strong>🦠 Selecciona el microorganismo:</strong> El sistema te muestra automáticamente solo hongos o bacterias según lo que elegiste antes.</li>
+                  <li><strong>👥 Selecciona responsables:</strong> Marca las personas del equipo que participaron. Puedes elegir varios manteniendo presionado Ctrl (o Cmd en Mac).</li>
+                  <li><strong>📊 Ingresa la cantidad de bolsas:</strong> Escribe cuántas unidades de la cepa estás registrando. Nota: Si es conversión de lote, se calcula automáticamente.</li>
+                </ol>
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-semibold text-[#0154AC] mb-2">Campos adicionales para conversión de lotes:</h4>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700">
+                    <li>Seleccionar el lote a convertir (solo los que estén en incubación).</li>
+                    <li>Confirmar la cantidad de bolsas a convertir.</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* ¿Qué pasa al registrar? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">✅</span>
+                  ¿Qué pasa al registrar?
+                </h3>
+                <ul className="list-disc list-inside space-y-2 text-gray-700">
+                  <li>El sistema guarda los datos en la base de datos.</li>
+                  <li>Descuenta automáticamente insumos o lotes según el caso.</li>
+                  <li>Muestra una ventana de confirmación con: fecha, microorganismo, responsables, cantidad y advertencias.</li>
+                </ul>
+              </div>
+
+              {/* Mensajes del sistema */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💬</span>
+                  Mensajes del sistema
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <div className="flex items-center mb-2">
+                      <span className="text-2xl mr-2">✅</span>
+                      <span className="font-semibold text-green-800">Verde</span>
+                    </div>
+                    <p className="text-green-700">Si todo salió bien.</p>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                    <div className="flex items-center mb-2">
+                      <span className="text-2xl mr-2">❌</span>
+                      <span className="font-semibold text-red-800">Rojo</span>
+                    </div>
+                    <p className="text-red-700">Si hubo un error, explicando qué falta o qué pasó.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ¿Por qué es útil? */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">💡</span>
+                  ¿Por qué es útil?
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Permite un control organizado de todas las cepas, evita errores manuales, mantiene un historial confiable y asegura que los recursos del laboratorio se descuenten de manera automática y transparente.
+                </p>
+              </div>
+
+              {/* Ejemplos en video */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-[#0154AC] mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 text-[#0154AC] rounded-lg flex items-center justify-center mr-3 text-sm">🎥</span>
+                  Ejemplos en video
+                </h3>
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Video correcto */}
+                  <div className="bg-gradient-to-br from-green-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-green-100 p-6">
+                    <div className="flex items-center mb-4">
+                      <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-white text-lg">✅</span>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-semibold text-[#3C4858]">Uso Correcto</h4>
+                        <p className="text-sm text-gray-600">Cómo registrar cepas correctamente</p>
+                      </div>
+                    </div>
+                    <video
+                      className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757686756/V%C3%ADdeo_sin_t%C3%ADtulo_Hecho_con_Clipchamp_hcnzmv.mp4" type="video/mp4" />
+                      Tu navegador no soporta el elemento de video.
+                    </video>
+                  </div>
+
+                  {/* Video incorrecto */}
+                  <div className="bg-gradient-to-br from-red-50/90 to-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-red-100 p-6">
+                    <div className="flex items-center mb-4">
+                      <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-white text-lg">❌</span>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-semibold text-[#3C4858]">Errores Comunes</h4>
+                        <p className="text-sm text-gray-600">Qué no hacer al registrar cepas</p>
+                      </div>
+                    </div>
+                    <video
+                      className="w-full h-64 rounded-lg shadow-md border border-gray-200 object-contain bg-gray-100"
+                      controls
+                      preload="metadata"
+                    >
+                      <source src="https://res.cloudinary.com/dvnuttrox/video/upload/v1757685163/Incorrecto_Cepas_DataLab_-_PC_jza9pt.mp4" type="video/mp4" />
                       Tu navegador no soporta el elemento de video.
                     </video>
                   </div>
