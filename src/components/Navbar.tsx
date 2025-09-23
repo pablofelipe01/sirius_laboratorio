@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import LoginModal from './LoginModal';
 
 interface DropdownMenuItem {
@@ -73,6 +74,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ title, icon, items }) => {
 
 const Navbar: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuth();
+  const pathname = usePathname();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -132,21 +134,39 @@ const Navbar: React.FC = () => {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3">
-            <Link href="/" className="flex items-center" onClick={closeMobileMenu}>
-              <Image 
-                src="/logo.png" 
-                alt="Sirius Logo" 
-                width={448}
-                height={320}
-                className="w-32 sm:w-40 md:w-48 lg:w-56 h-auto object-contain transition-transform duration-300 hover:scale-105"
-                style={{ 
-                  minWidth: '40px',
-                  imageRendering: 'crisp-edges'
-                }}
-                priority
-                quality={100}
-              />
-            </Link>
+            {pathname === '/' ? (
+              <a href="https://www.siriusagentic.com/" className="flex items-center" onClick={closeMobileMenu}>
+                <Image 
+                  src="/logo.png" 
+                  alt="Sirius Logo" 
+                  width={448}
+                  height={320}
+                  className="w-32 sm:w-40 md:w-48 lg:w-56 h-auto object-contain transition-transform duration-300 hover:scale-105"
+                  style={{ 
+                    minWidth: '40px',
+                    imageRendering: 'crisp-edges'
+                  }}
+                  priority
+                  quality={100}
+                />
+              </a>
+            ) : (
+              <Link href="/" className="flex items-center" onClick={closeMobileMenu}>
+                <Image 
+                  src="/logo.png" 
+                  alt="Sirius Logo" 
+                  width={448}
+                  height={320}
+                  className="w-32 sm:w-40 md:w-48 lg:w-56 h-auto object-contain transition-transform duration-300 hover:scale-105"
+                  style={{ 
+                    minWidth: '40px',
+                    imageRendering: 'crisp-edges'
+                  }}
+                  priority
+                  quality={100}
+                />
+              </Link>
+            )}
             
             {/* Desktop Navigation */}
             <div className="hidden xl:flex items-center gap-4">
