@@ -217,6 +217,18 @@ const Navbar: React.FC = () => {
                     <span className="text-lg">📖</span>
                     <span>Manual</span>
                   </Link>
+
+                  {/* Proyección */}
+                  <Link 
+                    href="/proyeccion" 
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-white/10 ${
+                      isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white'
+                    }`}
+                  >
+                    <span className="text-lg">📈</span>
+                    <span>Proyección</span>
+                  </Link>
+
                   <div className="flex items-center gap-3 ml-6">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -514,6 +526,27 @@ const Navbar: React.FC = () => {
                         </Link>
                       </div>
                     </div>
+
+                    {/* Proyección */}
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 px-2 text-gray-500 dark:text-gray-400">
+                        📈 Análisis
+                      </h3>
+                      <div className="space-y-1">
+                        <Link
+                          href="/proyeccion"
+                          onClick={closeMobileMenu}
+                          className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-cyan-50 hover:text-cyan-700 dark:text-gray-200 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400"
+                        >
+                          <span className="text-xl">📈</span>
+                          <span className="font-medium">Proyección</span>
+                          <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               ) : (
