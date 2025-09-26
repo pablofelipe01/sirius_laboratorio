@@ -28,7 +28,7 @@ export async function GET() {
     const responsables = records.map(record => ({
       id: record.id,
       nombre: record.fields['Nombre'] as string, // Usar el nombre del campo en lugar del field ID
-    })).filter(item => item.nombre); // Filtrar los que no tienen nombre
+    })).filter(item => item.nombre && item.id !== 'recVfyi6V1HidiGVl'); // Filtrar los que no tienen nombre y excluir Fabian Bejarano
 
     return NextResponse.json({
       success: true,

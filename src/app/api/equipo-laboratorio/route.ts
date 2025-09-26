@@ -33,7 +33,7 @@ export async function GET() {
       salt: record.fields['Salt'] as string,
       idChat: record.fields['ID_Chat'] as string, // Usaremos esto para la cédula
       estadoSistemas: record.fields['Estados Sistemas'] as string,
-    })).filter(item => item.nombre); // Filtrar los que no tienen nombre
+    })).filter(item => item.nombre && item.id !== 'recVfyi6V1HidiGVl'); // Filtrar los que no tienen nombre y excluir Fabian Bejarano
 
     // Para la respuesta de cosecha, solo necesitamos id y nombre
     const responsables = usuarios.map(usuario => ({
