@@ -77,7 +77,19 @@ export async function POST(request: NextRequest) {
     
     // Procesar cada insumo usando lógica FIFO
     for (const registro of registros) {
-      console.log(`🔍 [PROD-DEBUG] ===== PROCESANDO INSUMO ${registro.insumoId} =====`);
+      // Obtener el nombre del insumo para mejores mensajes de error
+      let insumoNombre = `ID: ${registro.insumoId}`;
+      try {
+        const insumoRecord = await base(process.env.AIRTABLE_TABLE_INSUMOS_LABORATORIO!)
+          .find(registro.insumoId);
+        if (insumoRecord.fields.nombre && typeof insumoRecord.fields.nombre === 'string') {
+          insumoNombre = insumoRecord.fields.nombre;
+        }
+      } catch (error) {
+        console.warn(`⚠️ [PROD-DEBUG] No se pudo obtener el nombre del insumo ${registro.insumoId}:`, error);
+      }
+      
+      console.log(`🔍 [PROD-DEBUG] ===== PROCESANDO INSUMO ${insumoNombre} =====`);
       console.log(`🔍 [PROD-DEBUG] Registro completo:`, JSON.stringify(registro, null, 2));
       console.log(`🔍 [PROD-DEBUG] Cantidad necesaria: ${registro.cantidad} gramos`);
       console.log(`🔍 [PROD-DEBUG] Equivalencia: ${registro.equivalenciaGramos} gramos por unidad`);
@@ -112,8 +124,8 @@ export async function POST(request: NextRequest) {
         })));
         
         if (entradasResponse.length === 0) {
-          console.error(`❌ [PROD-DEBUG] No se encontraron entradas para el insumo ${registro.insumoId}`);
-          throw new Error(`No se encontraron entradas para el insumo ${registro.insumoId}`);
+          console.error(`❌ [PROD-DEBUG] No se encontraron entradas para el insumo ${insumoNombre}`);
+          throw new Error(`No se encontraron entradas para el insumo ${insumoNombre}`);
         }
 
         let unidadesRestantes = unidadesNecesarias;
@@ -206,8 +218,8 @@ export async function POST(request: NextRequest) {
         console.log(`🔍 [PROD-DEBUG] Detalles registros salida:`, JSON.stringify(salidasACrear, null, 2));
         
         if (unidadesRestantes > 0) {
-          console.error(`❌ [PROD-DEBUG] Stock insuficiente para el insumo ${registro.insumoId}. Faltan ${unidadesRestantes} unidades`);
-          throw new Error(`Stock insuficiente para el insumo ${registro.insumoId}. Faltan ${unidadesRestantes} unidades`);
+          console.error(`❌ [PROD-DEBUG] Stock insuficiente para el insumo ${insumoNombre}. Faltan ${unidadesRestantes} unidades`);
+          throw new Error(`Stock insuficiente para el insumo ${insumoNombre}. Faltan ${unidadesRestantes} unidades`);
         }
 
         // 4. Crear todos los registros de salida para este insumo

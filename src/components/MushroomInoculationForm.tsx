@@ -226,6 +226,46 @@ const MushroomInoculationForm = () => {
   const [responsables, setResponsables] = useState<Responsable[]>([]);
   const [loadingResponsables, setLoadingResponsables] = useState(true);
 
+  // Función para verificar stock disponible de un insumo
+  const verificarStockDisponible = async (insumoId: string) => {
+    try {
+      console.log(`🔍 Verificando stock para insumo ID: ${insumoId}`);
+      
+      // Usar la misma lógica que la tabla de stock de insumos
+      const response = await fetch('/api/stock-insumos');
+      console.log(`📡 Respuesta de API stock-insumos:`, response.status, response.statusText);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`📊 Datos de stock-insumos:`, data);
+        
+        if (data.success && data.insumos) {
+          // Buscar el insumo específico por ID
+          const insumoEncontrado = data.insumos.find((insumo: any) => insumo.id === insumoId);
+          
+          if (insumoEncontrado) {
+            // Usar el campo 'Total Insumo Unidades' que aparece en los logs
+            const stockDisponible = insumoEncontrado.fields['Total Insumo Unidades'] || 0;
+            console.log(`✅ Stock encontrado para ${insumoId}: ${stockDisponible} unidades`);
+            return stockDisponible;
+          } else {
+            console.log(`⚠️ Insumo ${insumoId} no encontrado en la tabla de stock`);
+            return 0;
+          }
+        } else {
+          console.log(`❌ Respuesta no exitosa de stock-insumos:`, data);
+          return 0;
+        }
+      } else {
+        console.log(`❌ Error HTTP en stock-insumos:`, response.status, response.statusText);
+        return 0;
+      }
+    } catch (error) {
+      console.error('❌ Error verificando stock:', error);
+      return 0;
+    }
+  };
+
   useEffect(() => {
     fetchMicroorganisms();
     fetchResponsables();
@@ -340,7 +380,7 @@ const MushroomInoculationForm = () => {
 
     // Calcular insumos necesarios basado en la cantidad total de bolsas
     const totalBolsas = formData.bagQuantity;
-    const insumosNecesarios = calcularInsumos(totalBolsas);
+    const insumosNecesarios = await calcularInsumos(totalBolsas);
     setInsumosCalculados(insumosNecesarios);
 
     // Mostrar modal de confirmación
@@ -574,7 +614,7 @@ const MushroomInoculationForm = () => {
   };
 
   // Función para calcular insumos según la fórmula maestra
-  const calcularInsumos = (cantidadBolsas: number) => {
+  const calcularInsumos = async (cantidadBolsas: number) => {
     const formInsumos = [
       {
         id: 'recAhttbj6RjnpACX',
@@ -626,7 +666,19 @@ const MushroomInoculationForm = () => {
       }
     ];
 
-    return formInsumos;
+    // Verificar stock disponible para cada insumo
+    const insumosConStock = await Promise.all(
+      formInsumos.map(async (insumo) => {
+        const stockDisponible = await verificarStockDisponible(insumo.id);
+        return {
+          ...insumo,
+          stockDisponible,
+          disponible: stockDisponible >= insumo.cantidad
+        };
+      })
+    );
+
+    return insumosConStock;
   };
 
   return (
@@ -961,20 +1013,27 @@ const MushroomInoculationForm = () => {
                     </h4>
                     <div className="space-y-1">
                       {insumosCalculados.map((insumo, index) => (
-                        <div key={index} className="bg-white rounded-lg p-2 border border-orange-200 flex justify-between items-center">
-                          <div className="flex-1">
-                            <span className="font-medium text-orange-900 text-sm">{insumo.nombre}</span>
-                            <p className="text-xs text-orange-700">{insumo.descripcion}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-semibold">
-                              {insumo.cantidad < 1 ? 
-                                insumo.cantidad.toFixed(3) :
-                                insumo.cantidad % 1 === 0 ? 
-                                  insumo.cantidad.toLocaleString() : 
-                                  insumo.cantidad.toFixed(2)
-                              } {insumo.unidad}
-                            </span>
+                        <div key={index} className={`bg-white rounded-lg p-2 border ${!insumo.disponible ? 'border-red-300 bg-red-50' : 'border-orange-200'}`}>
+                          <div className="flex justify-between items-center">
+                            <div className="flex-1">
+                              <span className={`font-medium text-sm ${!insumo.disponible ? 'text-red-900' : 'text-orange-900'}`}>{insumo.nombre}</span>
+                              <p className={`text-xs ${!insumo.disponible ? 'text-red-700' : 'text-orange-700'}`}>{insumo.descripcion}</p>
+                              {!insumo.disponible && (
+                                <p className="text-xs text-red-600 font-medium mt-1">
+                                  ⚠️ Stock insuficiente: {insumo.stockDisponible?.toFixed(2) || 0} {insumo.unidad} disponible
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${!insumo.disponible ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}`}>
+                                {insumo.cantidad < 1 ? 
+                                  insumo.cantidad.toFixed(3) :
+                                  insumo.cantidad % 1 === 0 ? 
+                                    insumo.cantidad.toLocaleString() : 
+                                    insumo.cantidad.toFixed(2)
+                                } {insumo.unidad}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       ))}
