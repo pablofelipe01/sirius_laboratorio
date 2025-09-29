@@ -471,7 +471,22 @@ const MushroomInoculationForm = () => {
                   
                   // ROLLBACK COMPLETO: Eliminar inoculación y salidas de cepas
                   try {
-                    // Primero intentar eliminar la inoculación
+                    // Primero eliminar las salidas de cepas
+                    const deleteCepasResponse = await fetch('/api/salida-cepas', {
+                      method: 'DELETE',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ inoculacionId: result.recordId }),
+                    });
+                    
+                    if (deleteCepasResponse.ok) {
+                      console.log('✅ Rollback: Salidas de cepas eliminadas');
+                    } else {
+                      console.warn('⚠️ No se pudieron eliminar salidas de cepas en rollback');
+                    }
+                    
+                    // Luego eliminar la inoculación
                     const rollbackResponse = await fetch(`/api/inoculacion/${result.recordId}`, {
                       method: 'DELETE',
                       headers: {

@@ -167,3 +167,64 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    if (!SALIDA_CEPAS_TABLE_ID) {
+      return NextResponse.json(
+        { error: 'Configuración de tabla SALIDA_CEPAS no encontrada' },
+        { status: 500 }
+      );
+    }
+
+    const { inoculacionId } = await request.json();
+    
+    if (!inoculacionId) {
+      return NextResponse.json(
+        { error: 'Se requiere inoculacionId para eliminar registros' },
+        { status: 400 }
+      );
+    }
+
+    console.log('🗑️ Eliminando registros de Salida Cepas para inoculacionId:', inoculacionId);
+
+    // Primero buscar los registros a eliminar
+    const recordsToDelete = await base(SALIDA_CEPAS_TABLE_ID)
+      .select({
+        filterByFormula: `{Inoculacion} = '${inoculacionId}'`
+      })
+      .all();
+
+    if (recordsToDelete.length === 0) {
+      console.log('⚠️ No se encontraron registros de Salida Cepas para eliminar');
+      return NextResponse.json({
+        success: true,
+        message: 'No se encontraron registros para eliminar',
+        deleted: 0
+      });
+    }
+
+    console.log(`🗑️ Eliminando ${recordsToDelete.length} registros de Salida Cepas`);
+
+    // Eliminar los registros
+    const deleteResults = await base(SALIDA_CEPAS_TABLE_ID).destroy(recordsToDelete.map(r => r.id));
+
+    console.log('✅ Registros de Salida Cepas eliminados:', deleteResults.length);
+
+    return NextResponse.json({
+      success: true,
+      message: `Se eliminaron ${deleteResults.length} registros de Salida Cepas`,
+      deleted: deleteResults.length
+    });
+
+  } catch (error) {
+    console.error('❌ Error al eliminar registros de Salida Cepas:', error);
+    return NextResponse.json(
+      { 
+        error: 'Error al eliminar registros de Salida Cepas',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
+      { status: 500 }
+    );
+  }
+}
