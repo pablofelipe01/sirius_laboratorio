@@ -244,9 +244,9 @@ const MushroomInoculationForm = () => {
           const insumoEncontrado = data.insumos.find((insumo: any) => insumo.id === insumoId);
           
           if (insumoEncontrado) {
-            // Usar el campo 'Total Insumo Unidades' que aparece en los logs
-            const stockDisponible = insumoEncontrado.fields['Total Insumo Unidades'] || 0;
-            console.log(`✅ Stock encontrado para ${insumoId}: ${stockDisponible} unidades`);
+            // Usar el campo 'Total Insumo Granel' para comparar con cantidades en gramos
+            const stockDisponible = insumoEncontrado.fields['Total Insumo Granel'] || 0;
+            console.log(`✅ Stock encontrado para ${insumoId}: ${stockDisponible} gramos`);
             return stockDisponible;
           } else {
             console.log(`⚠️ Insumo ${insumoId} no encontrado en la tabla de stock`);
