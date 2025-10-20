@@ -122,6 +122,7 @@ export default function AlmacenamientoPage() {
   useEffect(() => {
     // Cargar resumen de inventario al montar el componente
     fetchResumenInventario();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

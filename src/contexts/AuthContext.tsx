@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import Cookies from 'js-cookie';
 
 interface User {
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const token = Cookies.get('auth_token');
       
@@ -70,11 +70,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // Array vacío porque no depende de ningún valor del estado
 
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
   const value: AuthContextType = {
     user,
