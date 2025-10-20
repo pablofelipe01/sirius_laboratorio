@@ -181,6 +181,7 @@ const Navbar: React.FC = () => {
                       { href: "/cepas", label: "Cepas", emoji: "🧬", color: "bg-purple-50" },
                       { href: "/cosecha", label: "Cosecha", emoji: "🧪", color: "bg-green-50" },
                       { href: "/bacterias", label: "Bacterias", emoji: "🦠", color: "bg-yellow-50" },
+                      { href: "/calcular-formulacion", label: "Calcular Formulación", emoji: "🧮", color: "bg-cyan-50" },
                     ]}
                   />
                   
@@ -412,6 +413,18 @@ const Navbar: React.FC = () => {
                         >
                           <span className="text-xl">🦠</span>
                           <span className="font-medium">Bacterias</span>
+                          <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                        
+                        <Link
+                          href="/calcular-formulacion"
+                          onClick={closeMobileMenu}
+                          className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-cyan-50 hover:text-cyan-700 dark:text-gray-200 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400"
+                        >
+                          <span className="text-xl">🧮</span>
+                          <span className="font-medium">Calcular Formulación</span>
                           <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
