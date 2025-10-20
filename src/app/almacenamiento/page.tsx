@@ -10,7 +10,7 @@ interface LoteAlmacenamiento {
   fields: {
     'Codigo Lote'?: string;
     'Microorganismo (from Microorganismos)'?: string[];
-    'Total Cantidad Bolsas'?: number;
+    'Cantidad Actual Bolsas'?: number;
     'Fecha Creacion'?: string;
     'Fecha Inoculacion'?: string;
     'Fecha Guardado Refrigeración'?: string;
@@ -109,7 +109,7 @@ export default function AlmacenamientoPage() {
 
   // Calcular totales de bolsas
   const totalBolsasRefrigeracion = lotesRefrigeracion.reduce((total, lote) => {
-    return total + (lote.fields['Total Cantidad Bolsas'] || 0);
+    return total + (lote.fields['Cantidad Actual Bolsas'] || 0);
   }, 0);
 
   console.log('📊 FILTROS RESULTADO:');
@@ -334,7 +334,7 @@ export default function AlmacenamientoPage() {
       codigoLote: lote.fields['Codigo Lote'],
       estadoLote: lote.fields['Estado Lote'],
       microorganismo: lote.fields['Microorganismo (from Microorganismos)'],
-      cantidadBolsas: lote.fields['Total Cantidad Bolsas'],
+      cantidadBolsas: lote.fields['Cantidad Actual Bolsas'],
       fechaCreacion: lote.fields['Fecha Creacion'],
       responsables: lote.fields['Nombre (from Responsables)']
     });
@@ -376,7 +376,7 @@ export default function AlmacenamientoPage() {
           
           <div>
             <span className="font-medium text-gray-700">Cantidad:</span>
-            <p className="text-gray-600">{lote.fields['Total Cantidad Bolsas'] || 0} bolsas</p>
+            <p className="text-gray-600">{lote.fields['Cantidad Actual Bolsas'] || 0} bolsas</p>
           </div>
           
           <div>
@@ -1129,10 +1129,10 @@ export default function AlmacenamientoPage() {
           console.log('🔍 RESUMEN: Evaluando lote hongo:', {
             id: lote.id,
             estado: lote.fields['Estado Lote'],
-            totalBolsas: lote.fields['Total Cantidad Bolsas'],
+            totalBolsas: lote.fields['Cantidad Actual Bolsas'],
             microorganismo: lote.fields['Microorganismo (from Microorganismos)']
           });
-          return lote.fields['Estado Lote'] === 'Refrigeración' && (lote.fields['Total Cantidad Bolsas'] || 0) > 0;
+          return lote.fields['Estado Lote'] === 'Refrigeración' && (lote.fields['Cantidad Actual Bolsas'] || 0) > 0;
         });
         
         console.log('✅ RESUMEN: Hongos disponibles filtrados:', hongosDisponibles.length);
@@ -1141,7 +1141,7 @@ export default function AlmacenamientoPage() {
         const agrupacionHongos: { [key: string]: { bolsas: number, litros: number } } = {};
         hongosDisponibles.forEach((lote: LoteAlmacenamiento) => {
           const microorganismo = lote.fields['Microorganismo (from Microorganismos)']?.[0] || 'Sin especificar';
-          const bolsas = lote.fields['Total Cantidad Bolsas'] || 0;
+          const bolsas = lote.fields['Cantidad Actual Bolsas'] || 0;
           
           console.log('📦 RESUMEN: Procesando hongo:', {
             microorganismo,
@@ -2059,7 +2059,7 @@ export default function AlmacenamientoPage() {
                     
                     <div className="bg-gray-50 p-3 rounded-lg">
                       <label className="font-medium text-gray-700">Cantidad de Bolsas:</label>
-                      <p className="text-gray-900 text-lg font-semibold">{loteHistorial.fields['Total Cantidad Bolsas'] || 0}</p>
+                      <p className="text-gray-900 text-lg font-semibold">{loteHistorial.fields['Cantidad Actual Bolsas'] || 0}</p>
                     </div>
                   </div>
                 </div>
