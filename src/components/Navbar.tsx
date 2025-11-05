@@ -197,27 +197,16 @@ const Navbar: React.FC = () => {
                     ]}
                   />
 
-                  {/* SIRIUS - Asistente IA */}
-                  <Link 
-                    href="/sirius" 
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-white/10 ${
-                      isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white'
-                    }`}
-                  >
-                    <span className="text-lg">✨</span>
-                    <span>SIRIUS</span>
-                  </Link>
-
-                  {/* Manual de Usuario */}
-                  <Link 
-                    href="/manual-usuario" 
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-white/10 ${
-                      isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white'
-                    }`}
-                  >
-                    <span className="text-lg">📖</span>
-                    <span>Manual</span>
-                  </Link>
+                  {/* Dropdown Soporte */}
+                  <DropdownMenu
+                    title="Soporte"
+                    icon="🛠️"
+                    items={[
+                      { href: "/sirius", label: "SIRIUS - Asistente IA", emoji: "✨", color: "bg-blue-50" },
+                      { href: "/manual-usuario", label: "Manual de Usuario", emoji: "📖", color: "bg-gray-50" },
+                      { href: "/feedback", label: "Feedback", emoji: "💬", color: "bg-purple-50" },
+                    ]}
+                  />
 
                   {/* Proyección */}
                   <Link 
@@ -500,10 +489,10 @@ const Navbar: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Asistente IA */}
+                    {/* Soporte */}
                     <div>
                       <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 px-2 text-gray-500 dark:text-gray-400">
-                        ✨ Asistente IA
+                        🛠️ Soporte
                       </h3>
                       <div className="space-y-1">
                         <Link
@@ -512,20 +501,12 @@ const Navbar: React.FC = () => {
                           className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 hover:from-blue-100 hover:to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 dark:text-blue-400"
                         >
                           <span className="text-xl">✨</span>
-                          <span className="font-medium">SIRIUS</span>
+                          <span className="font-medium">SIRIUS - Asistente IA</span>
                           <span className="ml-auto px-2 py-1 text-xs bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full">
                             IA
                           </span>
                         </Link>
-                      </div>
-                    </div>
-
-                    {/* Manual de Usuario */}
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 px-2 text-gray-500 dark:text-gray-400">
-                        📖 Ayuda
-                      </h3>
-                      <div className="space-y-1">
+                        
                         <Link
                           href="/manual-usuario"
                           onClick={closeMobileMenu}
@@ -533,6 +514,18 @@ const Navbar: React.FC = () => {
                         >
                           <span className="text-xl">📖</span>
                           <span className="font-medium">Manual de Usuario</span>
+                          <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                        
+                        <Link
+                          href="/feedback"
+                          onClick={closeMobileMenu}
+                          className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-purple-50 hover:text-purple-700 dark:text-gray-200 dark:hover:bg-purple-900/30 dark:hover:text-purple-400"
+                        >
+                          <span className="text-xl">�</span>
+                          <span className="font-medium">Feedback</span>
                           <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
