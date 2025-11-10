@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const baseId = process.env.AIRTABLE_BASE_ID;
-    const tableId = process.env.AIRTABLE_TABLE_PROYECCIONES; // ID de la tabla Proyecciones de Lina(Comercial)
+    const tableId = process.env.AIRTABLE_TABLE_PROYECCION_VENTAS; // ID de la tabla Proyecciones de Lina(Comercial)
     const apiKey = process.env.AIRTABLE_API_KEY;
 
     if (!apiKey) {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching proyección data:', error);
+    console.error('Error fetching dashboard lab data:', error);
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
   }
 }

@@ -185,14 +185,18 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     console.log('🔍 API INOCULACION GET: Iniciando obtención de registros...');
+    
+    const { searchParams } = new URL(request.url);
+    const codigo = searchParams.get('codigo');
     
     // Usar la tabla de Inoculación desde variables de entorno
     const tableId = process.env.AIRTABLE_TABLE_INOCULACION;
     
     console.log('📋 API INOCULACION: Table ID:', tableId);
+    console.log('🔍 API INOCULACION: Codigo filtro:', codigo);
     
     if (!tableId) {
       console.error('❌ API INOCULACION: Missing AIRTABLE_TABLE_INOCULACION environment variable');
@@ -201,12 +205,21 @@ export async function GET() {
 
     console.log('📡 API INOCULACION: Haciendo query a Airtable...');
     
+    // Preparar configuración de query
+    const queryConfig: any = {
+      maxRecords: 100,
+      sort: [{ field: 'Fecha Creacion', direction: 'desc' }]
+    };
+
+    // Si se proporciona código, filtrar por ese código
+    if (codigo) {
+      queryConfig.filterByFormula = `{Codigo Lote} = '${codigo}'`;
+      console.log('📋 API INOCULACION: Filtrando por código:', codigo);
+    }
+    
     // Obtener registros de Airtable usando nombres de campos exactos
     const records = await base(tableId)
-      .select({
-        maxRecords: 100,
-        sort: [{ field: 'Fecha Creacion', direction: 'desc' }]
-      })
+      .select(queryConfig)
       .firstPage();
 
     console.log('📊 API INOCULACION: Records obtenidos:', records.length);
@@ -233,13 +246,13 @@ export async function GET() {
 
     const response = {
       success: true,
-      inoculaciones: formattedRecords, // Cambiar de 'records' a 'inoculaciones'
+      records: formattedRecords, // Devolver como 'records' para compatibilidad con frontend
       total: formattedRecords.length
     };
     
     console.log('🚀 API INOCULACION: Enviando response:', {
       success: response.success,
-      inoculaciones_count: response.inoculaciones.length,
+      records_count: response.records.length,
       total: response.total
     });
 
@@ -257,3 +270,5 @@ export async function GET() {
     );
   }
 }
+
+

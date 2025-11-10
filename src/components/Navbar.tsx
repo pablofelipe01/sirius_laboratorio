@@ -208,15 +208,15 @@ const Navbar: React.FC = () => {
                     ]}
                   />
 
-                  {/* Proyección */}
+                  {/* Dashboard Lab */}
                   <Link 
-                    href="/proyeccion" 
+                    href="/dashboard-lab" 
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-white/10 ${
                       isScrolled ? 'text-gray-700 hover:bg-gray-100' : 'text-white'
                     }`}
                   >
-                    <span className="text-lg">📈</span>
-                    <span>Proyección</span>
+                    <span className="text-lg">🧪</span>
+                    <span>Dashboard Lab</span>
                   </Link>
 
                   <div className="flex items-center gap-3 ml-6">
@@ -540,12 +540,12 @@ const Navbar: React.FC = () => {
                       </h3>
                       <div className="space-y-1">
                         <Link
-                          href="/proyeccion"
+                          href="/dashboard-lab"
                           onClick={closeMobileMenu}
                           className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-cyan-50 hover:text-cyan-700 dark:text-gray-200 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400"
                         >
-                          <span className="text-xl">📈</span>
-                          <span className="font-medium">Proyección</span>
+                          <span className="text-xl">🧪</span>
+                          <span className="font-medium">Dashboard Lab</span>
                           <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>

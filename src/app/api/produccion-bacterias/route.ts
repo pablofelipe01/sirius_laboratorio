@@ -230,7 +230,7 @@ async function registrarSalidaFermentacion(microorganismosUsados: any[], cantida
   try {
     console.log('📦 [SALIDA-FERMENTACION] ===== REGISTRANDO SALIDAS =====');
     
-    const AIRTABLE_TABLE_SALIDA_FERMENTACION = 'tbljasiyO9KCPCSRQ'; // ID de la tabla según documentación
+    const AIRTABLE_TABLE_SALIDA_FERMENTACION = process.env.AIRTABLE_TABLE_SALIDA_FERMENTACION || 'tbljasiyO9KCPCSRQ'; // ID de la tabla desde variable de entorno
     
     const registrosSalida = [];
     

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Crear el registro en la tabla Salida Inoculacion
-    const record = await base('tblFYgPP3LS9lo5J4').create({
+    const record = await base(process.env.AIRTABLE_TABLE_SALIDA_INOCULACION || 'tblFYgPP3LS9lo5J4').create({
       'Fecha Evento': fechaEvento,
       'Cantidad Bolsas': parseInt(cantidadBolsas),
       'Lote Alterado': [loteAlteradoId],
