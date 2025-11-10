@@ -22,10 +22,67 @@ interface LoteAlmacenamiento {
   };
 }
 
+// Días de incubación por microorganismo
+const DIAS_INCUBACION = {
+  'Trichoderma harzianum': 5,
+  'Metarhizium anisopliae': 14,
+  'Purpureocillium lilacinum': 14,
+  'Beauveria bassiana': 6
+} as const;
+
 export default function AlmacenamientoPage() {
   console.log('🏗️ ALMACENAMIENTO: Componente renderizando...');
   
   const { user } = useAuth();
+
+  // Función para calcular la fecha de recogida
+  const calcularFechaRecogida = (fechaInoculacion: string, microorganismo: string) => {
+    const diasIncubacion = DIAS_INCUBACION[microorganismo as keyof typeof DIAS_INCUBACION] || 7;
+    const fecha = new Date(fechaInoculacion);
+    fecha.setDate(fecha.getDate() + diasIncubacion);
+    return fecha;
+  };
+
+  // Función para calcular días restantes y estado
+  const calcularEstadoIncubacion = (fechaInoculacion: string, microorganismo: string) => {
+    const fechaRecogida = calcularFechaRecogida(fechaInoculacion, microorganismo);
+    const hoy = new Date();
+    const diasRestantes = Math.ceil((fechaRecogida.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+    
+    let estado = 'pendiente';
+    let color = 'bg-green-100 text-green-800 border-green-200';
+    let icono = '🟢';
+    let prioridad = 'baja';
+    
+    if (diasRestantes <= 0) {
+      // ¡URGENTE! Ya se pasó la fecha - ROJO CRÍTICO
+      estado = 'vencido';
+      color = 'bg-red-100 text-red-900 border-red-300 shadow-red-100';
+      icono = '🔴';
+      prioridad = 'critica';
+    } else if (diasRestantes <= 1) {
+      // ¡ATENCIÓN! Debe recogerse HOY o MAÑANA - ROJO URGENTE
+      estado = 'urgente';
+      color = 'bg-red-100 text-red-800 border-red-200';
+      icono = '🔴';
+      prioridad = 'alta';
+    } else if (diasRestantes <= 2) {
+      // Pronto debe recogerse - NARANJA
+      estado = 'proximo';
+      color = 'bg-orange-100 text-orange-800 border-orange-200';
+      icono = '🟠';
+      prioridad = 'media';
+    } else if (diasRestantes <= 3) {
+      // Prepararse para la recogida - AMARILLO
+      estado = 'preparar';
+      color = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      icono = '🟡';
+      prioridad = 'media-baja';
+    }
+    // Más de 3 días = VERDE (seguro)
+    
+    return { diasRestantes, estado, color, icono, fechaRecogida, prioridad };
+  };
   
   // Función para verificar si el usuario puede ver datos de ganancias
   const puedeVerGanancias = () => {
@@ -380,15 +437,123 @@ export default function AlmacenamientoPage() {
             <p className="text-gray-600">{lote.fields['Cantidad Actual Bolsas'] || 0} bolsas</p>
           </div>
           
-          <div>
-            <span className="font-medium text-gray-700">Fecha:</span>
-            <p className="text-gray-600">
-              {lote.fields['Fecha Creacion'] 
-                ? new Date(lote.fields['Fecha Creacion']).toLocaleDateString('es-CO')
-                : 'N/A'
-              }
-            </p>
-          </div>
+          {/* Fechas de Inoculación y Recogida */}
+          {lote.fields['Fecha Inoculacion'] && (
+            <>
+              <div>
+                <span className="font-medium text-gray-700">Fecha Inoculación:</span>
+                <p className="text-gray-600">
+                  {(() => {
+                    const rawDate = lote.fields['Fecha Inoculacion'];
+                    const fecha = new Date(rawDate);
+                    fecha.setMinutes(fecha.getMinutes() + fecha.getTimezoneOffset());
+                    return fecha.toLocaleDateString('es-CO', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      timeZone: 'UTC'
+                    });
+                  })()}
+                </p>
+              </div>
+              
+              {/* Información de Estado de Incubación - Solo para lotes en Incubación */}
+              {(() => {
+                const microorganismo = Array.isArray(lote.fields['Microorganismo (from Microorganismos)']) 
+                  ? lote.fields['Microorganismo (from Microorganismos)'][0] 
+                  : lote.fields['Microorganismo (from Microorganismos)'];
+                
+                const estadoLote = lote.fields['Estado Lote'];
+                
+                // Solo mostrar estado de incubación si el lote está en estado "Incubacion"
+                if (!microorganismo || estadoLote !== 'Incubacion') {
+                  return (
+                    <div>
+                      <span className="font-medium text-gray-700">Fecha Recogida:</span>
+                      <p className="text-gray-600">
+                        {lote.fields['Fecha Inoculacion'] && microorganismo 
+                          ? calcularFechaRecogida(lote.fields['Fecha Inoculacion'], microorganismo).toLocaleDateString('es-CO', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            })
+                          : 'No disponible'
+                        }
+                      </p>
+                    </div>
+                  );
+                }
+                
+                const estadoInfo = calcularEstadoIncubacion(lote.fields['Fecha Inoculacion'], microorganismo);
+                
+                return (
+                  <>
+                    <div>
+                      <span className="font-medium text-gray-700">Fecha Recogida:</span>
+                      <p className="text-gray-600">
+                        {estadoInfo.fechaRecogida.toLocaleDateString('es-CO', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                    
+                    <div className="mt-3 p-3 rounded-lg border-2" style={{
+                      backgroundColor: estadoInfo.color.includes('red') ? '#fef2f2' : 
+                                      estadoInfo.color.includes('orange') ? '#fff7ed' :
+                                      estadoInfo.color.includes('yellow') ? '#fefce8' : '#f0fdf4'
+                    }}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm text-gray-700">🌱 ¿Cómo voy?</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-2 rounded-lg text-sm font-bold shadow-sm border-2 ${estadoInfo.color}`}>
+                            <span className="text-lg mr-2">{estadoInfo.icono}</span>
+                            {(() => {
+                              if (estadoInfo.diasRestantes <= 0) {
+                                return '✨ ¡Ya estoy listo! 😊';
+                              } else if (estadoInfo.diasRestantes === 1) {
+                                return '🌟 Mañana estaré perfecto';
+                              } else if (estadoInfo.diasRestantes === 2) {
+                                return '⏰ Casi listo - me faltan 2 días';
+                              } else if (estadoInfo.diasRestantes === 3) {
+                                return '🕒 Creciendo bien - me faltan 3 días';
+                              } else {
+                                return `⏳ Creciendo feliz - me faltan ${estadoInfo.diasRestantes} días`;
+                              }
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Barra de progreso visual */}
+                      <div className="mt-2">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              estadoInfo.diasRestantes <= 0 ? 'bg-red-600' :
+                              estadoInfo.diasRestantes <= 1 ? 'bg-red-500' :
+                              estadoInfo.diasRestantes <= 2 ? 'bg-orange-500' :
+                              estadoInfo.diasRestantes <= 3 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
+                            style={{
+                              width: `${Math.max(10, Math.min(100, ((DIAS_INCUBACION[microorganismo as keyof typeof DIAS_INCUBACION] || 7) - estadoInfo.diasRestantes) / (DIAS_INCUBACION[microorganismo as keyof typeof DIAS_INCUBACION] || 7) * 100))}%`
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1 text-center">
+                          {estadoInfo.diasRestantes <= 0 
+                            ? '🎉 ¡Completé mi crecimiento!' 
+                            : `💪 Llevo ${(DIAS_INCUBACION[microorganismo as keyof typeof DIAS_INCUBACION] || 7) - estadoInfo.diasRestantes + 1} de ${DIAS_INCUBACION[microorganismo as keyof typeof DIAS_INCUBACION] || 7} días - ¡Voy muy bien!`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </>
+          )}
           
           {lote.fields['Nombre (from Responsables)'] && lote.fields['Nombre (from Responsables)'].length > 0 && (
             <div>

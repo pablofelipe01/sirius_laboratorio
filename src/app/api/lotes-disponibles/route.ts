@@ -23,7 +23,11 @@ export async function GET(request: NextRequest) {
     }
     
     // Consultar tabla de Inoculación
-    const records = await base('tblbpGevTHV9JjEYc') // Inoculacion table ID
+    if (!process.env.AIRTABLE_TABLE_INOCULACION) {
+      throw new Error('Variable de entorno AIRTABLE_TABLE_INOCULACION no está configurada');
+    }
+
+    const records = await base(process.env.AIRTABLE_TABLE_INOCULACION)
       .select({
         filterByFormula: `AND(
           FIND("${microorganismoId}", ARRAYJOIN({Microorganismos}, ",")),
@@ -44,7 +48,7 @@ export async function GET(request: NextRequest) {
         ? record.fields['Microorganismo (from Microorganismos)'][0] 
         : 'No especificado',
       cantidadDisponible: Number(record.fields['Total Cantidad Bolsas']) || 0,
-      fechaProduccion: record.fields['Fecha Inoculacion'] || new Date().toISOString().split('T')[0],
+      fechaProduccion: record.fields['Fecha Inoculacion'] || '',
       estado: record.fields['Estado Lote'] || 'Incubacion'
     }));
     
