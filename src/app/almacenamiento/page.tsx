@@ -182,6 +182,8 @@ export default function AlmacenamientoPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // No establecer tipo por defecto automáticamente - dejar que el usuario elija
+
   useEffect(() => {
     console.log('🔄 USEEFFECT: Ejecutándose con tipoSeleccionado:', tipoSeleccionado);
     
@@ -218,21 +220,21 @@ export default function AlmacenamientoPage() {
       const data = await response.json();
       console.log('📋 ALMACENAMIENTO: Data recibida:', data);
       console.log('📋 ALMACENAMIENTO: data.success:', data.success);
-      console.log('📋 ALMACENAMIENTO: data.inoculaciones existe:', !!data.inoculaciones);
-      console.log('📋 ALMACENAMIENTO: data.inoculaciones length:', data.inoculaciones?.length);
+      console.log('📋 ALMACENAMIENTO: data.records existe:', !!data.records);
+      console.log('📋 ALMACENAMIENTO: data.records length:', data.records?.length);
       
       if (data.success) {
-        console.log('✅ ALMACENAMIENTO: Data con success=true, verificando inoculaciones...');
-        console.log('📋 ALMACENAMIENTO: data.inoculaciones existe:', !!data.inoculaciones);
-        console.log('📋 ALMACENAMIENTO: data.inoculaciones type:', typeof data.inoculaciones);
-        console.log('📋 ALMACENAMIENTO: data.inoculaciones length:', Array.isArray(data.inoculaciones) ? data.inoculaciones.length : 'No es array');
+        console.log('✅ ALMACENAMIENTO: Data con success=true, verificando records...');
+        console.log('📋 ALMACENAMIENTO: data.records existe:', !!data.records);
+        console.log('📋 ALMACENAMIENTO: data.records type:', typeof data.records);
+        console.log('📋 ALMACENAMIENTO: data.records length:', Array.isArray(data.records) ? data.records.length : 'No es array');
         
-        if (data.inoculaciones && Array.isArray(data.inoculaciones) && data.inoculaciones.length > 0) {
+        if (data.records && Array.isArray(data.records) && data.records.length > 0) {
           console.log('✅ ALMACENAMIENTO: Data válida, procesando lotes...');
-          console.log('📋 ALMACENAMIENTO: Todos los lotes:', data.inoculaciones);
+          console.log('📋 ALMACENAMIENTO: Todos los lotes:', data.records);
           
           // Log de cada lote para ver su estructura
-          data.inoculaciones.forEach((lote: LoteAlmacenamiento, index: number) => {
+          data.records.forEach((lote: LoteAlmacenamiento, index: number) => {
             console.log(`📦 ALMACENAMIENTO: Lote ${index + 1}:`, {
               id: lote.id,
               fields: lote.fields,
@@ -242,7 +244,7 @@ export default function AlmacenamientoPage() {
           });
           
           // Filtrar solo los lotes que están en Incubación o Refrigeración
-          const lotesAlmacenamiento = data.inoculaciones.filter((lote: LoteAlmacenamiento) => {
+          const lotesAlmacenamiento = data.records.filter((lote: LoteAlmacenamiento) => {
             const estado = lote.fields['Estado Lote'];
             const esAlmacenamiento = estado === 'Incubacion' || estado === 'Incubación' || estado === 'Refrigeración' || estado === 'Refrigerado'; // Compatibilidad
             console.log(`🔍 ALMACENAMIENTO: Lote ${lote.fields['Codigo Lote']} - Estado: "${estado}" - Es almacenamiento: ${esAlmacenamiento}`);
@@ -318,11 +320,11 @@ export default function AlmacenamientoPage() {
           console.log('📊 ALMACENAMIENTO: Total lotes almacenamiento después de filtro tipo:', lotesFiltradosPorTipo.length);
           setLotes(lotesFiltradosPorTipo);
         } else {
-          console.error('❌ ALMACENAMIENTO: inoculaciones no es válido:', data.inoculaciones);
+          console.error('❌ ALMACENAMIENTO: records no es válido:', data.records);
           setError('No se encontraron lotes de inoculación');
         }
       } else {
-        console.error('❌ ALMACENAMIENTO: Error en data - success:', data.success, 'inoculaciones:', !!data.inoculaciones);
+        console.error('❌ ALMACENAMIENTO: Error en data - success:', data.success, 'records:', !!data.records);
         setError('Error al cargar los lotes');
       }
     } catch (error) {
@@ -1288,10 +1290,10 @@ export default function AlmacenamientoPage() {
       
       // Procesar hongos disponibles
       let resumenHongos: Array<{microorganismo: string, bolsas: number, litros: number}> = [];
-      if (dataHongos.success && dataHongos.inoculaciones) {
-        console.log('📊 RESUMEN: Procesando hongos...', dataHongos.inoculaciones.length, 'registros');
+      if (dataHongos.success && dataHongos.records) {
+        console.log('📊 RESUMEN: Procesando hongos...', dataHongos.records.length, 'registros');
         
-        const hongosDisponibles = dataHongos.inoculaciones.filter((lote: LoteAlmacenamiento) => {
+        const hongosDisponibles = dataHongos.records.filter((lote: LoteAlmacenamiento) => {
           console.log('🔍 RESUMEN: Evaluando lote hongo:', {
             id: lote.id,
             estado: lote.fields['Estado Lote'],
