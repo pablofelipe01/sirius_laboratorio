@@ -394,6 +394,19 @@ const MushroomInoculationForm = () => {
     setErrorMessage('');
 
     try {
+      // Log detallado de los datos que se van a enviar
+      console.log('📤 DATOS A ENVIAR:', {
+        bagQuantity: formData.bagQuantity,
+        microorganism: formData.microorganism,
+        microorganismId: formData.microorganismId,
+        inoculationDate: formData.inoculationDate,
+        responsables: formData.responsables,
+        responsablesIds: formData.responsablesIds,
+        registradoPor: formData.registradoPor,
+        cepasSeleccionadas: formData.cepasSeleccionadas,
+        cantidadCepas: formData.cepasSeleccionadas.length
+      });
+
       // Enviar datos a la API de Airtable
       const response = await fetch('/api/inoculacion', {
         method: 'POST',
@@ -403,7 +416,15 @@ const MushroomInoculationForm = () => {
         body: JSON.stringify(formData),
       });
 
+      console.log('📡 RESPUESTA DEL SERVIDOR:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
       const result = await response.json();
+      
+      console.log('📋 RESULTADO PARSEADO:', result);
 
       if (response.ok && result.success) {
         // Si la inoculación se creó exitosamente, crear registros de Salida Cepas
@@ -613,10 +634,19 @@ const MushroomInoculationForm = () => {
           cepasSeleccionadas: [],
         });
       } else {
+        console.error('❌ ERROR EN RESPUESTA:', {
+          status: response.status,
+          ok: response.ok,
+          resultError: result.error,
+          resultDetails: result.details,
+          fullResult: result
+        });
         setSubmitStatus('error');
         setErrorMessage(result.error || 'Error al registrar la inoculación');
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ ERROR DE EXCEPCIÓN:', error);
+      console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack available');
       setSubmitStatus('error');
       setErrorMessage('Error de conexión. Por favor, intente nuevamente.');
     } finally {

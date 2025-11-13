@@ -12,6 +12,13 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY
 }).base(process.env.AIRTABLE_BASE_ID);
 
+// Nombres de campos de Airtable configurables
+const FIELD_RESPONSABLES = process.env.AIRTABLE_FIELD_INOCULACION_RESPONSABLES || 'Responsables';
+const FIELD_CANTIDAD_BOLSAS = process.env.AIRTABLE_FIELD_INOCULACION_CANTIDAD_BOLSAS || 'Cantidad Bolsas Inoculadas';
+const FIELD_MICROORGANISMOS = process.env.AIRTABLE_FIELD_INOCULACION_MICROORGANISMOS || 'Microorganismos';
+const FIELD_FECHA_INOCULACION = process.env.AIRTABLE_FIELD_INOCULACION_FECHA || 'Fecha Inoculacion';
+const FIELD_REALIZA_REGISTRO = process.env.AIRTABLE_FIELD_INOCULACION_REALIZA_REGISTRO || 'Realiza Registro';
+
 export async function POST(request: NextRequest) {
   try {
     const rawData = await request.json();
@@ -38,6 +45,9 @@ export async function POST(request: NextRequest) {
       dataFields: Object.keys(rawData)
     });
     
+    // Log de los datos crudos recibidos
+    console.log('📦 RAW DATA RECIBIDO:', JSON.stringify(rawData, null, 2));
+    
     // Validar datos de entrada con Zod
     const validation = validateData(InoculationSchema, rawData);
     
@@ -45,6 +55,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ Validation failed:', {
         browser: browserName,
         errors: validation.errors,
+        rawData: rawData,
         timestamp: new Date().toISOString()
       });
       
@@ -63,15 +74,15 @@ export async function POST(request: NextRequest) {
       throw new Error('Missing AIRTABLE_TABLE_INOCULACION environment variable');
     }
     
-    // Crear registro en Airtable usando nombres de campos exactos de la documentación
+    // Crear registro en Airtable usando variables de entorno para nombres de campos
     const record = await base(tableId).create([
       {
         fields: {
-          'Responsables': data.responsablesIds, // Array de IDs, no string
-          'Cantidad Bolsas': data.bagQuantity,
-          'Microorganismos': [data.microorganismId], // Array de IDs
-          'Fecha Inoculacion': data.inoculationDate, // Fecha en formato ISO
-          'Realiza Registro': data.registradoPor // Nombre del usuario que registra
+          [FIELD_RESPONSABLES]: data.responsablesIds, // Array de IDs
+          [FIELD_CANTIDAD_BOLSAS]: data.bagQuantity, // Number
+          [FIELD_MICROORGANISMOS]: [data.microorganismId], // Array de IDs
+          [FIELD_FECHA_INOCULACION]: data.inoculationDate, // Date (ISO format)
+          [FIELD_REALIZA_REGISTRO]: data.registradoPor // Text
         }
       }
     ]);
