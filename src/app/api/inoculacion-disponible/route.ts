@@ -29,12 +29,12 @@ export async function GET(request: NextRequest) {
       throw new Error('Missing AIRTABLE_TABLE_INOCULACION environment variable');
     }
 
-    let filterFormula = '{Total Cantidad Bolsas} > 0';
+    let filterFormula = '{Total Cantidad Bolsas en Stock} > 0';
     
     if (microorganismo) {
       // Filtrar por microorganismo si se especifica
       const safeOrganism = microorganismo.replace(/['"]/g, '');
-      filterFormula = `AND({Total Cantidad Bolsas} > 0, SEARCH("${safeOrganism}", ARRAYJOIN({Microorganismo (from Microorganismos)}, " ")))`;
+      filterFormula = `AND({Total Cantidad Bolsas en Stock} > 0, SEARCH("${safeOrganism}", ARRAYJOIN({Microorganismo (from Microorganismos)}, " ")))`;
       console.log('🔬 Filtrado por microorganismo:', safeOrganism);
     }
 
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
           'ID',
           'Microorganismo (from Microorganismos)',
           'Codigo Lote',
-          'Total Cantidad Bolsas',
+          'Total Cantidad Bolsas en Stock',
           'Fecha Inoculacion',
           'Nombre (from Responsables)'
         ]
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       id: record.get('ID'),
       microorganismo: record.get('Microorganismo (from Microorganismos)'),
       codigoLote: record.get('Codigo Lote'),
-      totalCantidadBolsas: record.get('Total Cantidad Bolsas'),
+      totalCantidadBolsas: record.get('Total Cantidad Bolsas en Stock'),
       fechaCreacion: record.get('Fecha Inoculacion'),
       responsables: record.get('Nombre (from Responsables)')
     }));

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         filterByFormula: `AND(
           FIND("${microorganismoId}", ARRAYJOIN({Microorganismos}, ",")),
           {Estado Lote} = "Incubacion",
-          {Total Cantidad Bolsas} > 0
+          {Total Cantidad Bolsas en Stock} > 0
         )`,
         sort: [{ field: "Fecha Inoculacion", direction: "asc" }]
       })
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       microorganismo: Array.isArray(record.fields['Microorganismo (from Microorganismos)']) 
         ? record.fields['Microorganismo (from Microorganismos)'][0] 
         : 'No especificado',
-      cantidadDisponible: Number(record.fields['Total Cantidad Bolsas']) || 0,
+      cantidadDisponible: Number(record.fields['Total Cantidad Bolsas en Stock']) || 0,
       fechaProduccion: record.fields['Fecha Inoculacion'] || '',
       estado: record.fields['Estado Lote'] || 'Incubacion'
     }));

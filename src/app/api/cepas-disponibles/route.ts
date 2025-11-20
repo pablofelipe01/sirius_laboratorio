@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       throw new Error('Missing AIRTABLE_TABLE_CEPAS environment variable');
     }
 
-    let filterFormula = '{Total Cantidad Bolsas} > 0';
+    let filterFormula = '{Cantidad Bolsas} > 0';
     
     // Si no hay filtros específicos, solo filtrar por cantidad > 0
     if (!microorganismo && !abreviatura) {
@@ -39,12 +39,12 @@ export async function GET(request: NextRequest) {
     } else if (microorganismo) {
       // Simplificar la fórmula para microorganismo
       const safeOrganism = microorganismo.replace(/['"]/g, '');
-      filterFormula = `AND({Total Cantidad Bolsas} > 0, SEARCH("${safeOrganism}", ARRAYJOIN({Microorganismo (from Microorganismos)}, " ")))`;
+      filterFormula = `AND({Cantidad Bolsas} > 0, SEARCH("${safeOrganism}", ARRAYJOIN({Microorganismo (from Microorganismos)}, " ")))`;
       console.log('🔬 Filtrado por microorganismo:', safeOrganism);
     } else if (abreviatura) {
       // Simplificar la fórmula para abreviatura
       const safeAbbrev = abreviatura.replace(/['"]/g, '');
-      filterFormula = `AND({Total Cantidad Bolsas} > 0, SEARCH("${safeAbbrev}", ARRAYJOIN({Abreviatura Hongo}, " ")))`;
+      filterFormula = `AND({Cantidad Bolsas} > 0, SEARCH("${safeAbbrev}", ARRAYJOIN({Abreviatura Hongo}, " ")))`;
       console.log('🏷️ Filtrado por abreviatura:', safeAbbrev);
     }
 
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           'Microorganismo (from Microorganismos)',
           'Abreviatura Hongo',
           'Codigo Cepa',
-          'Total Cantidad Bolsas',
+          'Cantidad Bolsas',
           'Fecha Creacion',
           'Nombre (from Responsables)'
         ]
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       microorganismo: record.get('Microorganismo (from Microorganismos)'),
       abreviatura: record.get('Abreviatura Hongo'),
       codigoCepa: record.get('Codigo Cepa'),
-      totalCantidadBolsas: record.get('Total Cantidad Bolsas'),
+      totalCantidadBolsas: record.get('Cantidad Bolsas'),
       fechaCreacion: record.get('Fecha Creacion'),
       responsables: record.get('Nombre (from Responsables)')
     }));
