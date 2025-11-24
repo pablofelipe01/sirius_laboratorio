@@ -43,6 +43,7 @@ interface InoculacionRecord {
     'Abreviatura'?: string[];
     'Codigo Lote'?: string;
     'Cantidad Bolsas'?: number;
+    'Cantidad Bolsas Inoculadas'?: number;
     'Total Cantidad Bolsas'?: number;
     'Cantidad Bolsas Descartadas'?: number[];
     'Realiza Registro'?: string;
@@ -693,8 +694,8 @@ export default function DashboardLabPage() {
                           </td>
                           <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-700 hidden sm:table-cell">
                             <span className="bg-gray-50 px-1 sm:px-2 py-1 rounded-md border border-gray-200 text-xs sm:text-sm">
-                              <span className="sm:hidden">{record.fields['Cantidad Bolsas'] || 0}</span>
-                              <span className="hidden sm:inline">{record.fields['Cantidad Bolsas'] || 0} bolsas</span>
+                              <span className="sm:hidden">{record.fields['Cantidad Bolsas Inoculadas'] || 0}</span>
+                              <span className="hidden sm:inline">{record.fields['Cantidad Bolsas Inoculadas'] || 0} bolsas</span>
                             </span>
                           </td>
                           <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-sm font-bold text-green-700">
@@ -808,7 +809,7 @@ export default function DashboardLabPage() {
                             <span className="text-xl sm:text-2xl mr-2 flex-shrink-0">📦</span>
                             <p className="font-bold text-gray-700 text-xs sm:text-sm uppercase tracking-wide">Cantidad Inicial</p>
                           </div>
-                          <p className="font-bold text-sm sm:text-lg text-gray-900 truncate">{selectedLoteInfo.inoculacion.fields['Cantidad Bolsas'] || 0} bolsas</p>
+                          <p className="font-bold text-sm sm:text-lg text-gray-900 truncate">{selectedLoteInfo.inoculacion.fields['Cantidad Bolsas Inoculadas'] || 0} bolsas</p>
                         </div>
                         <div className="bg-white p-5 rounded-xl shadow-sm border border-indigo-200 hover:shadow-md transition-shadow">
                           <div className="flex items-center mb-2">
