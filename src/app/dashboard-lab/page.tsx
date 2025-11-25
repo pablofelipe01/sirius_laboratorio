@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import VoiceFilterController from '@/components/VoiceFilterController';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 interface DashboardLabRecord {
   id: string;
@@ -232,6 +233,11 @@ export default function DashboardLabPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedLoteInfo, setSelectedLoteInfo] = useState<LoteCompleteInfo | null>(null);
 
+  // Estados para analytics
+  const [analyticsData, setAnalyticsData] = useState<any[]>([]);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<'weekly' | 'monthly' | 'annual'>('monthly');
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
   useEffect(() => {
     fetchInoculacionData();
   }, []);
@@ -243,6 +249,10 @@ export default function DashboardLabPage() {
   useEffect(() => {
     extractUniqueValues();
   }, [records]);
+
+  useEffect(() => {
+    fetchAnalyticsData(analyticsPeriod);
+  }, [analyticsPeriod]);
 
   const fetchInoculacionData = async () => {
     try {
@@ -346,7 +356,46 @@ export default function DashboardLabPage() {
     });
   };
 
-
+  const fetchAnalyticsData = async (period: 'weekly' | 'monthly' | 'annual' = 'monthly') => {
+    try {
+      setAnalyticsLoading(true);
+      const response = await fetch(`/api/dashboard-analytics?period=${period}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics data');
+      }
+      const data = await response.json();
+      
+      // Transform data to show by microorganism instead of by period
+      const microorganismData: { [key: string]: { inoculated: number; discarded: number; harvested: number } } = {};
+      
+      data.data.forEach((periodData: any) => {
+        if (periodData.byMicroorganism) {
+          Object.entries(periodData.byMicroorganism).forEach(([microorganism, metrics]: [string, any]) => {
+            if (!microorganismData[microorganism]) {
+              microorganismData[microorganism] = { inoculated: 0, discarded: 0, harvested: 0 };
+            }
+            microorganismData[microorganism].inoculated += metrics.inoculated || 0;
+            microorganismData[microorganism].discarded += metrics.discarded || 0;
+            microorganismData[microorganism].harvested += metrics.harvested || 0;
+          });
+        }
+      });
+      
+      // Convert to array format for the chart
+      const chartData = Object.entries(microorganismData).map(([microorganism, metrics]) => ({
+        microorganism,
+        inoculated: metrics.inoculated,
+        discarded: metrics.discarded,
+        harvested: metrics.harvested
+      }));
+      
+      setAnalyticsData(chartData);
+    } catch (err) {
+      console.error('Error fetching analytics data:', err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -610,6 +659,86 @@ export default function DashboardLabPage() {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Gráfico de Analytics */}
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-4 sm:mb-6 lg:mb-8">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-green-600 to-teal-600">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-semibold text-white">📊 Análisis de Producción</h2>
+                    <p className="text-green-100 text-xs sm:text-sm">Bolsas inoculadas, descartadas y cosechadas por microorganismo (filtrado por período)</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAnalyticsPeriod('weekly')}
+                      className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                        analyticsPeriod === 'weekly' ? 'bg-white text-green-600' : 'bg-green-500 text-white hover:bg-green-400'
+                      }`}
+                    >
+                      Semanal
+                    </button>
+                    <button
+                      onClick={() => setAnalyticsPeriod('monthly')}
+                      className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                        analyticsPeriod === 'monthly' ? 'bg-white text-green-600' : 'bg-green-500 text-white hover:bg-green-400'
+                      }`}
+                    >
+                      Mensual
+                    </button>
+                    <button
+                      onClick={() => setAnalyticsPeriod('annual')}
+                      className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                        analyticsPeriod === 'annual' ? 'bg-white text-green-600' : 'bg-green-500 text-white hover:bg-green-400'
+                      }`}
+                    >
+                      Anual
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6">
+                {analyticsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                    <span className="ml-3 text-gray-600">Cargando datos analíticos...</span>
+                  </div>
+                ) : analyticsData.length > 0 ? (
+                  <div className="h-80 sm:h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={analyticsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="microorganism"
+                          tick={{ fontSize: 12 }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value, name) => [
+                            `${value} bolsas`,
+                            name === 'Inoculadas' ? 'Bolsas Inoculadas' :
+                            name === 'Descartadas' ? 'Bolsas Descartadas' : 
+                            name === 'Cosechadas' ? 'Bolsas Cosechadas' : name
+                          ]}
+                          labelFormatter={(label) => `Microorganismo: ${label}`}
+                        />
+                        <Legend />
+                        <Bar dataKey="inoculated" fill="#3B82F6" name="Inoculadas" />
+                        <Bar dataKey="discarded" fill="#e61a1aff" name="Descartadas" />
+                        <Bar dataKey="harvested" fill="#10B981" name="Cosechadas" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">No hay datos disponibles para el período seleccionado</p>
+                  </div>
+                )}
               </div>
             </div>
 

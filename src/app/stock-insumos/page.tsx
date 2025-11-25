@@ -80,6 +80,10 @@ const StockInsumosPage = () => {
   const [searchInsumo, setSearchInsumo] = useState<{[key: number]: string}>({});
   const [dropdownOpen, setDropdownOpen] = useState<{[key: number]: boolean}>({});
 
+  // Estados para búsqueda en dropdowns del formulario de descontar
+  const [searchInsumoDescontar, setSearchInsumoDescontar] = useState<{[key: number]: string}>({});
+  const [dropdownOpenDescontar, setDropdownOpenDescontar] = useState<{[key: number]: boolean}>({});
+
   // Nuevo estado para manejar las entradas disponibles
   const [entradasDisponibles, setEntradasDisponibles] = useState<{[key: number]: any[]}>({});
   const [loadingEntradas, setLoadingEntradas] = useState<{[key: number]: boolean}>({});
@@ -413,6 +417,8 @@ const StockInsumosPage = () => {
       });
       setEntradasDisponibles({});
       setLoadingEntradas({});
+      setSearchInsumoDescontar({});
+      setDropdownOpenDescontar({});
       setShowDescontarStockForm(false);
       fetchInsumos(); // Recargar la lista
     } catch (error) {
@@ -539,6 +545,8 @@ const StockInsumosPage = () => {
       });
       setEntradasDisponibles({});
       setLoadingEntradas({});
+      setSearchInsumoDescontar({});
+      setDropdownOpenDescontar({});
       setShowDescontarStockForm(false);
     }
   };
@@ -1321,6 +1329,7 @@ const StockInsumosPage = () => {
                   <button
                     type="button"
                     onClick={() => {
+                      const newIndex = descontarData.insumos.length;
                       setDescontarData({
                         ...descontarData,
                         insumos: [
@@ -1332,6 +1341,9 @@ const StockInsumosPage = () => {
                           }
                         ]
                       });
+                      // Inicializar estados de búsqueda para el nuevo insumo
+                      setSearchInsumoDescontar({...searchInsumoDescontar, [newIndex]: ''});
+                      setDropdownOpenDescontar({...dropdownOpenDescontar, [newIndex]: false});
                     }}
                     className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                   >
@@ -1373,6 +1385,29 @@ const StockInsumosPage = () => {
                             
                             setEntradasDisponibles(reindexedEntradas);
                             setLoadingEntradas(reindexedLoading);
+                            
+                            // Limpiar y reindexar estados de búsqueda
+                            const newSearchInsumoDescontar = {...searchInsumoDescontar};
+                            const newDropdownOpenDescontar = {...dropdownOpenDescontar};
+                            delete newSearchInsumoDescontar[index];
+                            delete newDropdownOpenDescontar[index];
+                            
+                            // Reindexar los estados restantes
+                            const reindexedSearch: {[key: number]: string} = {};
+                            const reindexedDropdown: {[key: number]: boolean} = {};
+                            Object.keys(newSearchInsumoDescontar).forEach((key) => {
+                              const numKey = Number(key);
+                              if (numKey > index) {
+                                reindexedSearch[numKey - 1] = newSearchInsumoDescontar[numKey];
+                                reindexedDropdown[numKey - 1] = newDropdownOpenDescontar[numKey];
+                              } else if (numKey < index) {
+                                reindexedSearch[numKey] = newSearchInsumoDescontar[numKey];
+                                reindexedDropdown[numKey] = newDropdownOpenDescontar[numKey];
+                              }
+                            });
+                            
+                            setSearchInsumoDescontar(reindexedSearch);
+                            setDropdownOpenDescontar(reindexedDropdown);
                           }}
                           className="text-red-600 hover:text-red-800 transition-colors"
                         >
@@ -1387,34 +1422,73 @@ const StockInsumosPage = () => {
                         <label className="block text-sm font-semibold text-gray-800 mb-2">
                           Insumo *
                         </label>
-                        <select
-                          value={insumo.insumoId}
-                          onChange={(e) => {
-                            const nuevosInsumos = [...descontarData.insumos];
-                            nuevosInsumos[index].insumoId = e.target.value;
-                            nuevosInsumos[index].entradaId = ''; // Reset entrada selection
-                            setDescontarData({ ...descontarData, insumos: nuevosInsumos });
-                            
-                            // Cargar entradas disponibles para este insumo
-                            fetchEntradasDisponibles(e.target.value, index);
-                          }}
-                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
-                          required
-                        >
-                          <option value="">Seleccionar insumo</option>
-                          {insumos.map(insumoOption => {
-                            const hasName = insumoOption.fields.nombre && insumoOption.fields.nombre.trim();
-                            const totalUnidades = insumoOption.fields['Total Insumo Unidades'] || 0;
-                            const unidadPresentacion = insumoOption.fields['Unidad Ingresa Insumo'] || insumoOption.fields.unidad_medida || 'unidad';
-                            return (
-                              <option key={insumoOption.id} value={insumoOption.id}>
-                                {hasName ? insumoOption.fields.nombre : `Sin nombre - ${insumoOption.id.slice(-6)}`} 
-                                (Stock: {Number(totalUnidades).toFixed(2)} {unidadPresentacion})
-                              </option>
-                            );
-                          })}
-                        </select>
-                        
+                        <div className="relative">
+                          {/* Campo de búsqueda */}
+                          <input
+                            type="text"
+                            value={searchInsumoDescontar[index] || ''}
+                            onChange={(e) => {
+                              setSearchInsumoDescontar({...searchInsumoDescontar, [index]: e.target.value});
+                              setDropdownOpenDescontar({...dropdownOpenDescontar, [index]: true});
+                            }}
+                            onFocus={() => setDropdownOpenDescontar({...dropdownOpenDescontar, [index]: true})}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700 placeholder:text-gray-700 placeholder:font-semibold"
+                            placeholder="Buscar insumo..."
+                          />
+
+                          {/* Dropdown con resultados */}
+                          {dropdownOpenDescontar[index] && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {filtrarInsumos(searchInsumoDescontar[index] || '').length > 0 ? (
+                                filtrarInsumos(searchInsumoDescontar[index] || '').map(insumoOption => {
+                                  const hasName = insumoOption.fields.nombre && insumoOption.fields.nombre.trim();
+                                  const totalUnidades = insumoOption.fields['Total Insumo Unidades'] || 0;
+                                  const unidad = insumoOption.fields['Unidad Ingresa Insumo'] || insumoOption.fields.unidad_medida || 'unidad';
+                                  const displayName = hasName ? insumoOption.fields.nombre : `Sin nombre - ${insumoOption.id.slice(-6)}`;
+
+                                  return (
+                                    <div
+                                      key={insumoOption.id}
+                                      onClick={() => {
+                                        const nuevosInsumos = [...descontarData.insumos];
+                                        nuevosInsumos[index].insumoId = insumoOption.id;
+                                        nuevosInsumos[index].entradaId = ''; // Reset entrada selection
+                                        setDescontarData({ ...descontarData, insumos: nuevosInsumos });
+                                        setSearchInsumoDescontar({...searchInsumoDescontar, [index]: displayName || ''});
+                                        setDropdownOpenDescontar({...dropdownOpenDescontar, [index]: false});
+
+                                        // Cargar entradas disponibles para este insumo
+                                        fetchEntradasDisponibles(insumoOption.id, index);
+                                      }}
+                                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                    >
+                                      <div className="font-medium text-gray-900">{displayName}</div>
+                                      <div className="text-sm text-gray-500 flex items-center space-x-2">
+                                        <span>📦 Stock: {Number(totalUnidades).toFixed(2)} {unidad}</span>
+                                      </div>
+                                      {insumoOption.fields.categoria_insumo && (
+                                        <div className="text-xs text-gray-400">{insumoOption.fields.categoria_insumo}</div>
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="px-3 py-2 text-gray-500 text-center">
+                                  No se encontraron insumos
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Botón para cerrar dropdown */}
+                          {dropdownOpenDescontar[index] && (
+                            <div
+                              className="fixed inset-0 z-5"
+                              onClick={() => setDropdownOpenDescontar({...dropdownOpenDescontar, [index]: false})}
+                            />
+                          )}
+                        </div>
+
                         {/* Mostrar información del insumo seleccionado */}
                         {insumo.insumoId && (
                           <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
@@ -1423,7 +1497,7 @@ const StockInsumosPage = () => {
                               <span>
                                 <strong>Unidad:</strong> {
                                   insumos.find(ins => ins.id === insumo.insumoId)?.fields['Unidad Ingresa Insumo'] ||
-                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida || 
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields.unidad_medida ||
                                   'Sin unidad'
                                 }
                               </span>
