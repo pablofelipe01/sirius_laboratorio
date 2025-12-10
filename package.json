@@ -21,7 +21,7 @@
     "framer-motion": "^12.23.12",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
-    "next": "15.4.2",
+    "next": "15.4.8",
     "openai": "^5.10.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
