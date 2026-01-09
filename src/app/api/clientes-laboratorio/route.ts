@@ -34,7 +34,11 @@ export async function GET() {
           'ID',
           'Nombre',
           'NIT',
-          'Contacto Cliente'
+          'Contacto Cliente',
+          'Remisiones Laboratorio',
+          'Cosecha Laboratorio',
+          'ID_Cliente_Flujo_Caja_DB',
+          'ID_Cliente_Ordenes_Compras'
         ]
       })
       .firstPage();
@@ -43,7 +47,11 @@ export async function GET() {
       id: record.get('ID'),
       nombre: record.get('Nombre'),
       nit: record.get('NIT'),
-      contacto: record.get('Contacto Cliente')
+      contacto: record.get('Contacto Cliente'),
+      remisionesLaboratorio: record.get('Remisiones Laboratorio') || [],
+      cosechaLaboratorio: record.get('Cosecha Laboratorio') || [],
+      idClienteFlujoCaja: record.get('ID_Cliente_Flujo_Caja_DB'),
+      idClienteOrdenesCompras: record.get('ID_Cliente_Ordenes_Compras')
     }));
 
     console.log('✅ Clientes obtenidos:', {

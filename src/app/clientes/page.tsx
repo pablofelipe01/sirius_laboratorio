@@ -1,436 +1,442 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
-interface OrdenCompra {
+interface Cliente {
   id: string;
-  cliente: string;
-  fechaPedido: string;
-  fechaEntrega: string;
-  estado: string;
-  productos: string[];
-  cantidades: number[];
-  observaciones: string;
-  total: number;
-  prioridad: string;
+  nombre: string;
+  nit: string;
+  contacto: string;
+  remisionesLaboratorio: string[];
+  cosechaLaboratorio: string[];
+  idClienteFlujoCaja: string;
+  idClienteOrdenesCompras: string;
+}
+
+interface ProductoRemision {
+  producto: string;
+  cantidad: string;
+}
+
+interface RemisionModalProps {
+  onClose: () => void;
+  clientes: Cliente[];
+}
+
+function RemisionModal({ onClose, clientes }: RemisionModalProps) {
+  const { user } = useAuth();
+  const [responsable, setResponsable] = useState('');
+  const [clienteSeleccionado, setClienteSeleccionado] = useState('');
+  const [nitCliente, setNitCliente] = useState('');
+  const [ubicacion, setUbicacion] = useState('');
+  const [productos, setProductos] = useState<ProductoRemision[]>([{ producto: '', cantidad: '' }]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Efecto para establecer el responsable cuando el usuario esté disponible
+  useEffect(() => {
+    if (user?.nombre) {
+      setResponsable(user.nombre);
+    }
+  }, [user?.nombre]);
+
+  const agregarProducto = () => {
+    setProductos([...productos, { producto: '', cantidad: '' }]);
+  };
+
+  const removerProducto = (index: number) => {
+    setProductos(productos.filter((_, i) => i !== index));
+  };
+
+  const actualizarProducto = (index: number, campo: 'producto' | 'cantidad', valor: string) => {
+    const nuevosProductos = [...productos];
+    nuevosProductos[index] = {
+      ...nuevosProductos[index],
+      [campo]: valor || ''
+    };
+    setProductos(nuevosProductos);
+  };
+
+  const handleClienteChange = (clienteId: string) => {
+    setClienteSeleccionado(clienteId);
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (cliente) {
+      setNitCliente(cliente.nit || '');
+    } else {
+      setNitCliente('');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    // Aquí iría la lógica para enviar la remisión
+    console.log('Enviando remisión:', {
+      responsable,
+      clienteSeleccionado,
+      nitCliente,
+      ubicacion,
+      productos
+    });
+    
+    // Simular envío
+    setTimeout(() => {
+      setIsSubmitting(false);
+      onClose();
+      alert('Remisión enviada exitosamente');
+    }, 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-6 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+          
+          <div className="relative z-10 flex justify-between items-start">
+            <div className="flex-1 text-center">
+              <h2 className="text-3xl font-bold">Registro de Remisión</h2>
+              <p className="text-blue-100 mt-1">Sistema de entregas Sirius</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2 transition-all duration-200"
+            >
+              <span className="text-2xl">×</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="px-8 py-6 space-y-8 overflow-y-auto max-h-[60vh]">
+          {/* Información del Responsable */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-blue-500 p-2 rounded-lg mr-3">
+                <span className="text-white text-xl">👤</span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Información del Responsable</h3>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Responsable de entrega
+              </label>
+              <input
+                type="text"
+                value={responsable}
+                readOnly
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-900 text-base cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          {/* Información del Cliente */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-green-500 p-2 rounded-lg mr-3">
+                <span className="text-white text-xl">🏢</span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Información del Cliente</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Cliente
+                </label>
+                <select
+                  value={clienteSeleccionado}
+                  onChange={(e) => handleClienteChange(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+                  required
+                >
+                  <option value="" className="text-gray-400">Seleccione un cliente</option>
+                  {clientes.map((cliente) => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  NIT o Cédula del cliente
+                </label>
+                <input
+                  type="text"
+                  value={nitCliente}
+                  onChange={(e) => setNitCliente(e.target.value)}
+                  placeholder="Ejemplo: 901145626-1"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Ubicación */}
+          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border border-yellow-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-yellow-500 p-2 rounded-lg mr-3">
+                <span className="text-white text-xl">📍</span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Ubicación</h3>
+            </div>
+            <div>
+              <input
+                type="text"
+                value={ubicacion}
+                onChange={(e) => setUbicacion(e.target.value)}
+                placeholder="Ejemplo: Calle 123 #45-67, Bogotá"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Productos a Entregar */}
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-purple-500 p-2 rounded-lg mr-3">
+                <span className="text-white text-xl">📦</span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Productos a Entregar</h3>
+            </div>
+            <div className="space-y-6">
+              {productos.map((producto, index) => (
+                <div key={index} className="bg-white rounded-lg p-4 border-2 border-gray-100 shadow-sm">
+                  <div className="flex items-start justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-gray-700">Producto {index + 1}</h4>
+                    {productos.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removerProducto(index)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full p-1 transition-colors duration-200"
+                      >
+                        <span className="text-xl font-bold">✖</span>
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Producto
+                      </label>
+                      <select
+                        value={producto.producto}
+                        onChange={(e) => actualizarProducto(index, 'producto', e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+                        required
+                      >
+                        <option value="" className="text-gray-400">Seleccione un producto</option>
+                        <option value="Hongos Shiitake">Hongos Shiitake</option>
+                        <option value="Hongos Ostra">Hongos Ostra</option>
+                        <option value="Trichoderma">Trichoderma</option>
+                        <option value="Metarhizium">Metarhizium</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Cantidad a entregar (litros)
+                      </label>
+                      <input
+                        type="number"
+                        value={producto.cantidad}
+                        onChange={(e) => actualizarProducto(index, 'cantidad', e.target.value)}
+                        placeholder="Ejemplo: 100"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+                        min="1"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              <button
+                type="button"
+                onClick={agregarProducto}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-4 rounded-xl hover:from-purple-600 hover:to-pink-600 focus:ring-4 focus:ring-purple-500/20 transition-all duration-200 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                <span className="mr-2">➕</span>
+                Agregar Producto
+              </button>
+            </div>
+          </div>
+
+          {/* Botón de envío */}
+          <div className="flex justify-end space-x-4 pt-6 border-t-2 border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-8 py-3 border-2 border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 focus:ring-4 focus:ring-gray-500/20 transition-all duration-200 font-semibold text-base"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 focus:ring-4 focus:ring-blue-500/20 disabled:opacity-50 transition-all duration-200 font-semibold text-base shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <span className="mr-2 text-xl">🚀</span>
+                  Enviar Remisión
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 export default function ClientesPage() {
   const { user } = useAuth();
-  const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('pendiente');
-  const [ordenamientoPor, setOrdenamientoPor] = useState('fechaEntrega');
+  const [showRemisionForm, setShowRemisionForm] = useState(false);
 
   useEffect(() => {
     if (user) {
-      fetchOrdenesPendientes();
+      fetchClientes();
     }
-  }, [user, filtroEstado, ordenamientoPor]);
+  }, [user]);
 
-  const fetchOrdenesPendientes = async () => {
+  const fetchClientes = async () => {
     try {
       setLoading(true);
-      // Usar datos de ejemplo por ahora - cambia a '/api/ordenes-compras' cuando tengas Airtable configurado
-      const response = await fetch(`/api/ordenes-compras-ejemplo?estado=${filtroEstado}&orderBy=${ordenamientoPor}`);
+      const response = await fetch('/api/clientes-laboratorio');
       const data = await response.json();
       
       if (data.success) {
-        setOrdenes(data.ordenes || []);
-        if (data.message) {
-          console.log(data.message); // Mensaje informativo sobre datos de ejemplo
-        }
+        setClientes(data.clientes || []);
       } else {
-        setError(data.error || 'Error al cargar las órdenes');
+        setError(data.error || 'Error al cargar los clientes');
       }
     } catch (err) {
-      console.error('Error fetching órdenes:', err);
+      console.error('Error fetching clientes:', err);
       setError('Error de conexión');
     } finally {
       setLoading(false);
     }
   };
 
-  const actualizarEstadoOrden = async (ordenId: string, nuevoEstado: string) => {
-    try {
-      // Para datos de ejemplo, solo simulamos la actualización
-      const response = await fetch(`/api/ordenes-compras-ejemplo/${ordenId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          estado: nuevoEstado,
-          actualizadoPor: user?.nombre 
-        }),
-      });
-
-      if (response.ok) {
-        // Actualizar localmente para datos de ejemplo
-        setOrdenes(prevOrdenes => 
-          prevOrdenes.map(orden => 
-            orden.id === ordenId 
-              ? { ...orden, estado: nuevoEstado }
-              : orden
-          )
-        );
-      } else {
-        setError('Error al actualizar el estado (simulación)');
-      }
-    } catch (err) {
-      console.error('Error updating orden:', err);
-      setError('Error de conexión al actualizar');
-    }
-  };
-
-  const formatearFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'pendiente': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'en_proceso': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'listo': return 'bg-green-100 text-green-800 border-green-200';
-      case 'entregado': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'cancelado': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getPrioridadColor = (prioridad: string) => {
-    switch (prioridad) {
-      case 'alta': return 'bg-red-100 text-red-800';
-      case 'media': return 'bg-yellow-100 text-yellow-800';
-      case 'baja': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getDiasRestantes = (fechaEntrega: string) => {
-    const hoy = new Date();
-    const entrega = new Date(fechaEntrega);
-    const diferencia = Math.ceil((entrega.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-    return diferencia;
-  };
-
-  if (!user) {
-    return (
-      <div className="min-h-screen relative">
-        {/* Background Image */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: "url('/LABI, el robot científico.png')",
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-purple-900/85 to-pink-900/90"></div>
-        </div>
-        
-        <Navbar />
-        
-        <div className="relative z-10 flex items-center justify-center min-h-screen pt-20">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-400 mx-auto"></div>
-            <p className="mt-4 text-white text-lg">Verificando autenticación...</p>
-          </div>
-        </div>
-        
-        <Footer />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen relative">
-      {/* Background Image */}
+    <>
+      <Navbar />
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="min-h-screen relative pt-24"
         style={{
-          backgroundImage: "url('/LABI, el robot científico.png')",
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4)), url('https://res.cloudinary.com/dvnuttrox/image/upload/v1752168289/Lab_banner_xhhlfe.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-purple-900/85 to-pink-900/90"></div>
-      </div>
-      
-      <Navbar />
-      
-      <div className="relative z-10 py-8 pt-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">
-              👥 Gestión de Clientes
-            </h1>
-            <p className="text-lg text-gray-200">
-              Consulta y gestiona las órdenes de compra pendientes
-            </p>
-            <div className="mt-4">
-              <button
-                onClick={() => window.location.href = '/clientes/nueva'}
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 transition-colors font-medium"
-              >
-                ➕ Nueva Orden de Compra
-              </button>
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold text-white mb-2">
+                👥 Dashboard Clientes Laboratorio
+              </h1>
+              <p className="text-lg text-gray-200">
+                Gestión y visualización de clientes del laboratorio
+              </p>
             </div>
-            {/* Nota informativa sobre datos de ejemplo */}
-            <div className="mt-4 bg-blue-100/90 border border-blue-400 text-blue-700 px-4 py-2 rounded-lg inline-block backdrop-blur-sm">
-              <span className="text-blue-500 mr-2">ℹ️</span>
-              Mostrando datos de ejemplo. Configura tu tabla de Airtable para datos reales.
-            </div>
-          </div>
 
-          {/* Filtros y controles */}
-          <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg p-6 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Estado
-                </label>
-                <select
-                  value={filtroEstado}
-                  onChange={(e) => setFiltroEstado(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                >
-                  <option value="pendiente">Pendientes</option>
-                  <option value="en_proceso">En Proceso</option>
-                  <option value="listo">Listos</option>
-                  <option value="entregado">Entregados</option>
-                  <option value="todos">Todos</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ordenar por
-                </label>
-                <select
-                  value={ordenamientoPor}
-                  onChange={(e) => setOrdenamientoPor(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                >
-                  <option value="fechaEntrega">Fecha de Entrega</option>
-                  <option value="fechaPedido">Fecha de Pedido</option>
-                  <option value="prioridad">Prioridad</option>
-                  <option value="cliente">Cliente</option>
-                </select>
-              </div>
-
-              <div className="flex items-end">
+            {/* Estadísticas rápidas */}
+            {/* Tabla de clientes */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-gray-900">Lista de Clientes</h2>
                 <button
-                  onClick={fetchOrdenesPendientes}
-                  disabled={loading}
-                  className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-colors"
+                  onClick={() => setShowRemisionForm(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 transition-colors font-medium"
                 >
-                  {loading ? (
-                    <span className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Cargando...
-                    </span>
-                  ) : (
-                    '🔄 Actualizar'
-                  )}
+                  📋 Generar Remisión
                 </button>
               </div>
-            </div>
-          </div>
-
-          {/* Error message */}
-          {error && (
-            <div className="bg-red-100/90 backdrop-blur-sm border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
-              <div className="flex items-center">
-                <span className="text-red-500 mr-2">❌</span>
-                {error}
-              </div>
-            </div>
-          )}
-
-          {/* Estadísticas rápidas */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-4">
-              <div className="flex items-center">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <span className="text-2xl">⏳</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-600">Pendientes</p>
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {ordenes.filter(o => o.estado === 'pendiente').length}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-4">
-              <div className="flex items-center">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <span className="text-2xl">🔄</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-600">En Proceso</p>
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {ordenes.filter(o => o.estado === 'en_proceso').length}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-4">
-              <div className="flex items-center">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <span className="text-2xl">✅</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-600">Listos</p>
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {ordenes.filter(o => o.estado === 'listo').length}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-4">
-              <div className="flex items-center">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <span className="text-2xl">🚨</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-600">Urgentes</p>
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {ordenes.filter(o => getDiasRestantes(o.fechaEntrega) <= 2 && o.estado !== 'entregado').length}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Lista de órdenes */}
-          <div className="space-y-4">
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto"></div>
-                <p className="mt-4 text-gray-200">Cargando órdenes...</p>
-              </div>
-            ) : ordenes.length === 0 ? (
-              <div className="text-center py-12 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg">
-                <span className="text-6xl">📋</span>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">No hay órdenes</h3>
-                <p className="mt-2 text-gray-600">
-                  No se encontraron órdenes con los filtros seleccionados.
-                </p>
-              </div>
-            ) : (
-              ordenes.map((orden) => {
-                const diasRestantes = getDiasRestantes(orden.fechaEntrega);
-                return (
-                  <div key={orden.id} className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-3">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {orden.cliente}
-                          </h3>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getEstadoColor(orden.estado)}`}>
-                            {orden.estado.replace('_', ' ').toUpperCase()}
-                          </span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPrioridadColor(orden.prioridad)}`}>
-                            {orden.prioridad?.toUpperCase() || 'NORMAL'}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                          <div>
-                            <p className="text-sm text-gray-600">Fecha Pedido</p>
-                            <p className="font-medium">{formatearFecha(orden.fechaPedido)}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Fecha Entrega</p>
-                            <p className={`font-medium ${diasRestantes <= 2 && orden.estado !== 'entregado' ? 'text-red-600' : ''}`}>
-                              {formatearFecha(orden.fechaEntrega)}
-                              {diasRestantes <= 2 && orden.estado !== 'entregado' && (
-                                <span className="ml-2 text-red-500">🚨</span>
-                              )}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Días Restantes</p>
-                            <p className={`font-medium ${diasRestantes <= 2 ? 'text-red-600' : diasRestantes <= 7 ? 'text-yellow-600' : 'text-green-600'}`}>
-                              {diasRestantes > 0 ? `${diasRestantes} días` : diasRestantes === 0 ? 'HOY' : `${Math.abs(diasRestantes)} días atrasado`}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mb-4">
-                          <p className="text-sm text-gray-600 mb-1">Productos</p>
-                          <div className="flex flex-wrap gap-2">
-                            {orden.productos?.map((producto, index) => (
-                              <span key={index} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-lg text-sm">
-                                {producto} ({orden.cantidades?.[index] || 0})
-                              </span>
-                            )) || <span className="text-gray-500">Sin productos especificados</span>}
-                          </div>
-                        </div>
-
-                        {orden.observaciones && (
-                          <div className="mb-4">
-                            <p className="text-sm text-gray-600 mb-1">Observaciones</p>
-                            <p className="text-sm bg-gray-50 p-2 rounded-lg">{orden.observaciones}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="lg:ml-6 mt-4 lg:mt-0">
-                        <div className="flex flex-col space-y-2">
-                          {orden.estado === 'pendiente' && (
-                            <button
-                              onClick={() => actualizarEstadoOrden(orden.id, 'en_proceso')}
-                              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                            >
-                              ▶️ Iniciar Proceso
-                            </button>
-                          )}
-                          {orden.estado === 'en_proceso' && (
-                            <button
-                              onClick={() => actualizarEstadoOrden(orden.id, 'listo')}
-                              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-                            >
-                              ✅ Marcar Listo
-                            </button>
-                          )}
-                          {orden.estado === 'listo' && (
-                            <button
-                              onClick={() => actualizarEstadoOrden(orden.id, 'entregado')}
-                              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm"
-                            >
-                              📦 Marcar Entregado
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {/* TODO: Ver detalles */}}
-                            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
-                          >
-                            👁️ Ver Detalles
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+              
+              <div className="overflow-x-auto">
+                {loading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Cargando clientes...</p>
                   </div>
-                );
-              })
-            )}
+                ) : clientes.length === 0 ? (
+                  <div className="text-center py-12">
+                    <span className="text-6xl">👥</span>
+                    <h3 className="mt-4 text-lg font-medium text-gray-900">No hay clientes</h3>
+                    <p className="mt-2 text-gray-600">
+                      No se encontraron clientes registrados.
+                    </p>
+                  </div>
+                ) : (
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Nombre
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          NIT
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Remisiones
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Cosechas
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {clientes.map((cliente) => (
+                        <tr key={cliente.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {cliente.nombre}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {cliente.nit}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {cliente.remisionesLaboratorio.length}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {cliente.cosechaLaboratorio.length}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      
       <Footer />
-    </div>
+
+      {/* Modal de Remisión */}
+      {showRemisionForm && (
+        <RemisionModal 
+          onClose={() => setShowRemisionForm(false)}
+          clientes={clientes}
+        />
+      )}
+    </>
   );
 }
