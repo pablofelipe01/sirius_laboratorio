@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 const BACILLUS_FORMULA: { [key: string]: number } = {
   'Dipel': Number(process.env.BACILLUS_DIPEL_PER_LITER) || 50,
   'Melaza': Number(process.env.BACILLUS_MELAZA_PER_LITER) || 20,
-  'Tomate': Number(process.env.BACILLUS_TOMATE_PER_LITER) || 10,
+  'Tomate': Number(process.env.BACILLUS_TOMATE_PER_LITER) || 1,
   'Levadura': Number(process.env.BACILLUS_LEVADURA_PER_LITER) || 0.01
 };
 

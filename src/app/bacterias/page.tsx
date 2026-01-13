@@ -157,11 +157,8 @@ export default function BacteriasPage() {
     // Fórmula específica para Bacillus thuringiensis (por litro):
     // Dipel = 50g x litro
     // Melaza = 20g x litro  
-    // Tomate = 10g x litro
-    // Levadura = 0.01g x litro
-    
-    console.log(`📊 Calculando insumos para ${cantidadLitros} litros de Bacillus thuringiensis`);
-    
+    // Tomate = 1g x litro
+    // Extracto de Levadura = 1g x litro
     const formInsumos = [
       {
         id: 'dipel', // Se buscará dinámicamente en el backend
@@ -184,19 +181,19 @@ export default function BacteriasPage() {
       {
         id: 'tomate', // Se buscará dinámicamente en el backend
         nombre: 'Tomate',
-        cantidad: cantidadLitros * 10,
-        cantidadPorLitro: 10,
+        cantidad: cantidadLitros * 1,
+        cantidadPorLitro: 1,
         unidad: 'gr', 
         descripcion: 'Extracto de tomate - vitaminas y minerales',
         categoria: 'Suplemento'
       },
       {
-        id: 'levadura', // Se buscará dinámicamente en el backend
-        nombre: 'Levadura',
+        id: 'extracto-levadura', // Se buscará dinámicamente en el backend
+        nombre: 'Extracto de Levadura',
         cantidad: cantidadLitros * 0.01,
         cantidadPorLitro: 0.01,
         unidad: 'gr',
-        descripcion: 'Levadura nutricional - fuente de nitrógeno',
+        descripcion: 'Extracto de Levadura nutricional - fuente de nitrógeno',
         categoria: 'Nutriente'
       }
     ];
@@ -1453,7 +1450,7 @@ export default function BacteriasPage() {
                   <div className="mt-3 p-3 bg-orange-100 rounded-lg">
                     <p className="text-orange-800 text-sm font-medium flex items-center">
                       <span className="mr-2">💡</span>
-                      Fórmula estándar: Dipel (50g) + Melaza (20g) + Tomate (10g) + Levadura (0.01g) por litro
+                      Fórmula estándar: Dipel (50g) + Melaza (20g) + Tomate (1g) + Extracto de Levadura (0.01g) por litro
                     </p>
                   </div>
                   <div className="mt-2 p-3 bg-blue-100 rounded-lg">

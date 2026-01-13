@@ -194,6 +194,7 @@ const Navbar: React.FC = () => {
                       { href: "/stock-insumos", label: "Stock Insumos", emoji: "📋", color: "bg-teal-50" },
                       { href: "/clientes", label: "Clientes", emoji: "🛒", color: "bg-emerald-50" },
                       { href: "/bitacora-laboratorio", label: "Bitácora", emoji: "📝", color: "bg-indigo-50" },
+                      { href: "/calendario-produccion", label: "Calendario de Producción", emoji: "📅", color: "bg-pink-50" },
                     ]}
                   />
 
@@ -482,6 +483,18 @@ const Navbar: React.FC = () => {
                         >
                           <span className="text-xl">📝</span>
                           <span className="font-medium">Bitácora</span>
+                          <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                        
+                        <Link
+                          href="/calendario-produccion"
+                          onClick={closeMobileMenu}
+                          className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-pink-50 hover:text-pink-700 dark:text-gray-200 dark:hover:bg-pink-900/30 dark:hover:text-pink-400"
+                        >
+                          <span className="text-xl">📅</span>
+                          <span className="font-medium">Calendario de Producción</span>
                           <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
