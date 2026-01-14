@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import LoteSelector from '@/components/LoteSelector';
 
 interface Cliente {
   id: string;
@@ -32,6 +33,7 @@ function RemisionModal({ onClose, clientes }: RemisionModalProps) {
   const [clienteSeleccionado, setClienteSeleccionado] = useState('');
   const [nitCliente, setNitCliente] = useState('');
   const [ubicacion, setUbicacion] = useState('');
+  const [lotesSeleccionados, setLotesSeleccionados] = useState<string[]>([]);
   const [productos, setProductos] = useState<ProductoRemision[]>([{ producto: '', cantidad: '' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -67,6 +69,9 @@ function RemisionModal({ onClose, clientes }: RemisionModalProps) {
     } else {
       setNitCliente('');
     }
+    
+    // Limpiar lotes seleccionados cuando cambia el cliente
+    setLotesSeleccionados([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,6 +84,7 @@ function RemisionModal({ onClose, clientes }: RemisionModalProps) {
       clienteSeleccionado,
       nitCliente,
       ubicacion,
+      lotesSeleccionados,
       productos
     });
     
@@ -196,6 +202,22 @@ function RemisionModal({ onClose, clientes }: RemisionModalProps) {
                 required
               />
             </div>
+          </div>
+
+          {/* Selector de Lotes */}
+          <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-teal-500 p-2 rounded-lg mr-3">
+                <span className="text-white text-xl">🌾</span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Lotes del Cliente</h3>
+            </div>
+            <LoteSelector
+              clienteId={clienteSeleccionado}
+              lotesSeleccionados={lotesSeleccionados}
+              onLotesChange={setLotesSeleccionados}
+              disabled={isSubmitting}
+            />
           </div>
 
           {/* Productos a Entregar */}

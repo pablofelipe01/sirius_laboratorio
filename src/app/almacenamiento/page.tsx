@@ -34,6 +34,12 @@ export default function AlmacenamientoPage() {
   console.log('🏗️ ALMACENAMIENTO: Componente renderizando...');
   
   const { user } = useAuth();
+  
+  console.log('👤 ALMACENAMIENTO: Datos del usuario:', {
+    userExists: !!user,
+    userName: user?.nombre || 'no disponible',
+    userData: user || 'no hay datos'
+  });
 
   // Función para calcular la fecha de recogida
   const calcularFechaRecogida = (fechaInoculacion: string, microorganismo: string) => {

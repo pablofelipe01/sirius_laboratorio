@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import LoteSelector from '@/components/LoteSelector';
 
 interface ProduccionEvento {
   id: string;
@@ -94,12 +95,43 @@ export default function CalendarioProduccionPage() {
   const [formData, setFormData] = useState({
     titulo: '',
     tipo: 'inoculacion' as ProduccionEvento['tipo'],
+    tipoAplicacion: 'preventivo-pc',
+    cantidadAplicacionesAno: 1,
     fecha: new Date().toISOString().split('T')[0],
     descripcion: '',
     cliente: '',
     microorganismo: '',
     litros: 0,
   });
+
+  // Lotes selection states
+  const [selectedClienteId, setSelectedClienteId] = useState<string>('');
+  const [lotesSeleccionados, setLotesSeleccionados] = useState<string[]>([]);
+
+  // Función para limpiar el formulario
+  const limpiarFormulario = () => {
+    setFormData({
+      titulo: '',
+      tipo: 'inoculacion' as ProduccionEvento['tipo'],
+      tipoAplicacion: 'preventivo-pc',
+      cantidadAplicacionesAno: 1,
+      fecha: new Date().toISOString().split('T')[0],
+      descripcion: '',
+      cliente: '',
+      microorganismo: '',
+      litros: 0,
+    });
+    setClienteSearch('');
+    setSelectedClienteId('');
+    setLotesSeleccionados([]);
+    setShowClienteDropdown(false);
+  };
+
+  // Función para cerrar modal
+  const cerrarModal = () => {
+    setShowAddModal(false);
+    limpiarFormulario();
+  };
 
   // Search states for dropdowns
   const [clienteSearch, setClienteSearch] = useState('');
@@ -298,6 +330,8 @@ export default function CalendarioProduccionPage() {
     setFormData({
       titulo: '',
       tipo: 'inoculacion',
+      tipoAplicacion: 'preventivo-pc',
+      cantidadAplicacionesAno: 1,
       fecha: new Date().toISOString().split('T')[0],
       descripcion: '',
       cliente: '',
@@ -306,6 +340,15 @@ export default function CalendarioProduccionPage() {
     });
     setClienteSearch('');
     setShowClienteDropdown(false);
+  };
+
+  const openAddModal = (clienteDefault?: string) => {
+    resetForm();
+    if (clienteDefault) {
+      setFormData(prev => ({ ...prev, cliente: clienteDefault }));
+      setClienteSearch(clienteDefault);
+    }
+    setShowAddModal(true);
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -461,7 +504,7 @@ export default function CalendarioProduccionPage() {
                           ...formData,
                           fecha: day.date.toISOString().split('T')[0]
                         });
-                        setShowAddModal(true);
+                        openAddModal();
                       }}
                     >
                       <div className={`text-sm font-medium mb-1 ${
@@ -605,22 +648,33 @@ export default function CalendarioProduccionPage() {
 
           {/* Add Event Modal */}
           {showAddModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">Agregar Evento</h2>
+            <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+                {/* Modal Header */}
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-6 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+                  
+                  <div className="relative z-10 flex justify-between items-start">
+                    <div className="flex-1">
+                      <h2 className="text-3xl font-bold mb-2">Agregar Evento</h2>
+                      <p className="text-blue-100">Calendario de Producción</p>
+                    </div>
                     <button
-                      onClick={() => setShowAddModal(false)}
-                      className="text-gray-400 hover:text-gray-600"
+                      onClick={cerrarModal}
+                      className="text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2 transition-all duration-200"
                     >
-                      ✕
+                      <span className="text-2xl font-bold">✕</span>
                     </button>
                   </div>
+                </div>
 
-                  <form onSubmit={handleAddEvento} className="space-y-4">
+                {/* Modal Content */}
+                <div className="px-8 py-6 overflow-y-auto max-h-[70vh]">
+                  <form onSubmit={handleAddEvento} className="space-y-6">
+                    {/* Fila 1: Título del evento (ancho completo) */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
                         Título del Evento *
                       </label>
                       <input
@@ -628,65 +682,78 @@ export default function CalendarioProduccionPage() {
                         required
                         value={formData.titulo}
                         onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
                         placeholder="Ej: Inoculación lote 001"
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Fila 2: Tipo de Aplicación, Cantidad de Aplicaciones y Fecha */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {/* Tipo de Aplicación */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tipo de Evento *
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          Tipo de Aplicación *
                         </label>
                         <select
                           required
-                          value={formData.tipo}
-                          onChange={(e) => setFormData({ ...formData, tipo: e.target.value as ProduccionEvento['tipo'] })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-700"
+                          value={formData.tipoAplicacion}
+                          onChange={(e) => setFormData({ ...formData, tipoAplicacion: e.target.value })}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 text-base"
                         >
-                          {tiposEvento.map(tipo => (
-                            <option key={tipo.value} value={tipo.value}>
-                              {tipo.emoji} {tipo.label}
+                          <option value="preventivo-pc">🧪 Preventivo PC</option>
+                          <option value="preventivo-control-plagas">🐛 Preventivo y Control de Plagas</option>
+                          <option value="control-ml">🔬 Control ML</option>
+                          <option value="prevencion-pestalotiopsis">🍄 Prevención de Pestalotiopsis</option>
+                        </select>
+                      </div>
+
+                      {/* Cantidad de Aplicaciones al Año */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          Aplicaciones al año *
+                        </label>
+                        <select
+                          required
+                          value={formData.cantidadAplicacionesAno}
+                          onChange={(e) => setFormData({ ...formData, cantidadAplicacionesAno: parseInt(e.target.value) })}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 text-base"
+                        >
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
+                            <option key={num} value={num}>
+                              {num} {num === 1 ? 'aplicación' : 'aplicaciones'} al año
                             </option>
                           ))}
                         </select>
                       </div>
 
+                      {/* Fecha de inicio */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Fecha *
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          Fecha de inicio *
                         </label>
                         <input
                           type="date"
                           required
                           value={formData.fecha}
                           onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-700"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 text-base"
                         />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Descripción
-                      </label>
-                      <textarea
-                        value={formData.descripcion}
-                        onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                        rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
-                        placeholder="Detalles adicionales del evento..."
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Fila 3: Cliente y Microorganismo */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Cliente */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
                           Cliente
                         </label>
                         {loadingClientes ? (
-                          <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
-                            Cargando clientes...
+                          <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-base">
+                            <div className="flex items-center">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-3"></div>
+                              Cargando clientes...
+                            </div>
                           </div>
                         ) : (
                           <div className="relative cliente-dropdown-container">
@@ -699,22 +766,24 @@ export default function CalendarioProduccionPage() {
                               }}
                               onFocus={() => setShowClienteDropdown(true)}
                               placeholder="Buscar cliente..."
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-black placeholder:text-black"
+                              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
                             />
                             {showClienteDropdown && filteredClientes.length > 0 && (
-                              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              <div className="absolute z-[60] w-full mt-1 bg-white border-2 border-gray-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                                 {filteredClientes.map((cliente) => (
                                   <div
                                     key={cliente.id}
                                     onClick={() => {
                                       setFormData({ ...formData, cliente: cliente.nombre });
                                       setClienteSearch(cliente.nombre);
+                                      setSelectedClienteId(cliente.id);
+                                      setLotesSeleccionados([]); // Limpiar lotes seleccionados
                                       setShowClienteDropdown(false);
                                     }}
-                                    className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                    className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
                                   >
                                     <div className="font-medium text-gray-900">{cliente.nombre}</div>
-                                    <div className="text-xs text-gray-500">{cliente.ciudad} - NIT: {cliente.nit}</div>
+                                    <div className="text-sm text-gray-500">{cliente.ciudad} - NIT: {cliente.nit}</div>
                                   </div>
                                 ))}
                               </div>
@@ -723,19 +792,23 @@ export default function CalendarioProduccionPage() {
                         )}
                       </div>
 
+                      {/* Microorganismo */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
                           Microorganismo
                         </label>
                         {loadingMicroorganismos ? (
-                          <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
-                            Cargando microorganismos...
+                          <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-base">
+                            <div className="flex items-center">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-3"></div>
+                              Cargando...
+                            </div>
                           </div>
                         ) : (
                           <select
                             value={formData.microorganismo}
                             onChange={(e) => setFormData({ ...formData, microorganismo: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-700"
+                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 text-base"
                           >
                             <option value="" className="text-gray-400">Seleccionar microorganismo...</option>
                             {microorganismos.map((micro) => (
@@ -746,39 +819,79 @@ export default function CalendarioProduccionPage() {
                           </select>
                         )}
                       </div>
+                    </div>
 
+                    {/* Fila 4: Descripción y Litros */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Descripción */}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          Descripción
+                        </label>
+                        <textarea
+                          value={formData.descripcion}
+                          onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                          rows={3}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base resize-none"
+                          placeholder="Detalles adicionales del evento..."
+                        />
+                      </div>
+
+                      {/* Litros */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
                           Litros
                         </label>
                         <input
                           type="number"
                           value={formData.litros}
                           onChange={(e) => setFormData({ ...formData, litros: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
-                          placeholder="Cantidad en litros"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+                          placeholder="0"
                           min="0"
                           step="0.1"
                         />
                       </div>
                     </div>
 
-                    <div className="flex gap-3 pt-4">
-                      <button
-                        type="submit"
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg"
-                      >
-                        Crear Evento
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddModal(false)}
-                        className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
+                    {/* Selector de Lotes - Sección amplia dedicada */}
+                    {selectedClienteId && (
+                      <div className="border-t-2 border-gray-200 pt-8">
+                        <div className="mb-6">
+                          <h3 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+                            🎯 Selección de Lotes
+                          </h3>
+                          <p className="text-gray-600 text-sm">
+                            Selecciona los lotes específicos donde se aplicará este evento de producción.
+                          </p>
+                        </div>
+                        <LoteSelector
+                          clienteId={selectedClienteId}
+                          lotesSeleccionados={lotesSeleccionados}
+                          onLotesChange={setLotesSeleccionados}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
                   </form>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="px-8 py-6 bg-gray-50 border-t border-gray-200 flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 focus:ring-4 focus:ring-gray-500/20 transition-all duration-200 font-semibold text-base"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    onClick={handleAddEvento}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 font-semibold text-base shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
+                    Crear Evento
+                  </button>
                 </div>
               </div>
             </div>

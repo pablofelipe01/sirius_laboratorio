@@ -96,9 +96,15 @@ export async function signToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promi
 }
 
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
+  console.log('🔐 JWT: Verifying token...');
+  console.log('🔑 JWT: Using JWT_SECRET:', JWT_SECRET ? 'configured' : 'missing');
+  
   try {
     const parts = token.split('.');
+    console.log('🧩 JWT: Token parts count:', parts.length);
+    
     if (parts.length !== 3) {
+      console.log('❌ JWT: Invalid token format');
       return null;
     }
     
@@ -106,23 +112,33 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
     const message = `${encodedHeader}.${encodedPayload}`;
     
     // Verificar la firma
+    console.log('🔍 JWT: Verifying signature...');
     const isValid = await verifyHMAC(message, signature, JWT_SECRET);
+    console.log('✅ JWT: Signature valid:', isValid);
+    
     if (!isValid) {
+      console.log('❌ JWT: Signature verification failed');
       return null;
     }
     
     // Decodificar el payload
+    console.log('📋 JWT: Decoding payload...');
     const payloadJson = new TextDecoder().decode(base64UrlToUint8Array(encodedPayload));
     const payload = JSON.parse(payloadJson) as JWTPayload;
     
     // Verificar expiración
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    const now = Math.floor(Date.now() / 1000);
+    console.log('⏰ JWT: Checking expiration. Now:', now, 'Exp:', payload.exp);
+    
+    if (payload.exp && payload.exp < now) {
+      console.log('❌ JWT: Token expired');
       return null;
     }
     
+    console.log('✅ JWT: Token verified successfully for user:', payload.nombre);
     return payload;
   } catch (error) {
-    console.error('Error verifying token:', error);
+    console.error('💥 JWT: Error verifying token:', error);
     return null;
   }
 }

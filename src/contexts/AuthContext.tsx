@@ -43,31 +43,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const checkAuth = useCallback(async () => {
+    console.log('🔍 AUTH: Checking authentication...');
     try {
+      // Debug cookies
+      const allCookies = Cookies.get();
+      console.log('🍪 AUTH: All cookies available:', Object.keys(allCookies));
+      
       const token = Cookies.get('auth_token');
+      console.log('🍪 AUTH: Token from cookie:', token ? 'exists' : 'not found');
+      
+      if (token) {
+        console.log('🔑 AUTH: Token length:', token.length);
+        console.log('🔑 AUTH: Token starts with:', token.substring(0, 20) + '...');
+      }
       
       if (!token) {
+        console.log('❌ AUTH: No token found, user not authenticated');
         setIsLoading(false);
         return;
       }
 
+      console.log('🌐 AUTH: Making request to /api/auth/verify');
       const response = await fetch('/api/auth/verify', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
+      console.log('📡 AUTH: Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ AUTH: User authenticated successfully:', data.user);
         setUser(data.user);
       } else {
+        const errorData = await response.text();
+        console.error('❌ AUTH: Token validation failed:', response.status, errorData);
         // Token inválido, remover
         logout();
       }
     } catch (error) {
-      console.error('Error checking auth:', error);
+      console.error('💥 AUTH: Error checking auth:', error);
       logout();
     } finally {
+      console.log('🏁 AUTH: Check auth completed');
       setIsLoading(false);
     }
   }, []); // Array vacío porque no depende de ningún valor del estado
