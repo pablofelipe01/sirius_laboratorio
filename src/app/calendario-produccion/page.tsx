@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -8,10 +8,8 @@ import LoteSelector from '@/components/LoteSelector';
 
 interface ProduccionEvento {
   id: string;
-  titulo: string;
   tipo: 'inoculacion' | 'cosecha' | 'formulacion' | 'entrega' | 'mantenimiento';
   fecha: string;
-  descripcion: string;
   responsable?: string;
   estado: 'planificado' | 'en-proceso' | 'completado' | 'cancelado';
   prioridad: 'baja' | 'media' | 'alta';
@@ -22,6 +20,7 @@ interface ProduccionEvento {
 
 interface Cliente {
   id: string;
+  airtableId: string;
   nombre: string;
   nit: string;
   ciudad: string;
@@ -47,8 +46,36 @@ const tiposEvento = [
   { value: 'cosecha', label: 'Cosecha', emoji: '🧪', color: 'bg-green-500' },
   { value: 'formulacion', label: 'Formulación', emoji: '🧮', color: 'bg-purple-500' },
   { value: 'entrega', label: 'Entrega', emoji: '📦', color: 'bg-orange-500' },
-  { value: 'mantenimiento', label: 'Mantenimiento', emoji: '�', color: 'bg-gray-500' },
+  { value: 'mantenimiento', label: 'Mantenimiento', emoji: '🔧', color: 'bg-gray-500' },
 ];
+
+// Configuración de microorganismos predeterminados por tipo de aplicación (usando nombres para mapear con la base de datos)
+const microorganismosPredeterminados = {
+  'preventivo-pc': [
+    { nombre: 'Trichoderma harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
+    { nombre: 'Siriusbacter', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
+  ],
+  'preventivo-control-plagas': [
+    { nombre: 'Beauveria bassiana', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
+    { nombre: 'Bacillus thuringiensis', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
+  ],
+  'control-ml': [
+    { nombre: 'Purpureocillium lilacinum', dosificacionPorHa: 0.5, unidad: 'L/Ha' },
+    { nombre: 'Beauveria bassiana', dosificacionPorHa: 0.5, unidad: 'L/Ha' },
+    { nombre: 'Metarhizium anisopliae', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
+  ],
+  'prevencion-pestalotiopsis': [
+    { nombre: 'Trichoderma harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
+  ]
+};
+
+// Configuración de aplicaciones por año según el tipo
+const aplicacionesPorAno = {
+  'preventivo-pc': 4,
+  'preventivo-control-plagas': 3,
+  'control-ml': 6,
+  'prevencion-pestalotiopsis': 2
+};
 
 const estadosEvento = [
   { value: 'planificado', label: 'Planificado', color: 'bg-yellow-100 text-yellow-800' },
@@ -93,14 +120,15 @@ export default function CalendarioProduccionPage() {
 
   // Form states
   const [formData, setFormData] = useState({
-    titulo: '',
     tipo: 'inoculacion' as ProduccionEvento['tipo'],
     tipoAplicacion: 'preventivo-pc',
-    cantidadAplicacionesAno: 1,
-    fecha: new Date().toISOString().split('T')[0],
-    descripcion: '',
+    cantidadAplicacionesAno: 4,
+    periodicidadMeses: 3,  // Cada cuántos meses
+    fechasCalculadas: [] as string[], // Fechas calculadas automáticamente
+    fechaInicio: '', // Primera fecha de aplicación
+    periodo: 90, // Periodo en días (referencia)
     cliente: '',
-    microorganismo: '',
+    microorganismos: [] as {id: string, nombre: string, dosificacionPorHa: number, unidad: string}[],
     litros: 0,
   });
 
@@ -108,17 +136,92 @@ export default function CalendarioProduccionPage() {
   const [selectedClienteId, setSelectedClienteId] = useState<string>('');
   const [lotesSeleccionados, setLotesSeleccionados] = useState<string[]>([]);
 
+  // Handler para cambiar fecha de inicio
+  const handleFechaChange = useCallback((nuevaFecha: string) => {
+    setFormData(prev => {
+      const updated = { ...prev, fechaInicio: nuevaFecha };
+      return updated;
+    });
+  }, []);
+
+  // Handler para seleccionar fecha del calendario (con opción de modal)
+  const handleCalendarDateSelect = useCallback((date: Date, openModal: boolean = false) => {
+    const fechaFormateada = date.toISOString().split('T')[0];
+    setSelectedDate(date);
+    handleFechaChange(fechaFormateada);
+    if (openModal) {
+      // Pasar la fecha seleccionada al modal
+      openAddModal(undefined, fechaFormateada);
+    }
+  }, [handleFechaChange]);
+
+  // Función para calcular fechas de aplicación flexibles
+  const calcularFechasAplicacion = (fechaInicio: string, numeroAplicaciones: number, periodoMeses: number): string[] => {
+    // Validar que la fecha de inicio no esté vacía
+    if (!fechaInicio || fechaInicio.trim() === '') {
+      return [];
+    }
+    
+    const fechas: string[] = [];
+    
+    // Parsear la fecha YYYY-MM-DD correctamente
+    const [yearStr, monthStr, dayStr] = fechaInicio.split('-');
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr); // Mes 1-12
+    const day = parseInt(dayStr);
+    
+    // Validar componentes
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      return [];
+    }
+    
+    for (let i = 0; i < numeroAplicaciones; i++) {
+      let nuevoAño = year;
+      let nuevoMes = month;
+      
+      if (i === 0) {
+        // Primera aplicación: usar exactamente la fecha de inicio
+        nuevoAño = year;
+        nuevoMes = month;
+      } else {
+        // Aplicaciones siguientes: calcular basándose en la periodicidad
+        nuevoMes = month + (i * periodoMeses);
+        
+        // Ajustar año si el mes se pasa de 12
+        while (nuevoMes > 12) {
+          nuevoMes -= 12;
+          nuevoAño += 1;
+        }
+        
+        // Para aplicaciones trimestrales (4 al año), ajustar la 4ta aplicación a diciembre
+        if (i === 3 && numeroAplicaciones === 4 && periodoMeses === 3) {
+          nuevoMes = 12; // Diciembre
+        }
+      }
+      
+      // Formatear directamente sin crear objetos Date
+      const yearFinal = String(nuevoAño);
+      const monthFinal = String(nuevoMes).padStart(2, '0');
+      const dayFinal = String(day).padStart(2, '0');
+      
+      fechas.push(`${yearFinal}-${monthFinal}-${dayFinal}`);
+    }
+    
+    return fechas;
+  };
+
   // Función para limpiar el formulario
   const limpiarFormulario = () => {
     setFormData({
-      titulo: '',
       tipo: 'inoculacion' as ProduccionEvento['tipo'],
       tipoAplicacion: 'preventivo-pc',
-      cantidadAplicacionesAno: 1,
-      fecha: new Date().toISOString().split('T')[0],
-      descripcion: '',
+      cantidadAplicacionesAno: 4,
+      periodicidadMeses: 3,
+      fechasCalculadas: [],
+      fechaInicio: '',
+      periodo: 90,
       cliente: '',
-      microorganismo: '',
+      microorganismos: [],
       litros: 0,
     });
     setClienteSearch('');
@@ -143,6 +246,56 @@ export default function CalendarioProduccionPage() {
     fetchClientes();
     fetchMicroorganismos();
   }, []);
+
+  // Inicializar microorganismos predeterminados al cargar el componente
+  useEffect(() => {
+    // Esperar a que se carguen los microorganismos de la base de datos antes de configurar los predeterminados
+    if (microorganismos.length > 0) {
+      const configDefault = microorganismosPredeterminados[formData.tipoAplicacion as keyof typeof microorganismosPredeterminados] || [];
+      const aplicacionesDefault = aplicacionesPorAno[formData.tipoAplicacion as keyof typeof aplicacionesPorAno] || 1;
+      const fechas = calcularFechasAplicacion(formData.fechaInicio, formData.cantidadAplicacionesAno, formData.periodicidadMeses);
+      
+      // Mapear los microorganismos predeterminados con los de la base de datos
+      const microorganismosDefault = configDefault.map(config => {
+        const microFromDB = microorganismos.find(m => 
+          m.nombre.toLowerCase().includes(config.nombre.split(' ')[0].toLowerCase())
+        );
+        
+        return {
+          id: microFromDB?.id || 'custom',
+          nombre: config.nombre,
+          dosificacionPorHa: config.dosificacionPorHa,
+          unidad: config.unidad
+        };
+      });
+      
+      setFormData(prev => ({
+        ...prev,
+        microorganismos: microorganismosDefault,
+        cantidadAplicacionesAno: aplicacionesDefault,
+        fechasCalculadas: fechas
+      }));
+    }
+  }, [microorganismos, formData.tipoAplicacion]); // Depende de microorganismos y tipoAplicacion
+
+  // Recalcular fechas automáticamente cuando cambien los parámetros
+  useEffect(() => {
+    const fechas = calcularFechasAplicacion(formData.fechaInicio, formData.cantidadAplicacionesAno, formData.periodicidadMeses);
+    setFormData(prev => ({
+      ...prev,
+      fechasCalculadas: fechas
+    }));
+  }, [formData.fechaInicio, formData.cantidadAplicacionesAno, formData.periodicidadMeses]);
+
+  // Sincronizar selectedDate cuando se cambie la fecha de inicio del formulario
+  useEffect(() => {
+    if (formData.fechaInicio) {
+      const fechaObj = new Date(formData.fechaInicio);
+      if (!isNaN(fechaObj.getTime())) {
+        setSelectedDate(fechaObj);
+      }
+    }
+  }, [formData.fechaInicio]);
 
   useEffect(() => {
     applyFilters();
@@ -175,6 +328,36 @@ export default function CalendarioProduccionPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Actualizar microorganismos y aplicaciones cuando cambie el tipo de aplicación
+  useEffect(() => {
+    if (microorganismos.length > 0) {
+      const configDefault = microorganismosPredeterminados[formData.tipoAplicacion as keyof typeof microorganismosPredeterminados] || [];
+      const aplicacionesDefault = aplicacionesPorAno[formData.tipoAplicacion as keyof typeof aplicacionesPorAno] || 1;
+      const fechasCalculadas = calcularFechasAplicacion(formData.fechaInicio, formData.cantidadAplicacionesAno, formData.periodicidadMeses);
+      
+      // Mapear los microorganismos predeterminados con los de la base de datos
+      const microorganismosDefault = configDefault.map(config => {
+        const microFromDB = microorganismos.find(m => 
+          m.nombre.toLowerCase().includes(config.nombre.split(' ')[0].toLowerCase())
+        );
+        
+        return {
+          id: microFromDB?.id || 'custom',
+          nombre: config.nombre,
+          dosificacionPorHa: config.dosificacionPorHa,
+          unidad: config.unidad
+        };
+      });
+      
+      setFormData(prev => ({
+        ...prev,
+        microorganismos: microorganismosDefault,
+        cantidadAplicacionesAno: aplicacionesDefault,
+        fechasCalculadas: fechasCalculadas
+      }));
+    }
+  }, [formData.tipoAplicacion, microorganismos]);
 
   const fetchClientes = async () => {
     setLoadingClientes(true);
@@ -255,10 +438,9 @@ export default function CalendarioProduccionPage() {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(e => 
-        e.titulo.toLowerCase().includes(term) ||
-        e.descripcion.toLowerCase().includes(term) ||
         e.cliente?.toLowerCase().includes(term) ||
-        e.microorganismo?.toLowerCase().includes(term)
+        e.microorganismo?.toLowerCase().includes(term) ||
+        e.responsable?.toLowerCase().includes(term)
       );
     }
 
@@ -328,25 +510,29 @@ export default function CalendarioProduccionPage() {
 
   const resetForm = () => {
     setFormData({
-      titulo: '',
       tipo: 'inoculacion',
       tipoAplicacion: 'preventivo-pc',
-      cantidadAplicacionesAno: 1,
-      fecha: new Date().toISOString().split('T')[0],
-      descripcion: '',
+      cantidadAplicacionesAno: 4,
+      periodicidadMeses: 3,
+      fechasCalculadas: [],
+      fechaInicio: '',
+      periodo: 90,
       cliente: '',
-      microorganismo: '',
+      microorganismos: [],
       litros: 0,
     });
     setClienteSearch('');
     setShowClienteDropdown(false);
   };
 
-  const openAddModal = (clienteDefault?: string) => {
+  const openAddModal = (clienteDefault?: string, fechaDefault?: string) => {
     resetForm();
     if (clienteDefault) {
       setFormData(prev => ({ ...prev, cliente: clienteDefault }));
       setClienteSearch(clienteDefault);
+    }
+    if (fechaDefault) {
+      setFormData(prev => ({ ...prev, fechaInicio: fechaDefault }));
     }
     setShowAddModal(true);
   };
@@ -489,6 +675,7 @@ export default function CalendarioProduccionPage() {
                 {getDaysInMonth(currentMonth).map((day, index) => {
                   const dayEventos = getEventosForDate(day.date);
                   const isToday = day.date.toDateString() === new Date().toDateString();
+                  const isSelectedInForm = formData.fechaInicio && day.date.toISOString().split('T')[0] === formData.fechaInicio;
                   
                   return (
                     <div
@@ -497,15 +684,8 @@ export default function CalendarioProduccionPage() {
                         day.isCurrentMonth
                           ? 'bg-white border-gray-200'
                           : 'bg-gray-50 border-gray-100'
-                      } ${isToday ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
-                      onClick={() => {
-                        setSelectedDate(day.date);
-                        setFormData({
-                          ...formData,
-                          fecha: day.date.toISOString().split('T')[0]
-                        });
-                        openAddModal();
-                      }}
+                      } ${isToday ? 'ring-2 ring-blue-500 bg-blue-50' : ''} ${isSelectedInForm ? 'ring-2 ring-green-500 bg-green-50' : ''}`}
+                      onClick={() => handleCalendarDateSelect(day.date, true)}
                     >
                       <div className={`text-sm font-medium mb-1 ${
                         day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
@@ -516,13 +696,14 @@ export default function CalendarioProduccionPage() {
                       <div className="space-y-1">
                         {dayEventos.slice(0, 3).map(evento => {
                           const tipo = getTipoEvento(evento.tipo);
+                          const eventTitle = `${tipo.label} - ${evento.cliente || 'Sin cliente'}`;
                           return (
                             <div
                               key={evento.id}
                               className={`text-xs px-2 py-1 rounded ${tipo.color} text-white truncate`}
-                              title={evento.titulo}
+                              title={eventTitle}
                             >
-                              {tipo.emoji} {evento.titulo}
+                              {tipo.emoji} {tipo.label}
                             </div>
                           );
                         })}
@@ -598,8 +779,8 @@ export default function CalendarioProduccionPage() {
                                 {formatDate(evento.fecha)}
                               </td>
                               <td className="px-6 py-4">
-                                <div className="text-sm font-medium text-gray-900">{evento.titulo}</div>
-                                <div className="text-sm text-gray-500">{evento.descripcion}</div>
+                              <div className="text-sm font-medium text-gray-900">{getTipoEvento(evento.tipo).label} - {evento.cliente || 'Sin cliente'}</div>
+                                <div className="text-sm text-gray-500">{evento.microorganismo || 'Sin microorganismo'} - {evento.responsable || 'Sin responsable'}</div>
                                 {evento.cliente && (
                                   <div className="text-xs text-gray-400 mt-1">Cliente: {evento.cliente}</div>
                                 )}
@@ -672,22 +853,7 @@ export default function CalendarioProduccionPage() {
                 {/* Modal Content */}
                 <div className="px-8 py-6 overflow-y-auto max-h-[70vh]">
                   <form onSubmit={handleAddEvento} className="space-y-6">
-                    {/* Fila 1: Título del evento (ancho completo) */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-3">
-                        Título del Evento *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.titulo}
-                        onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
-                        placeholder="Ej: Inoculación lote 001"
-                      />
-                    </div>
-
-                    {/* Fila 2: Tipo de Aplicación, Cantidad de Aplicaciones y Fecha */}
+                    {/* Fila 1: Tipo de Aplicación, Cantidad de Aplicaciones y Fecha */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {/* Tipo de Aplicación */}
                       <div>
@@ -726,6 +892,61 @@ export default function CalendarioProduccionPage() {
                         </select>
                       </div>
 
+                      {/* Fechas de Aplicaciones Programadas */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          📅 Fechas programadas ({formData.cantidadAplicacionesAno} aplicaciones)
+                        </label>
+                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                          {formData.fechasCalculadas.length > 0 ? (
+                            <div className="space-y-2">
+                              {formData.fechasCalculadas.map((fecha, index) => {
+                                // Parsear la fecha manualmente para evitar problemas de zona horaria
+                                const [year, month, day] = fecha.split('-');
+                                const fechaObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0);
+                                const fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
+                                  weekday: 'long',
+                                  year: 'numeric', 
+                                  month: 'long',
+                                  day: 'numeric'
+                                });
+                                
+                                // Calcular días hasta la próxima aplicación
+                                let diasPeriodo = null;
+                                if (index < formData.fechasCalculadas.length - 1) {
+                                  const [yearSig, monthSig, daySig] = formData.fechasCalculadas[index + 1].split('-');
+                                  const fechaSiguiente = new Date(parseInt(yearSig), parseInt(monthSig) - 1, parseInt(daySig), 12, 0, 0);
+                                  const diffTime = fechaSiguiente.getTime() - fechaObj.getTime();
+                                  diasPeriodo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                }
+                                
+                                return (
+                                  <div key={fecha} className="flex items-center justify-between bg-white rounded-lg p-3 border">
+                                    <div className="flex items-center space-x-3">
+                                      <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                                        {index + 1}
+                                      </span>
+                                      <span className="font-medium text-gray-900 capitalize">
+                                        {fechaFormateada}
+                                      </span>
+                                    </div>
+                                    {diasPeriodo && (
+                                      <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                        +{diasPeriodo} días
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-center py-4">
+                              Selecciona una fecha de inicio para ver las fechas programadas
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Fecha de inicio */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -734,15 +955,37 @@ export default function CalendarioProduccionPage() {
                         <input
                           type="date"
                           required
-                          value={formData.fecha}
-                          onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                          value={formData.fechaInicio}
+                          onChange={(e) => handleFechaChange(e.target.value)}
                           className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 text-base"
                         />
                       </div>
+
+                      {/* Campo Periodicidad */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          Periodicidad (meses)
+                        </label>
+                        <div className="text-xs text-gray-500 mb-2">
+                          Intervalo entre aplicaciones. Ej: 3 meses = Trimestral, 2 meses = Bimestral, 6 meses = Semestral
+                        </div>
+                        <select
+                          value={formData.periodicidadMeses}
+                          onChange={(e) => setFormData({ ...formData, periodicidadMeses: parseInt(e.target.value) })}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 text-base"
+                        >
+                          <option value={1}>1 mes (Mensual)</option>
+                          <option value={2}>2 meses (Bimestral)</option>
+                          <option value={3}>3 meses (Trimestral)</option>
+                          <option value={4}>4 meses (Cuatrimestral)</option>
+                          <option value={6}>6 meses (Semestral)</option>
+                          <option value={12}>12 meses (Anual)</option>
+                        </select>
+                      </div>
                     </div>
 
-                    {/* Fila 3: Cliente y Microorganismo */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Fila 4: Solo Cliente */}
+                    <div className="grid grid-cols-1 gap-6">
                       {/* Cliente */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -766,7 +1009,7 @@ export default function CalendarioProduccionPage() {
                               }}
                               onFocus={() => setShowClienteDropdown(true)}
                               placeholder="Buscar cliente..."
-                              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+                              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-black text-base"
                             />
                             {showClienteDropdown && filteredClientes.length > 0 && (
                               <div className="absolute z-[60] w-full mt-1 bg-white border-2 border-gray-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
@@ -776,7 +1019,7 @@ export default function CalendarioProduccionPage() {
                                     onClick={() => {
                                       setFormData({ ...formData, cliente: cliente.nombre });
                                       setClienteSearch(cliente.nombre);
-                                      setSelectedClienteId(cliente.id);
+                                      setSelectedClienteId(cliente.airtableId); // Use airtableId for API calls
                                       setLotesSeleccionados([]); // Limpiar lotes seleccionados
                                       setShowClienteDropdown(false);
                                     }}
@@ -791,52 +1034,134 @@ export default function CalendarioProduccionPage() {
                           </div>
                         )}
                       </div>
-
-                      {/* Microorganismo */}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-3">
-                          Microorganismo
-                        </label>
-                        {loadingMicroorganismos ? (
-                          <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-base">
-                            <div className="flex items-center">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-3"></div>
-                              Cargando...
-                            </div>
-                          </div>
-                        ) : (
-                          <select
-                            value={formData.microorganismo}
-                            onChange={(e) => setFormData({ ...formData, microorganismo: e.target.value })}
-                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 text-base"
-                          >
-                            <option value="" className="text-gray-400">Seleccionar microorganismo...</option>
-                            {microorganismos.map((micro) => (
-                              <option key={micro.id} value={micro.nombre}>
-                                {micro.nombre} {micro.tipo ? `(${micro.tipo})` : ''}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
                     </div>
 
-                    {/* Fila 4: Descripción y Litros */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {/* Descripción */}
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-3">
-                          Descripción
-                        </label>
-                        <textarea
-                          value={formData.descripcion}
-                          onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                          rows={3}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base resize-none"
-                          placeholder="Detalles adicionales del evento..."
-                        />
+                    {/* Sección de Microorganismos Configurables */}
+                    <div className="mt-6 p-6 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-gray-800 flex items-center">
+                          🧬 Microorganismos y Dosificaciones
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newMicroorganismo = {
+                              id: Date.now().toString(),
+                              nombre: 'Nuevo microorganismo',
+                              dosificacionPorHa: 1.0,
+                              unidad: 'L/Ha'
+                            };
+                            setFormData(prev => ({
+                              ...prev,
+                              microorganismos: [...prev.microorganismos, newMicroorganismo]
+                            }));
+                          }}
+                          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                          ➕ Agregar microorganismo
+                        </button>
                       </div>
 
+                      {formData.microorganismos.length === 0 ? (
+                        <div className="text-gray-700 text-center py-8">
+                          No hay microorganismos configurados para este tipo de aplicación
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {formData.microorganismos.map((micro, index) => (
+                            <div key={micro.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Microorganismo
+                                  </label>
+                                  <select
+                                    value={micro.nombre}
+                                    onChange={(e) => {
+                                      const newMicroorganismos = [...formData.microorganismos];
+                                      newMicroorganismos[index].nombre = e.target.value;
+                                      setFormData(prev => ({ ...prev, microorganismos: newMicroorganismos }));
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-700 bg-white"
+                                  >
+                                    <option value="">Seleccionar microorganismo...</option>
+                                    {microorganismos.map((microorganismo) => (
+                                      <option key={microorganismo.id} value={microorganismo.nombre}>
+                                        {microorganismo.nombre} {microorganismo.tipo ? `(${microorganismo.tipo})` : ''}
+                                      </option>
+                                    ))}
+                                    <option value="custom">🔧 Personalizado...</option>
+                                  </select>
+                                  {micro.nombre === 'custom' && (
+                                    <input
+                                      type="text"
+                                      placeholder="Escribir microorganismo personalizado..."
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-700 mt-2 placeholder-gray-500"
+                                      onChange={(e) => {
+                                        const newMicroorganismos = [...formData.microorganismos];
+                                        newMicroorganismos[index].nombre = e.target.value;
+                                        setFormData(prev => ({ ...prev, microorganismos: newMicroorganismos }));
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Dosificación
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={micro.dosificacionPorHa}
+                                    onChange={(e) => {
+                                      const newMicroorganismos = [...formData.microorganismos];
+                                      newMicroorganismos[index].dosificacionPorHa = parseFloat(e.target.value) || 0;
+                                      setFormData(prev => ({ ...prev, microorganismos: newMicroorganismos }));
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-700"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Unidad
+                                  </label>
+                                  <select
+                                    value={micro.unidad}
+                                    onChange={(e) => {
+                                      const newMicroorganismos = [...formData.microorganismos];
+                                      newMicroorganismos[index].unidad = e.target.value;
+                                      setFormData(prev => ({ ...prev, microorganismos: newMicroorganismos }));
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-700"
+                                  >
+                                    <option value="L/Ha">L/Ha</option>
+                                    <option value="ml/Ha">ml/Ha</option>
+                                    <option value="g/Ha">g/Ha</option>
+                                    <option value="kg/Ha">kg/Ha</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newMicroorganismos = formData.microorganismos.filter((_, i) => i !== index);
+                                      setFormData(prev => ({ ...prev, microorganismos: newMicroorganismos }));
+                                    }}
+                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm transition-colors"
+                                  >
+                                    🗑️ Eliminar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Fila 4: Litros */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Litros */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -846,7 +1171,7 @@ export default function CalendarioProduccionPage() {
                           type="number"
                           value={formData.litros}
                           onChange={(e) => setFormData({ ...formData, litros: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-black text-base"
                           placeholder="0"
                           min="0"
                           step="0.1"
@@ -904,7 +1229,7 @@ export default function CalendarioProduccionPage() {
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedEvento.titulo}</h2>
+                      <h2 className="text-2xl font-bold text-gray-900 mb-2">{getTipoEvento(selectedEvento.tipo).label} - {selectedEvento.cliente || 'Sin cliente'}</h2>
                       <div className="flex gap-2">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getTipoEvento(selectedEvento.tipo).color} text-white`}>
                           {getTipoEvento(selectedEvento.tipo).emoji} {getTipoEvento(selectedEvento.tipo).label}
@@ -931,10 +1256,10 @@ export default function CalendarioProduccionPage() {
                       <p className="text-gray-900">{formatDate(selectedEvento.fecha)}</p>
                     </div>
 
-                    {selectedEvento.descripcion && (
+                    {selectedEvento.responsable && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Descripción</label>
-                        <p className="text-gray-900">{selectedEvento.descripcion}</p>
+                        <label className="text-sm font-medium text-gray-500">Responsable</label>
+                        <p className="text-gray-900">{selectedEvento.responsable}</p>
                       </div>
                     )}
 

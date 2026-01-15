@@ -43,63 +43,57 @@ export default function LoteSelector({
 }: LoteSelectorProps) {
   const [cultivos, setCultivos] = useState<Cultivo[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
+  const [cultivosSeleccionados, setCultivosSeleccionados] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [filtroTexto, setFiltroTexto] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [paso, setPaso] = useState<'cultivos' | 'lotes'>('cultivos');
 
-  // Cargar cultivos y lotes cuando cambia el cliente
+  // Fetch cultivos y lotes
   useEffect(() => {
     if (!clienteId) {
       setCultivos([]);
       setLotes([]);
+      setCultivosSeleccionados([]);
+      onLotesChange([]);
+      setPaso('cultivos');
       return;
     }
 
     const fetchCultivosLotes = async () => {
       setLoading(true);
       setError('');
-      console.log('🔍 LoteSelector: Cargando datos para cliente:', clienteId);
       
       try {
-        const url = `/api/cultivos-lotes?clienteId=${clienteId}`;
-        console.log('📡 LoteSelector: Haciendo request a:', url);
+        console.log('🌾 LoteSelector: Cargando cultivos y lotes para cliente:', clienteId);
         
-        const response = await fetch(url);
-        console.log('📥 LoteSelector: Response status:', response.status);
+        const response = await fetch(`/api/cultivos-lotes?clienteId=${encodeURIComponent(clienteId)}`);
         
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ LoteSelector: Error response:', {
-            status: response.status,
-            statusText: response.statusText,
-            body: errorText
-          });
-          throw new Error(`Error ${response.status}: ${response.statusText}. ${errorText}`);
+          throw new Error(`Error HTTP: ${response.status}`);
         }
         
         const data = await response.json();
-        console.log('✅ LoteSelector: Data recibida:', data);
         
-        if (data.error) {
-          throw new Error(data.error);
+        if (!data.success && data.error) {
+          throw new Error(data.error || 'Error al cargar los datos');
         }
         
-        const cultivos = data.cultivos || [];
-        const lotes = data.lotes || [];
-        
-        console.log('📊 LoteSelector: Procesando datos:', {
-          cultivosCount: cultivos.length,
-          lotesCount: lotes.length
+        console.log('✅ LoteSelector: Datos recibidos:', {
+          cultivos: data.cultivos?.length || 0,
+          lotes: data.lotes?.length || 0
         });
         
-        setCultivos(cultivos);
-        setLotes(lotes);
+        setCultivos(data.cultivos || []);
+        setLotes(data.lotes || []);
         
+        if ((data.cultivos?.length || 0) === 0) {
+          setError('No se encontraron cultivos para este cliente');
+        }
       } catch (err) {
         console.error('💥 LoteSelector: Error completo:', err);
         const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-        setError(`Error al cargar los lotes: ${errorMessage}`);
+        setError(`Error al cargar los datos: ${errorMessage}`);
         setCultivos([]);
         setLotes([]);
       } finally {
@@ -110,38 +104,44 @@ export default function LoteSelector({
     fetchCultivosLotes();
   }, [clienteId]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.lote-selector-container')) {
-        setShowDropdown(false);
-      }
-    };
+  // Filtrar cultivos según el texto de búsqueda
+  const cultivosFiltrados = cultivos.filter(cultivo => {
+    if (!filtroTexto) return true;
+    const texto = filtroTexto.toLowerCase();
+    return (
+      cultivo.codigo.toLowerCase().includes(texto) ||
+      cultivo.nombre.toLowerCase().includes(texto) ||
+      cultivo.tipo.toLowerCase().includes(texto) ||
+      cultivo.ubicacion.toLowerCase().includes(texto)
+    );
+  });
 
-    if (showDropdown) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-      }, 0);
-      
-      return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [showDropdown]);
-
-  // Filtrar lotes según el texto de búsqueda
+  // Filtrar lotes según cultivos seleccionados y texto de búsqueda
   const lotesFiltrados = lotes.filter(lote => {
+    // Primero filtrar por cultivos seleccionados
+    if (cultivosSeleccionados.length > 0 && !cultivosSeleccionados.includes(lote.cultivoId)) {
+      return false;
+    }
+    
+    // Luego por texto de búsqueda
     if (!filtroTexto) return true;
     const texto = filtroTexto.toLowerCase();
     return (
       lote.codigo.toLowerCase().includes(texto) ||
       lote.nombreLote.toLowerCase().includes(texto) ||
-      lote.nombreCultivo.toLowerCase().includes(texto) ||
-      lote.variedad.toLowerCase().includes(texto)
+      lote.nombreCultivo.toLowerCase().includes(texto)
     );
   });
+
+  const toggleCultivo = (cultivoId: string) => {
+    if (disabled) return;
+    
+    const nuevosCultivos = cultivosSeleccionados.includes(cultivoId)
+      ? cultivosSeleccionados.filter(id => id !== cultivoId)
+      : [...cultivosSeleccionados, cultivoId];
+    
+    setCultivosSeleccionados(nuevosCultivos);
+  };
 
   const toggleLote = (loteId: string) => {
     if (disabled) return;
@@ -153,13 +153,33 @@ export default function LoteSelector({
     onLotesChange(nuevosLotes);
   };
 
-  const loteSeleccionado = (loteId: string) => lotesSeleccionados.includes(loteId);
+  const continuarALotes = () => {
+    if (cultivosSeleccionados.length === 0) return;
+    setPaso('lotes');
+    setFiltroTexto('');
+  };
+
+  const volverACultivos = () => {
+    setPaso('cultivos');
+    setFiltroTexto('');
+  };
+
+  const seleccionarTodosLotes = () => {
+    if (disabled) return;
+    const todosLosIds = lotesFiltrados.map(lote => lote.id);
+    onLotesChange(todosLosIds);
+  };
+
+  const limpiarTodos = () => {
+    if (disabled) return;
+    onLotesChange([]);
+  };
 
   if (!clienteId) {
     return (
       <div className={`lote-selector-container ${className}`}>
         <label className="block text-sm font-semibold text-gray-700 mb-3">
-          Lotes del cliente
+          🎯 Selección de Cultivos y Lotes
         </label>
         <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-base">
           Primero seleccione un cliente
@@ -170,223 +190,223 @@ export default function LoteSelector({
 
   return (
     <div className={`lote-selector-container ${className}`}>
-      <label className="block text-sm font-semibold text-gray-700 mb-3">
-        🎯 Lotes disponibles para el cliente
-        {lotesSeleccionados.length > 0 && (
-          <span className="ml-2 bg-blue-500 text-white px-2 py-1 rounded-full text-xs">
-            {lotesSeleccionados.length} seleccionados
-          </span>
+      {/* Header con pasos */}
+      <div className="flex items-center justify-between mb-4">
+        <label className="block text-sm font-semibold text-gray-700">
+          {paso === 'cultivos' ? '🌾 Paso 1: Selecciona Cultivos' : '🎯 Paso 2: Selecciona Lotes'}
+        </label>
+        
+        {paso === 'lotes' && (
+          <button
+            onClick={volverACultivos}
+            className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+          >
+            ← Volver a cultivos
+          </button>
         )}
-      </label>
-      
-      <div className="relative">
-        <div className="relative">
-          <input
-            type="text"
-            value={filtroTexto}
-            onChange={(e) => setFiltroTexto(e.target.value)}
-            onFocus={() => setShowDropdown(true)}
-            placeholder={loading ? "Cargando lotes..." : "🔍 Buscar por código, nombre del lote, cultivo o variedad..."}
-            disabled={disabled || loading}
-            className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base disabled:bg-gray-50 disabled:text-gray-500"
-          />
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-            {loading ? (
-              <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-            ) : (
-              <>
-                {filtroTexto && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFiltroTexto('');
-                      setShowDropdown(true);
-                    }}
-                    className="text-gray-400 hover:text-gray-600 w-5 h-5 rounded-full hover:bg-gray-100 flex items-center justify-center"
-                    title="Limpiar búsqueda"
-                  >
-                    ×
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="text-gray-400 hover:text-gray-600"
-                  title={showDropdown ? "Cerrar lista" : "Abrir lista"}
-                >
-                  {showDropdown ? '⬆️' : '⬇️'}
-                </button>
-              </>
+      </div>
+
+      {/* Indicador de progreso */}
+      <div className="flex items-center mb-4">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+          paso === 'cultivos' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'
+        }`}>
+          1
+        </div>
+        <div className={`flex-1 h-1 mx-2 ${paso === 'lotes' ? 'bg-green-500' : 'bg-gray-200'}`}></div>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+          paso === 'lotes' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'
+        }`}>
+          2
+        </div>
+      </div>
+
+      {/* Paso 1: Selección de Cultivos */}
+      {paso === 'cultivos' && (
+        <div>
+          {/* Búsqueda de cultivos */}
+          <div className="relative mb-4">
+            <input
+              type="text"
+              value={filtroTexto}
+              onChange={(e) => setFiltroTexto(e.target.value)}
+              placeholder={loading ? "Cargando cultivos..." : "🔍 Buscar cultivo..."}
+              disabled={disabled || loading}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+            />
+            {loading && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+              </div>
             )}
           </div>
-        </div>
 
-        {!loading && lotes.length > 0 && (
-          <div className="mt-2 text-xs text-gray-500 flex justify-between items-center">
-            <span>
-              📊 {lotes.length} lotes disponibles
-              {filtroTexto && ` (mostrando ${lotesFiltrados.length})`}
-            </span>
+          {/* Lista de cultivos */}
+          {error ? (
+            <div className="p-4 text-red-600 bg-red-50 rounded-xl border border-red-200">
+              {error}
+            </div>
+          ) : (
+            <>
+              <div className="text-sm text-gray-600 mb-2">
+                📊 {cultivosFiltrados.length} cultivos disponibles
+              </div>
+              
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {cultivosFiltrados.map((cultivo) => (
+                  <div
+                    key={cultivo.id}
+                    onClick={() => toggleCultivo(cultivo.id)}
+                    className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                      cultivosSeleccionados.includes(cultivo.id)
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {cultivo.codigo} - {cultivo.nombre}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          📍 {cultivo.ubicacion}
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        cultivosSeleccionados.includes(cultivo.id)
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-300'
+                      }`}>
+                        {cultivosSeleccionados.includes(cultivo.id) && (
+                          <span className="text-white text-xs">✓</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Botón continuar */}
+              {cultivosSeleccionados.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-sm text-gray-600 mb-2">
+                    ✅ {cultivosSeleccionados.length} cultivos seleccionados
+                  </div>
+                  <button
+                    onClick={continuarALotes}
+                    className="w-full bg-blue-500 text-white py-3 px-4 rounded-xl hover:bg-blue-600 transition-colors font-medium"
+                  >
+                    Continuar a Lotes →
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Paso 2: Selección de Lotes */}
+      {paso === 'lotes' && (
+        <div>
+          {/* Búsqueda de lotes */}
+          <div className="relative mb-4">
+            <input
+              type="text"
+              value={filtroTexto}
+              onChange={(e) => setFiltroTexto(e.target.value)}
+              placeholder="🔍 Buscar lote..."
+              disabled={disabled}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-400 text-base"
+            />
+          </div>
+
+          {/* Controles de lotes */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm text-gray-600">
+              📊 {lotesFiltrados.length} lotes disponibles
+            </div>
             <div className="flex gap-2">
               <button
-                type="button"
-                onClick={() => {
-                  const todosLotesFiltrados = lotesFiltrados.map(l => l.id);
-                  onLotesChange([...new Set([...lotesSeleccionados, ...todosLotesFiltrados])]);
-                }}
-                className="text-blue-600 hover:text-blue-800 underline"
-                disabled={disabled}
+                onClick={seleccionarTodosLotes}
+                disabled={disabled || lotesFiltrados.length === 0}
+                className="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
               >
                 Seleccionar todos
               </button>
-            </div>
-          </div>
-        )}
-
-        {lotesSeleccionados.length > 0 && (
-          <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-blue-800">
-                  📋 Lotes seleccionados ({lotesSeleccionados.length})
-                </span>
+              {lotesSeleccionados.length > 0 && (
                 <button
-                  type="button"
-                  onClick={() => onLotesChange([])}
-                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                  onClick={limpiarTodos}
                   disabled={disabled}
+                  className="text-sm text-red-600 hover:text-red-800"
                 >
                   Limpiar todos
                 </button>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {lotesSeleccionados.map(loteId => {
-                const lote = lotes.find(l => l.id === loteId);
-                if (!lote) return null;
-                return (
-                  <div key={loteId} className="bg-white border border-blue-200 text-blue-900 px-3 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm">
-                    <div className="font-medium">{lote.codigo}</div>
-                    <div className="text-blue-600">•</div>
-                    <div className="text-xs">{lote.nombreLote}</div>
-                    <button
-                      type="button"
-                      onClick={() => toggleLote(loteId)}
-                      className="text-blue-600 hover:text-blue-800 font-bold ml-1 w-5 h-5 rounded-full hover:bg-blue-100 flex items-center justify-center transition-all"
-                      disabled={disabled}
-                      title="Quitar lote"
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
+              )}
             </div>
           </div>
-        )}
 
-        {showDropdown && !loading && (
-          <div className="absolute z-[100] w-full mt-1 bg-white border-2 border-gray-300 rounded-xl shadow-2xl max-h-96 overflow-y-auto">
-            {error ? (
-              <div className="p-6 text-red-600 text-center">
-                <div className="text-lg font-semibold mb-2">❌ Error</div>
-                {error}
+          {/* Lotes seleccionados */}
+          {lotesSeleccionados.length > 0 && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-medium text-green-800 mb-2">
+                📋 Lotes seleccionados ({lotesSeleccionados.length})
               </div>
-            ) : lotesFiltrados.length === 0 ? (
-              <div className="p-6 text-gray-500 text-center">
-                <div className="text-lg font-semibold mb-2">📭 Sin resultados</div>
-                {filtroTexto ? 'No se encontraron lotes que coincidan con la búsqueda' : 'No hay lotes disponibles para este cliente'}
-              </div>
-            ) : (
-              <>
-                <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-4 border-b border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-bold text-lg">{lotesFiltrados.length} lotes disponibles</div>
-                      <div className="text-blue-100 text-sm">Haz clic para seleccionar/deseleccionar</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowDropdown(false)}
-                      className="text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2 transition-all w-8 h-8 flex items-center justify-center"
+              <div className="flex flex-wrap gap-2">
+                {lotesSeleccionados.map((loteId) => {
+                  const lote = lotes.find(l => l.id === loteId);
+                  if (!lote) return null;
+                  return (
+                    <span
+                      key={loteId}
+                      className="inline-flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-green-300 text-sm"
                     >
-                      ✕
-                    </button>
+                      {lote.codigo} • {lote.nombreLote}
+                      <button
+                        onClick={() => toggleLote(loteId)}
+                        className="text-red-500 hover:text-red-700 ml-1"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Lista de lotes */}
+          <div className="max-h-80 overflow-y-auto space-y-2">
+            {lotesFiltrados.map((lote) => (
+              <div
+                key={lote.id}
+                onClick={() => toggleLote(lote.id)}
+                className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                  lotesSeleccionados.includes(lote.id)
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      {lote.codigo} • {lote.nombreLote}
+                    </div>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    lotesSeleccionados.includes(lote.id)
+                      ? 'border-green-500 bg-green-500'
+                      : 'border-gray-300'
+                  }`}>
+                    {lotesSeleccionados.includes(lote.id) && (
+                      <span className="text-white text-xs">✓</span>
+                    )}
                   </div>
                 </div>
-
-                <div className="max-h-80 overflow-y-auto">
-                  {lotesFiltrados.map((lote) => (
-                    <div
-                      key={lote.id}
-                      className={`p-4 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-all duration-200 ${
-                        loteSeleccionado(lote.id) 
-                          ? 'bg-blue-50 border-l-4 border-l-blue-500' 
-                          : 'hover:border-l-4 hover:border-l-gray-300'
-                      }`}
-                      onClick={() => toggleLote(lote.id)}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className={`mt-1 w-5 h-5 border-2 rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
-                          loteSeleccionado(lote.id)
-                            ? 'bg-blue-500 border-blue-500 text-white'
-                            : 'border-gray-300 hover:border-blue-400'
-                        }`}>
-                          {loteSeleccionado(lote.id) && (
-                            <span className="text-xs font-bold">✓</span>
-                          )}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-bold text-blue-600 text-lg">{lote.codigo}</span>
-                            <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">
-                              {lote.estado}
-                            </span>
-                          </div>
-                          
-                          <div className="font-semibold text-gray-900 mb-1 text-base">
-                            📍 {lote.nombreLote}
-                          </div>
-                          
-                          <div className="text-sm text-gray-600 mb-2">
-                            🌱 <span className="font-medium">Cultivo:</span> {lote.nombreCultivo}
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                            <div>
-                              <span className="font-medium">🌾 Variedad:</span> {lote.variedad}
-                            </div>
-                            <div>
-                              <span className="font-medium">📏 Área:</span> {lote.areaHa} ha
-                            </div>
-                            <div>
-                              <span className="font-medium">🏔️ Suelo:</span> {lote.tipoSuelo}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {lote.riego ? (
-                                <span className="text-blue-600 font-medium">💧 Con riego</span>
-                              ) : (
-                                <span className="text-gray-500">☁️ Sin riego</span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {lote.anioSiembra && (
-                            <div className="text-xs text-gray-500 mt-2">
-                              📅 Siembra: {lote.anioSiembra}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

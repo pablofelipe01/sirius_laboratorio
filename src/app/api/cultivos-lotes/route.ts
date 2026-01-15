@@ -52,19 +52,22 @@ export async function GET(request: NextRequest) {
 
     if (!AIRTABLE_API_KEY) {
       console.error('❌ AIRTABLE_API_KEY_SIRIUS_CLIENTES_CORE no configurada');
-      return NextResponse.json({ error: 'API key no configurada' }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'API key no configurada' }, { status: 500 });
     }
 
     if (!clienteId) {
       console.error('❌ clienteId faltante en query params');
-      return NextResponse.json({ error: 'Cliente ID es requerido' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Cliente ID es requerido' }, { status: 400 });
     }
 
     console.log('🔍 Buscando cultivos para cliente:', clienteId);
 
     // Primero obtener los cultivos del cliente
     const cultivosUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_CULTIVOS_CORE}`;
+    
+    // El clienteId ahora es el record ID real de Airtable
     const filterFormula = `FIND("${clienteId}", ARRAYJOIN({cliente_id})) > 0`;
+    
     const fullUrl = `${cultivosUrl}?filterByFormula=${encodeURIComponent(filterFormula)}`;
     
     console.log('📡 Request URL para cultivos:', fullUrl);
@@ -80,8 +83,18 @@ export async function GET(request: NextRequest) {
     console.log('📥 Response status cultivos:', cultivosResponse.status);
 
     if (!cultivosResponse.ok) {
-      console.error('❌ Error al obtener cultivos:', cultivosResponse.status, await cultivosResponse.text());
-      return NextResponse.json({ error: 'Error al obtener cultivos' }, { status: cultivosResponse.status });
+      const errorText = await cultivosResponse.text();
+      console.error('❌ Error al obtener cultivos:', {
+        status: cultivosResponse.status,
+        statusText: cultivosResponse.statusText,
+        error: errorText,
+        clienteId: clienteId,
+        filterFormula: filterFormula
+      });
+      return NextResponse.json({ 
+        success: false,
+        error: `Error al obtener cultivos: ${cultivosResponse.status} ${cultivosResponse.statusText}` 
+      }, { status: cultivosResponse.status });
     }
 
     const cultivosData = await cultivosResponse.json();
@@ -90,7 +103,13 @@ export async function GET(request: NextRequest) {
     console.log(`✅ Cultivos encontrados: ${cultivos.length}`);
 
     if (cultivos.length === 0) {
-      return NextResponse.json({ cultivos: [], lotes: [] });
+      console.log('⚠️ No se encontraron cultivos para el cliente:', clienteId);
+      return NextResponse.json({ 
+        success: true,
+        cultivos: [], 
+        lotes: [],
+        message: `No se encontraron cultivos para el cliente ${clienteId}`
+      });
     }
 
     // Obtener todos los IDs de lotes asociados a estos cultivos
@@ -189,6 +208,7 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({
+      success: true,
       cultivos: cultivosFormateados,
       lotes: lotesFormateados
     });
@@ -196,7 +216,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('💥 Error en API cultivos-lotes:', error);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { success: false, error: 'Error interno del servidor' },
       { status: 500 }
     );
   }
