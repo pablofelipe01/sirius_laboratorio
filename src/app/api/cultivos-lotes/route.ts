@@ -60,18 +60,57 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Cliente ID es requerido' }, { status: 400 });
     }
 
-    console.log('🔍 Buscando cultivos para cliente:', clienteId);
+    console.log('🔍 Obteniendo registro del cliente:', clienteId);
 
-    // Primero obtener los cultivos del cliente
+    // Primero obtener el registro del cliente para acceder a sus cultivos vinculados
+    const clienteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_CLIENTES_CORE}/${clienteId}`;
+    
+    console.log('📡 Request URL para cliente:', clienteUrl);
+    
+    const clienteResponse = await fetch(clienteUrl, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('📥 Response status cliente:', clienteResponse.status);
+
+    if (!clienteResponse.ok) {
+      const errorText = await clienteResponse.text();
+      console.error('❌ Error al obtener cliente:', {
+        status: clienteResponse.status,
+        statusText: clienteResponse.statusText,
+        error: errorText,
+        clienteId: clienteId
+      });
+      return NextResponse.json({ 
+        success: false,
+        error: `Error al obtener cliente: ${clienteResponse.status} ${clienteResponse.statusText}` 
+      }, { status: clienteResponse.status });
+    }
+
+    const clienteData = await clienteResponse.json();
+    const cultivoIds = clienteData.fields?.['Cultivos Core'] || [];
+
+    console.log(`✅ IDs de cultivos vinculados al cliente: ${cultivoIds.length}`, cultivoIds);
+
+    if (cultivoIds.length === 0) {
+      console.log('⚠️ No se encontraron cultivos vinculados para el cliente:', clienteId);
+      return NextResponse.json({ 
+        success: true,
+        cultivos: [], 
+        lotes: [],
+        message: `No se encontraron cultivos vinculados para el cliente ${clienteId}`
+      });
+    }
+
+    // Obtener los cultivos usando los IDs vinculados
     const cultivosUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_CULTIVOS_CORE}`;
-    
-    // El clienteId ahora es el record ID real de Airtable
-    const filterFormula = `FIND("${clienteId}", ARRAYJOIN({cliente_id})) > 0`;
-    
+    const filterFormula = `OR(${cultivoIds.map((id: string) => `RECORD_ID() = "${id}"`).join(', ')})`;
     const fullUrl = `${cultivosUrl}?filterByFormula=${encodeURIComponent(filterFormula)}`;
     
     console.log('📡 Request URL para cultivos:', fullUrl);
-    console.log('🔍 Filter formula:', filterFormula);
     
     const cultivosResponse = await fetch(fullUrl, {
       headers: {
@@ -87,9 +126,7 @@ export async function GET(request: NextRequest) {
       console.error('❌ Error al obtener cultivos:', {
         status: cultivosResponse.status,
         statusText: cultivosResponse.statusText,
-        error: errorText,
-        clienteId: clienteId,
-        filterFormula: filterFormula
+        error: errorText
       });
       return NextResponse.json({ 
         success: false,

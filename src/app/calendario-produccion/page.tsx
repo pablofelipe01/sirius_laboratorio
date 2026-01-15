@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -135,6 +135,41 @@ export default function CalendarioProduccionPage() {
   // Lotes selection states
   const [selectedClienteId, setSelectedClienteId] = useState<string>('');
   const [lotesSeleccionados, setLotesSeleccionados] = useState<string[]>([]);
+  const [todosLotesDisponibles, setTodosLotesDisponibles] = useState<any[]>([]); // Almacenar todos los lotes para cálculos
+
+  // Calcular hectáreas totales de lotes seleccionados
+  const hectareasTotales = useMemo(() => {
+    const lotesSeleccionadosData = todosLotesDisponibles.filter(lote => lotesSeleccionados.includes(lote.id));
+    const total = lotesSeleccionadosData.reduce((sum, lote) => sum + (lote.areaHa || 0), 0);
+    console.log('🌾 Hectáreas totales calculadas:', total, 'de', lotesSeleccionadosData.length, 'lotes');
+    return total;
+  }, [lotesSeleccionados, todosLotesDisponibles]);
+
+  // Calcular litros totales basados en microorganismos y hectáreas
+  const litrosTotales = useMemo(() => {
+    if (hectareasTotales === 0 || formData.microorganismos.length === 0) return 0;
+    
+    const total = formData.microorganismos.reduce((sum, micro) => {
+      const litrosPorMicro = hectareasTotales * micro.dosificacionPorHa;
+      return sum + litrosPorMicro;
+    }, 0);
+    
+    console.log('🧪 Litros totales calculados:', total.toFixed(2), 'L');
+    return total;
+  }, [hectareasTotales, formData.microorganismos]);
+
+  // Cantidad de bolsas = litros totales (1L = 1 bolsa)
+  const bolsasTotales = useMemo(() => {
+    const bolsas = Math.ceil(litrosTotales); // Redondear hacia arriba
+    console.log('📦 Bolsas totales calculadas:', bolsas);
+    return bolsas;
+  }, [litrosTotales]);
+
+  // Handler estable para cambiar lotes seleccionados
+  const handleLotesChange = useCallback((nuevosLotes: string[]) => {
+    console.log('📝 handleLotesChange ejecutado con:', nuevosLotes.length, 'lotes');
+    setLotesSeleccionados(nuevosLotes);
+  }, []);
 
   // Handler para cambiar fecha de inicio
   const handleFechaChange = useCallback((nuevaFecha: string) => {
@@ -232,6 +267,7 @@ export default function CalendarioProduccionPage() {
 
   // Función para cerrar modal
   const cerrarModal = () => {
+    console.log('🚨 cerrarModal ejecutado - Stack trace:', new Error().stack);
     setShowAddModal(false);
     limpiarFormulario();
   };
@@ -829,8 +865,8 @@ export default function CalendarioProduccionPage() {
 
           {/* Add Event Modal */}
           {showAddModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+            <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { console.log('🎯 Click en BACKDROP'); cerrarModal(); }}>
+              <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => { console.log('✅ Click en CONTENIDO del modal - stopPropagation'); e.stopPropagation(); }}>
                 {/* Modal Header */}
                 <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-6 text-white relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
@@ -1179,6 +1215,72 @@ export default function CalendarioProduccionPage() {
                       </div>
                     </div>
 
+                    {/* Resumen de Cálculos */}
+                    {selectedClienteId && lotesSeleccionados.length > 0 && (
+                      <div className="mt-6 p-6 bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-200 rounded-xl">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                          📊 Resumen de Producción
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Hectáreas Totales */}
+                          <div className="bg-white rounded-lg p-4 border-2 border-blue-300">
+                            <div className="text-sm text-gray-600 mb-1">🌾 Hectáreas Totales</div>
+                            <div className="text-2xl font-bold text-blue-600">
+                              {hectareasTotales.toFixed(2)} ha
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {lotesSeleccionados.length} lote{lotesSeleccionados.length !== 1 ? 's' : ''} seleccionado{lotesSeleccionados.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+
+                          {/* Litros Totales */}
+                          <div className="bg-white rounded-lg p-4 border-2 border-green-300">
+                            <div className="text-sm text-gray-600 mb-1">🧪 Litros Necesarios</div>
+                            <div className="text-2xl font-bold text-green-600">
+                              {litrosTotales.toFixed(2)} L
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {formData.microorganismos.length} microorganismo{formData.microorganismos.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+
+                          {/* Bolsas Totales */}
+                          <div className="bg-white rounded-lg p-4 border-2 border-purple-300">
+                            <div className="text-sm text-gray-600 mb-1">📦 Bolsas a Producir</div>
+                            <div className="text-2xl font-bold text-purple-600">
+                              {bolsasTotales}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              1 litro = 1 bolsa
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desglose por microorganismo */}
+                        {formData.microorganismos.length > 0 && (
+                          <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                            <div className="text-sm font-semibold text-gray-700 mb-2">🦠 Desglose por Microorganismo:</div>
+                            <div className="space-y-2">
+                              {formData.microorganismos.map((micro) => {
+                                const litrosMicro = hectareasTotales * micro.dosificacionPorHa;
+                                return (
+                                  <div key={micro.id} className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-700">
+                                      <span className="font-medium">{micro.nombre}</span>
+                                      <span className="text-gray-500 ml-2">({micro.dosificacionPorHa} L/ha)</span>
+                                    </span>
+                                    <span className="font-semibold text-blue-600">
+                                      {litrosMicro.toFixed(2)} L
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Selector de Lotes - Sección amplia dedicada */}
                     {selectedClienteId && (
                       <div className="border-t-2 border-gray-200 pt-8">
@@ -1193,7 +1295,8 @@ export default function CalendarioProduccionPage() {
                         <LoteSelector
                           clienteId={selectedClienteId}
                           lotesSeleccionados={lotesSeleccionados}
-                          onLotesChange={setLotesSeleccionados}
+                          onLotesChange={handleLotesChange}
+                          onLotesDataChange={setTodosLotesDisponibles}
                           className="w-full"
                         />
                       </div>
