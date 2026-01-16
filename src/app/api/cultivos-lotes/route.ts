@@ -217,22 +217,37 @@ export async function GET(request: NextRequest) {
       console.log('⚠️ No se encontraron IDs de lotes en los cultivos');
     }
 
+    // Crear mapeo de record ID a ID formateado para cultivos
+    const cultivoIdMap = new Map();
+    cultivos.forEach(cultivo => {
+      const idFormateado = cultivo.fields.ID || `CU-${String(cultivo.fields['Codigo Serial'] || 0).padStart(4, '0')}`;
+      cultivoIdMap.set(cultivo.id, idFormateado);
+    });
+
     // Formatear los datos para el frontend
-    const cultivosFormateados = cultivos.map(cultivo => ({
-      id: cultivo.id,
-      codigo: cultivo.fields.ID || `CU-${String(cultivo.fields['Codigo Serial'] || 0).padStart(4, '0')}`,
+    const cultivosFormateados = cultivos.map(cultivo => {
+      const idFormateado = cultivo.fields.ID || `CU-${String(cultivo.fields['Codigo Serial'] || 0).padStart(4, '0')}`;
+      return {
+      id: idFormateado,
+      codigo: idFormateado,
       nombre: cultivo.fields.nombre_cultivo || 'Sin nombre',
       tipo: cultivo.fields.tipo_cultivo || 'N/A',
       estado: cultivo.fields.estado || 'N/A',
       ubicacion: cultivo.fields.ubicacion_general || 'N/A',
       tecnicoResponsable: cultivo.fields.tecnico_responsable || 'N/A',
       lotesAsociados: cultivo.fields.lotes_asociados || []
-    }));
+    };
+    });
 
-    const lotesFormateados = lotes.map(lote => ({
-      id: lote.id,
-      codigo: lote.fields.ID || `LT-${String(lote.fields['Codigo Serial'] || 0).padStart(4, '0')}`,
-      cultivoId: lote.fields.cultivo_id?.[0] || '',
+    const lotesFormateados = lotes.map(lote => {
+      const idFormateado = lote.fields.ID || `LT-${String(lote.fields['Codigo Serial'] || 0).padStart(4, '0')}`;
+      const cultivoRecordId = lote.fields.cultivo_id?.[0] || '';
+      const cultivoIdFormateado = cultivoIdMap.get(cultivoRecordId) || cultivoRecordId;
+      
+      return {
+      id: idFormateado,
+      codigo: idFormateado,
+      cultivoId: cultivoIdFormateado,
       nombreCultivo: lote.fields.nombre_cultivo || 'Sin nombre',
       nombreLote: lote.fields.nombre_lote || 'Sin nombre',
       variedad: lote.fields.variedad || 'N/A',
@@ -242,7 +257,8 @@ export async function GET(request: NextRequest) {
       tipoSuelo: lote.fields.tipo_suelo || 'N/A',
       estado: lote.fields.estado_lote || 'N/A',
       fechaUltimaSiembra: lote.fields.fecha_ultima_siembra || null
-    }));
+    };
+    });
 
     return NextResponse.json({
       success: true,
