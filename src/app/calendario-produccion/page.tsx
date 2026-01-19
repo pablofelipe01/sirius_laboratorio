@@ -57,10 +57,10 @@ const tiposEvento = [
   { value: 'mantenimiento', label: 'Mantenimiento', emoji: '🔧', color: 'bg-gray-500' },
 ];
 
-// Configuración de microorganismos predeterminados por tipo de aplicación (usando nombres para mapear con la base de datos)
+// Configuración de microorganismos predeterminados por tipo de aplicación (usando nombres exactos de Sirius Product Core)
 const microorganismosPredeterminados = {
   'preventivo-pc': [
-    { nombre: 'Trichoderma harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
+    { nombre: 'Trichoderma Harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
     { nombre: 'Siriusbacter', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
   ],
   'preventivo-control-plagas': [
@@ -73,7 +73,7 @@ const microorganismosPredeterminados = {
     { nombre: 'Metarhizium anisopliae', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
   ],
   'prevencion-pestalotiopsis': [
-    { nombre: 'Trichoderma harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
+    { nombre: 'Trichoderma Harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
   ]
 };
 
@@ -423,10 +423,10 @@ export default function CalendarioProduccionPage() {
       const aplicacionesDefault = aplicacionesPorAno[formData.tipoAplicacion as keyof typeof aplicacionesPorAno] || 1;
       const fechasCalculadas = calcularFechasAplicacion(formData.fechaInicio, formData.cantidadAplicacionesAno, formData.periodicidadMeses);
       
-      // Mapear los microorganismos predeterminados con los de la base de datos
+      // Mapear los microorganismos predeterminados con los productos de Sirius usando nombres exactos
       const microorganismosDefault = configDefault.map(config => {
         const microFromDB = microorganismos.find(m => 
-          m.nombre.toLowerCase().includes(config.nombre.split(' ')[0].toLowerCase())
+          m.nombre === config.nombre
         );
         
         return {
@@ -466,16 +466,26 @@ export default function CalendarioProduccionPage() {
   const fetchMicroorganismos = async () => {
     setLoadingMicroorganismos(true);
     try {
-      const response = await fetch('/api/microorganismos');
+      const response = await fetch('/api/sirius-productos');
       const data = await response.json();
       
       if (data.success) {
-        setMicroorganismos(data.microorganismos || []);
+        // Transformar productos de Sirius a formato de microorganismos para compatibilidad
+        const productosFormateados = data.productos.map((producto: any) => ({
+          id: producto.id,
+          nombre: producto.nombre,
+          tipo: producto.tipo,
+          airtableId: producto.airtableId,
+          codigo: producto.codigo,
+          categoria: producto.categoria,
+          unidadBase: producto.unidadBase
+        }));
+        setMicroorganismos(productosFormateados || []);
       } else {
-        console.error('Error loading microorganismos:', data.error);
+        console.error('Error loading productos Sirius:', data.error);
       }
     } catch (error) {
-      console.error('Error fetching microorganismos:', error);
+      console.error('Error fetching productos Sirius:', error);
     } finally {
       setLoadingMicroorganismos(false);
     }
@@ -499,38 +509,82 @@ export default function CalendarioProduccionPage() {
       }
       
       // Convertir eventos de aplicaciones al formato del calendario
-      if (dataAplicaciones.success && dataAplicaciones.eventos) {
-        const eventosAplicaciones = dataAplicaciones.eventos.map((evento: any) => {
-          // Determinar el tipo de aplicación basado en el ID del paquete o estado
-          let tipoAplicacion = 'Aplicación Programada';
-          const clienteInfo = 'Cliente Programado';
-          
-          // Si hay información del paquete, usarla
-          if (evento.paqueteAplicaciones && evento.paqueteAplicaciones.length > 0) {
-            tipoAplicacion = 'Paquete de Aplicaciones';
-          }
-          
-          return {
-            id: evento.id,
-            fecha: evento.fechaProgramada,
-            titulo: tipoAplicacion,
-            descripcion: `${evento.cantidadLitros || 0} litros - ${evento.estadoAplicacion}`,
-            tipo: 'inoculacion' as const,
-            estado: evento.estadoAplicacion === 'PLANIFICADA' ? 'planificado' as const 
-                   : evento.estadoAplicacion === 'EJECUTADA' ? 'completado' as const
-                   : 'cancelado' as const,
-            prioridad: evento.estadoAplicacion === 'PLANIFICADA' ? 'media' as const : 'baja' as const,
-            cliente: clienteInfo,
-            microorganismos: [],
-            litros: evento.cantidadLitros || 0,
-            observaciones: evento.observaciones || '',
-            paqueteId: evento.idPaquete,
-            fechaCreacion: evento.createdTime,
-            // Datos adicionales específicos de aplicaciones
-            fechaAplicacion: evento.fechaAplicacion,
-            estadoAplicacion: evento.estadoAplicacion
-          };
-        });
+      if (dataAplicaciones.success && dataAplicaciones.eventos && Array.isArray(dataAplicaciones.eventos)) {
+        const eventosAplicaciones = dataAplicaciones.eventos
+          .filter((evento: any) => evento != null) // Filtrar elementos null/undefined
+          .map((evento: any) => {
+            // Extraer información real del paquete y aplicación
+            let tipoAplicacionReal = 'Aplicación Programada';
+            let clienteReal = 'Cliente Programado';
+            let microorganismosReales: any[] = [];
+            let descripcionDetallada = `${evento.cantidadLitros || 0} litros - ${evento.estadoAplicacion}`;
+            
+            // Si hay información del paquete, extraer datos reales
+            if (evento.paqueteAplicaciones && Array.isArray(evento.paqueteAplicaciones) && evento.paqueteAplicaciones.length > 0) {
+              const paqueteInfo = evento.paqueteAplicaciones[0];
+              
+              // Extraer tipo de aplicación real del nombre del paquete
+              if (paqueteInfo.nombre) {
+                if (paqueteInfo.nombre.toLowerCase().includes('preventivo-pc')) {
+                  tipoAplicacionReal = 'Preventivo Pie de Cría';
+                } else if (paqueteInfo.nombre.toLowerCase().includes('preventivo-control-plagas')) {
+                  tipoAplicacionReal = 'Preventivo Control de Plagas';
+                } else if (paqueteInfo.nombre.toLowerCase().includes('control-ml')) {
+                  tipoAplicacionReal = 'Control Mal de Lulo';
+                } else if (paqueteInfo.nombre.toLowerCase().includes('prevencion-pestalotiopsis')) {
+                  tipoAplicacionReal = 'Prevención Pestalotiopsis';
+                } else {
+                  // Extraer el cliente del nombre del paquete (formato: "Cliente - Tipo - Año")
+                  const nombrePartes = paqueteInfo.nombre.split(' - ');
+                  if (nombrePartes.length >= 2) {
+                    clienteReal = nombrePartes[0];
+                    tipoAplicacionReal = nombrePartes[1] || tipoAplicacionReal;
+                  }
+                }
+              }
+              
+              // Extraer cliente real si está disponible
+              if (paqueteInfo.clienteId) {
+                // Buscar el cliente en la lista si está disponible
+                // Por ahora usar el clienteId como referencia
+                clienteReal = paqueteInfo.clienteId;
+              }
+              
+              // Construir descripción más detallada
+              const hectareas = paqueteInfo.hectareasTotales || 0;
+              const lotes = paqueteInfo.lotesIds?.length || 0;
+              const aplicaciones = paqueteInfo.cantidadAplicacionesAno || 1;
+              
+              descripcionDetallada = `${evento.cantidadLitros || 0}L • ${hectareas}ha • ${lotes} lotes • ${aplicaciones}/año`;
+            }
+            
+            // Extraer microorganismos si están disponibles
+            if (evento.microorganismos && Array.isArray(evento.microorganismos)) {
+              microorganismosReales = evento.microorganismos;
+            }
+            
+            return {
+              id: evento.id || `evento-${Date.now()}-${Math.random()}`,
+              fecha: evento.fechaProgramada || new Date().toISOString().split('T')[0],
+              titulo: tipoAplicacionReal,
+              descripcion: descripcionDetallada,
+              tipo: 'inoculacion' as const,
+              estado: evento.estadoAplicacion === 'PLANIFICADA' ? 'planificado' as const 
+                     : evento.estadoAplicacion === 'EJECUTADA' ? 'completado' as const
+                     : 'cancelado' as const,
+              prioridad: evento.estadoAplicacion === 'PLANIFICADA' ? 'media' as const : 'baja' as const,
+              cliente: clienteReal,
+              microorganismos: microorganismosReales,
+              litros: evento.cantidadLitros || 0,
+              observaciones: evento.observaciones || '',
+              paqueteId: evento.idPaquete || '',
+              fechaCreacion: evento.createdTime || new Date().toISOString(),
+              // Datos adicionales específicos de aplicaciones
+              fechaAplicacion: evento.fechaAplicacion || '',
+              estadoAplicacion: evento.estadoAplicacion || ''
+            };
+          })
+          .filter(Boolean); // Filtrar elementos null
         
         todosLosEventos = [...todosLosEventos, ...eventosAplicaciones];
       }
@@ -692,7 +746,7 @@ export default function CalendarioProduccionPage() {
           id: lote.id,
           areaHa: lote.areaHa
         })), // Datos completos de lotes con hectáreas
-        microorganismos: formData.microorganismos.map(m => m.id), // Solo los IDs para el link de Airtable
+        microorganismos: formData.microorganismos, // Enviar datos completos con dosificación
         cantidadAplicacionesAno: formData.cantidadAplicacionesAno,
         periodicidadMeses: formData.periodicidadMeses,
         fechaInicio: formData.fechaInicio,
@@ -1647,7 +1701,20 @@ export default function CalendarioProduccionPage() {
                     {selectedEvento.cliente && (
                       <div>
                         <label className="text-sm font-medium text-gray-500">Cliente</label>
-                        <p className="text-gray-900">{selectedEvento.cliente}</p>
+                        <p className="text-gray-900 font-semibold">{selectedEvento.cliente}</p>
+                      </div>
+                    )}
+
+                    {selectedEvento.microorganismos && selectedEvento.microorganismos.length > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Microorganismos</label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {selectedEvento.microorganismos.map((micro: any, index: number) => (
+                            <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              🦠 {typeof micro === 'string' ? micro : micro.nombre || micro}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -1667,22 +1734,46 @@ export default function CalendarioProduccionPage() {
 
                     {selectedEvento.paqueteId && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500">ID Paquete</label>
-                        <p className="text-gray-900 font-mono text-sm">{selectedEvento.paqueteId}</p>
+                        <label className="text-sm font-medium text-gray-500">ID del Paquete</label>
+                        <p className="text-gray-900 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{selectedEvento.paqueteId}</p>
                       </div>
                     )}
 
                     {selectedEvento.estadoAplicacion && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Estado de Aplicación</label>
-                        <p className="text-gray-900">{selectedEvento.estadoAplicacion}</p>
+                        <label className="text-sm font-medium text-gray-500">Estado de la Aplicación</label>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                            selectedEvento.estadoAplicacion === 'PLANIFICADA' ? 'bg-yellow-100 text-yellow-800' :
+                            selectedEvento.estadoAplicacion === 'EJECUTADA' ? 'bg-green-100 text-green-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {selectedEvento.estadoAplicacion === 'PLANIFICADA' ? '⏱️' :
+                             selectedEvento.estadoAplicacion === 'EJECUTADA' ? '✅' : '❌'}
+                            {selectedEvento.estadoAplicacion}
+                          </span>
+                        </div>
                       </div>
                     )}
 
-                    {selectedEvento.fechaAplicacion && (
+                    {selectedEvento.fechaAplicacion && selectedEvento.fechaAplicacion !== selectedEvento.fecha && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Fecha de Aplicación</label>
+                        <label className="text-sm font-medium text-gray-500">Fecha de Ejecución Real</label>
                         <p className="text-gray-900">{formatDate(selectedEvento.fechaAplicacion)}</p>
+                      </div>
+                    )}
+
+                    {selectedEvento.descripcion && selectedEvento.descripcion.includes('•') && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Detalles de la Aplicación</label>
+                        <div className="text-gray-900 bg-blue-50 p-3 rounded-lg">
+                          {selectedEvento.descripcion.split('•').map((detail, index) => (
+                            <div key={index} className="flex items-center gap-2 text-sm">
+                              {index === 0 ? '💧' : index === 1 ? '🌾' : index === 2 ? '📍' : '📅'}
+                              <span>{detail.trim()}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 

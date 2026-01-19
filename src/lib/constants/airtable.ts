@@ -40,18 +40,44 @@ export const AIRTABLE_CONFIG = {
     COSECHA_LABORATORIO: process.env.AIRTABLE_TABLE_COSECHA_LABORATORIO!,
     CEPAS: process.env.AIRTABLE_TABLE_CEPAS!,
     SALIDA_FERMENTACION: process.env.AIRTABLE_TABLE_SALIDA_FERMENTACION,
+    PRODUCTOS_APLICACION: process.env.AIRTABLE_TABLE_PRODUCTOS_APLICACION,
+  }
+} as const;
+
+// Configuración específica para Sirius Product Core
+export const SIRIUS_PRODUCT_CORE_CONFIG = {
+  BASE_ID: process.env.AIRTABLE_BASE_SIRIUS_PRODUCT_CORE!,
+  API_KEY: process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE!,
+  
+  TABLES: {
+    PRODUCTOS: process.env.AIRTABLE_TABLE_SIRIUS_PRODUCTOS!,
+    FORMULACIONES: process.env.AIRTABLE_TABLE_SIRIUS_FORMULACIONES!,
+    CATEGORIAS_PRODUCTO: process.env.AIRTABLE_TABLE_SIRIUS_CATEGORIAS_PRODUCTO!,
+    PRODUCTO_DOMINIO: process.env.AIRTABLE_TABLE_SIRIUS_PRODUCTO_DOMINIO!,
   }
 } as const;
 
 // Helper para construir URLs de la API
-export const buildAirtableUrl = (tableId: string, recordId?: string) => {
-  const baseUrl = `https://api.airtable.com/v0/${AIRTABLE_CONFIG.BASE_ID}/${tableId}`;
+export const buildAirtableUrl = (tableId: string, recordId?: string, baseId?: string) => {
+  const base = baseId || AIRTABLE_CONFIG.BASE_ID;
+  const baseUrl = `https://api.airtable.com/v0/${base}/${tableId}`;
   return recordId ? `${baseUrl}/${recordId}` : baseUrl;
+};
+
+// Helper específico para Sirius Product Core
+export const buildSiriusProductCoreUrl = (tableId: string, recordId?: string) => {
+  return buildAirtableUrl(tableId, recordId, SIRIUS_PRODUCT_CORE_CONFIG.BASE_ID);
 };
 
 // Headers comunes para requests
 export const getAirtableHeaders = () => ({
   'Authorization': `Bearer ${AIRTABLE_CONFIG.API_KEY}`,
+  'Content-Type': 'application/json',
+});
+
+// Headers específicos para Sirius Product Core
+export const getSiriusProductCoreHeaders = () => ({
+  'Authorization': `Bearer ${SIRIUS_PRODUCT_CORE_CONFIG.API_KEY}`,
   'Content-Type': 'application/json',
 });
 

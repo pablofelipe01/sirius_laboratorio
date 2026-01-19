@@ -17,7 +17,7 @@ interface PaqueteAplicacionData {
   cultivoId: string;
   lotesIds: string[]; // Array de IDs de lotes
   lotesData?: Array<{id: string, areaHa: number}>; // Datos completos de lotes con hectáreas
-  microorganismos: string[]; // Array de IDs de microorganismos
+  microorganismos: Array<{id: string, nombre: string, dosificacionPorHa: number, unidad: string}>; // Datos completos con dosificación
   cantidadAplicacionesAno: number;
   periodicidadMeses: number;
   fechaInicio: string;
@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
     const paqueteRecord = await base('Paquete Aplicaciones').create({
       'Tipo Aplicacion': data.nombre, // Usar como identificador del paquete
       'ID Cliente': data.clienteId,
-      'ID Microorganismos': data.microorganismos, // Link to records en DataLab
+      // Nota: data.microorganismos contiene IDs de Sirius Product Core, no de DataLab
+      // Por ahora solo guardamos la cantidad, los productos específicos estarán en Productos Aplicacion
       'Ciclo Dias': Math.round(365 / data.cantidadAplicacionesAno), // Calcular días por ciclo
       'Status': 'Activo',
       'Realiza Registro': data.userName || 'Usuario Desconocido'
@@ -147,6 +148,144 @@ export async function POST(request: NextRequest) {
         });
         
         console.log('✅ [PAQUETE-API] Paquete actualizado con eventos:', eventosIds.length);
+        
+        // Crear registros en la tabla Productos Aplicacion
+        console.log('🔄 [PAQUETE-API] Creando registros de Productos Aplicacion...');
+        console.log('🔍 [PAQUETE-API] Microorganismos con dosificación recibidos:', JSON.stringify(data.microorganismos, null, 2));
+        console.log('🔍 [PAQUETE-API] Hectáreas totales:', data.hectareasTotales);
+        
+        // Obtener códigos de producto de Sirius Product Core para cada microorganismo
+        const microorganismosCompletos = [];
+        for (const microorganismo of data.microorganismos) {
+          try {
+            console.log(`🔍 [PAQUETE-API] Obteniendo código de producto para: ${microorganismo.nombre} (${microorganismo.id})`);
+            const productoResponse = await fetch(
+              `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_SIRIUS_PRODUCT_CORE}/${process.env.AIRTABLE_TABLE_SIRIUS_PRODUCTOS}/${microorganismo.id}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (productoResponse.ok) {
+              const productoData = await productoResponse.json();
+              
+              // Validar que las variables de entorno estén configuradas
+              if (!process.env.AIRTABLE_FIELD_SIRIUS_CODIGO_PRODUCTO) {
+                throw new Error('AIRTABLE_FIELD_SIRIUS_CODIGO_PRODUCTO no está configurado');
+              }
+              if (!process.env.AIRTABLE_FIELD_SIRIUS_NOMBRE) {
+                throw new Error('AIRTABLE_FIELD_SIRIUS_NOMBRE no está configurado');
+              }
+              
+              const codigoProducto = productoData.fields[process.env.AIRTABLE_FIELD_SIRIUS_CODIGO_PRODUCTO];
+              const nombre = productoData.fields[process.env.AIRTABLE_FIELD_SIRIUS_NOMBRE];
+              
+              microorganismosCompletos.push({
+                id: microorganismo.id,
+                nombre: nombre || microorganismo.nombre,
+                codigoProducto: codigoProducto,
+                dosificacionPorHa: microorganismo.dosificacionPorHa // Usar la dosificación del frontend
+              });
+              
+              console.log(`✅ [PAQUETE-API] Producto: ${nombre} (${codigoProducto}) - ${microorganismo.dosificacionPorHa} L/ha (dosificación del frontend)`);
+            } else {
+              console.warn(`⚠️ [PAQUETE-API] No se pudo obtener datos del producto: ${microorganismo.id}, usando datos del frontend`);
+              microorganismosCompletos.push({
+                id: microorganismo.id,
+                nombre: microorganismo.nombre,
+                codigoProducto: `SIRIUS-PRODUCT-${microorganismo.id}`,
+                dosificacionPorHa: microorganismo.dosificacionPorHa
+              });
+            }
+          } catch (error) {
+            console.error(`❌ [PAQUETE-API] Error obteniendo producto ${microorganismo.id}:`, error);
+            microorganismosCompletos.push({
+              id: microorganismo.id,
+              nombre: microorganismo.nombre,
+              codigoProducto: `SIRIUS-PRODUCT-${microorganismo.id}`,
+              dosificacionPorHa: microorganismo.dosificacionPorHa
+            });
+          }
+        }
+        
+        console.log(`📊 [PAQUETE-API] Microorganismos completos obtenidos: ${microorganismosCompletos.length}`);
+        
+        const productosAplicacionData = [];
+        
+        // Para cada evento creado
+        for (const evento of eventosCreados) {
+          // Para cada microorganismo configurado
+          for (const microorganismo of microorganismosCompletos) {
+            // La dosificación que se guarda es la dosis por hectárea configurada, no el total
+            const dosificacionPorHa = microorganismo.dosificacionPorHa;
+            
+            console.log('🔍 [PAQUETE-API] Procesando microorganismo:', {
+              nombre: microorganismo.nombre,
+              id: microorganismo.id,
+              codigoProducto: microorganismo.codigoProducto,
+              dosificacionPorHa: dosificacionPorHa,
+              hectareasTotales: data.hectareasTotales,
+              dosificacionGuardada: dosificacionPorHa
+            });
+            
+            // Validar que las variables de entorno estén configuradas
+            if (!process.env.AIRTABLE_FIELD_PRODUCTOS_APLICACION_DOSIFICACION) {
+              throw new Error('AIRTABLE_FIELD_PRODUCTOS_APLICACION_DOSIFICACION no está configurado');
+            }
+            if (!process.env.AIRTABLE_FIELD_PRODUCTOS_APLICACION_ID_PRODUCTO) {
+              throw new Error('AIRTABLE_FIELD_PRODUCTOS_APLICACION_ID_PRODUCTO no está configurado');
+            }
+            if (!process.env.AIRTABLE_FIELD_PRODUCTOS_APLICACION_EVENTOS) {
+              throw new Error('AIRTABLE_FIELD_PRODUCTOS_APLICACION_EVENTOS no está configurado');
+            }
+            
+            const registroACrear = {
+              fields: {
+                [process.env.AIRTABLE_FIELD_PRODUCTOS_APLICACION_DOSIFICACION]: dosificacionPorHa,
+                [process.env.AIRTABLE_FIELD_PRODUCTOS_APLICACION_ID_PRODUCTO]: microorganismo.codigoProducto || `SIRIUS-PRODUCT-${microorganismo.id}`,
+                [process.env.AIRTABLE_FIELD_PRODUCTOS_APLICACION_EVENTOS]: [evento.id]
+              }
+            };
+            
+            console.log('🔍 [PAQUETE-API] Registro a crear:', JSON.stringify(registroACrear, null, 2));
+            productosAplicacionData.push(registroACrear);
+          }
+        }
+        
+        console.log(`📦 [PAQUETE-API] Creando ${productosAplicacionData.length} registros de productos aplicacion...`);
+        console.log(`📊 [PAQUETE-API] Cálculo: ${eventosCreados.length} eventos × ${data.microorganismos.length} productos = ${productosAplicacionData.length} registros`);
+        console.log(`🔍 [PAQUETE-API] Ejemplo de registro a crear:`, JSON.stringify(productosAplicacionData[0], null, 2));
+        
+        // Crear registros en lotes de máximo 10
+        const productosAplicacionCreados = [];
+        const batchSizeProductos = 10;
+        for (let i = 0; i < productosAplicacionData.length; i += batchSizeProductos) {
+          const batch = productosAplicacionData.slice(i, i + batchSizeProductos);
+          console.log(`📦 [PAQUETE-API] Creando batch de productos aplicacion ${Math.floor(i/batchSizeProductos) + 1} con ${batch.length} registros`);
+          
+          try {
+            const batchResults = await base(process.env.AIRTABLE_TABLE_PRODUCTOS_APLICACION!).create(batch);
+            productosAplicacionCreados.push(...batchResults);
+            console.log(`✅ [PAQUETE-API] Batch ${Math.floor(i/batchSizeProductos) + 1} creado exitosamente: ${batchResults.length} registros`);
+            
+            // Log del primer registro creado para verificar datos
+            if (batchResults.length > 0) {
+              console.log('🔍 [PAQUETE-API] Primer registro creado:', JSON.stringify({
+                id: batchResults[0].id,
+                fields: batchResults[0].fields
+              }, null, 2));
+            }
+          } catch (batchError) {
+            console.error('❌ [PAQUETE-API] Error creando batch de productos aplicacion:', batchError);
+            console.error('📦 [PAQUETE-API] Batch que falló:', JSON.stringify(batch, null, 2));
+            throw batchError;
+          }
+        }
+        
+        console.log('✅ [PAQUETE-API] Registros Productos Aplicacion creados:', productosAplicacionCreados.length);
       }
     }
 
@@ -155,7 +294,8 @@ export async function POST(request: NextRequest) {
       paqueteId: paqueteRecord.id,
       cultivoLotesCount: cultivoLotesCreados.length,
       eventosCount: eventosCreados.length,
-      message: `Paquete "${data.nombre}" creado exitosamente con ${cultivoLotesCreados.length} cultivos-lotes y ${eventosCreados.length} aplicaciones programadas`
+      productosAplicacionCount: eventosCreados.length * data.microorganismos.length,
+      message: `Paquete "${data.nombre}" creado exitosamente con ${cultivoLotesCreados.length} cultivos-lotes, ${eventosCreados.length} aplicaciones programadas y ${eventosCreados.length * data.microorganismos.length} registros de productos aplicacion`
     });
 
   } catch (error) {
