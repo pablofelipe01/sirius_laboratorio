@@ -12,14 +12,11 @@ interface ProduccionEvento {
   fecha: string;
   titulo?: string;
   descripcion?: string;
-  responsable?: string;
   estado: 'planificado' | 'en-proceso' | 'completado' | 'cancelado';
-  prioridad: 'baja' | 'media' | 'alta';
   cliente?: string;
   microorganismo?: string;
   microorganismos?: any[];
   litros?: number;
-  observaciones?: string;
   paqueteId?: string;
   fechaCreacion?: string;
   fechaAplicacion?: string;
@@ -46,7 +43,6 @@ interface CalendarioStats {
   eventosPendientes: number;
   eventosEnProceso: number;
   eventosCompletados: number;
-  eventosPrioridadAlta: number;
 }
 
 const tiposEvento = [
@@ -86,16 +82,10 @@ const aplicacionesPorAno = {
 };
 
 const estadosEvento = [
-  { value: 'planificado', label: 'Planificado', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'en-proceso', label: 'En Proceso', color: 'bg-blue-100 text-blue-800' },
-  { value: 'completado', label: 'Completado', color: 'bg-green-100 text-green-800' },
-  { value: 'cancelado', label: 'Cancelado', color: 'bg-red-100 text-red-800' },
-];
-
-const prioridades = [
-  { value: 'baja', label: 'Baja', color: 'bg-gray-100 text-gray-800' },
-  { value: 'media', label: 'Media', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'alta', label: 'Alta', color: 'bg-red-100 text-red-800' },
+  { value: 'planificado', label: 'Presupuestada', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'en-proceso', label: 'Confirmada', color: 'bg-blue-100 text-blue-800' },
+  { value: 'completado', label: 'Entregada', color: 'bg-green-100 text-green-800' },
+  { value: 'cancelado', label: 'Pospuesta', color: 'bg-red-100 text-red-800' },
 ];
 
 export default function CalendarioProduccionPage() {
@@ -108,6 +98,7 @@ export default function CalendarioProduccionPage() {
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [loadingMicroorganismos, setLoadingMicroorganismos] = useState(false);
   const [loadingPaquete, setLoadingPaquete] = useState(false);
+  const [loadingDetailedEvent, setLoadingDetailedEvent] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [vistaActual, setVistaActual] = useState<'mes' | 'semana' | 'lista' | 'paquetes'>('mes');
@@ -116,18 +107,22 @@ export default function CalendarioProduccionPage() {
   const [paquetesAplicaciones, setPaquetesAplicaciones] = useState<any[]>([]);
   const [loadingPaquetes, setLoadingPaquetes] = useState(false);
   const [selectedEvento, setSelectedEvento] = useState<ProduccionEvento | null>(null);
+  const [editandoEvento, setEditandoEvento] = useState<ProduccionEvento | null>(null);
+  const [showEditEventModal, setShowEditEventModal] = useState(false);
+  const [editEventForm, setEditEventForm] = useState({
+    fecha: '',
+    estado: 'planificado' as ProduccionEvento['estado']
+  });
   const [stats, setStats] = useState<CalendarioStats>({
     totalEventos: 0,
     eventosPendientes: 0,
     eventosEnProceso: 0,
-    eventosCompletados: 0,
-    eventosPrioridadAlta: 0,
+    eventosCompletados: 0
   });
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
-  const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Form states
@@ -273,6 +268,7 @@ export default function CalendarioProduccionPage() {
     setSelectedClienteId('');
     setLotesSeleccionados([]);
     setShowClienteDropdown(false);
+    setEditandoEvento(null);
   };
 
   // Función para cerrar modal
@@ -386,7 +382,7 @@ export default function CalendarioProduccionPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [eventos, filtroTipo, filtroEstado, filtroPrioridad, searchTerm]);
+  }, [eventos, filtroTipo, filtroEstado, searchTerm]);
 
   // Filter clientes based on search input
   useEffect(() => {
@@ -569,14 +565,14 @@ export default function CalendarioProduccionPage() {
               titulo: tipoAplicacionReal,
               descripcion: descripcionDetallada,
               tipo: 'inoculacion' as const,
-              estado: evento.estadoAplicacion === 'PLANIFICADA' ? 'planificado' as const 
-                     : evento.estadoAplicacion === 'EJECUTADA' ? 'completado' as const
-                     : 'cancelado' as const,
-              prioridad: evento.estadoAplicacion === 'PLANIFICADA' ? 'media' as const : 'baja' as const,
+              estado: evento.estadoAplicacion === 'PRESUPUESTADA' ? 'planificado' as const 
+                     : evento.estadoAplicacion === 'ENTREGADA' ? 'completado' as const
+                     : evento.estadoAplicacion === 'POSPUESTA' ? 'cancelado' as const
+                     : evento.estadoAplicacion === 'CONFIRMADA' ? 'en-proceso' as const
+                     : 'planificado' as const,
               cliente: clienteReal,
               microorganismos: microorganismosReales,
               litros: evento.cantidadLitros || 0,
-              observaciones: evento.observaciones || '',
               paqueteId: evento.idPaquete || '',
               fechaCreacion: evento.createdTime || new Date().toISOString(),
               // Datos adicionales específicos de aplicaciones
@@ -609,8 +605,7 @@ export default function CalendarioProduccionPage() {
       totalEventos: eventos.length,
       eventosPendientes: eventos.filter(e => e.estado === 'planificado').length,
       eventosEnProceso: eventos.filter(e => e.estado === 'en-proceso').length,
-      eventosCompletados: eventos.filter(e => e.estado === 'completado').length,
-      eventosPrioridadAlta: eventos.filter(e => e.prioridad === 'alta').length,
+      eventosCompletados: eventos.filter(e => e.estado === 'completado').length
     });
   };
 
@@ -625,16 +620,11 @@ export default function CalendarioProduccionPage() {
       filtered = filtered.filter(e => e.estado === filtroEstado);
     }
 
-    if (filtroPrioridad !== 'todos') {
-      filtered = filtered.filter(e => e.prioridad === filtroPrioridad);
-    }
-
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(e => 
         e.cliente?.toLowerCase().includes(term) ||
-        e.microorganismo?.toLowerCase().includes(term) ||
-        e.responsable?.toLowerCase().includes(term)
+        e.microorganismo?.toLowerCase().includes(term)
       );
     }
 
@@ -808,6 +798,72 @@ export default function CalendarioProduccionPage() {
     }
   };
 
+  const handleUpdateIndividualEvent = async () => {
+    if (!editandoEvento || loadingDetailedEvent) return;
+    
+    setLoadingDetailedEvent(true);
+    
+    try {
+      console.log('🔄 Actualizando evento individual:', editandoEvento.id);
+      
+      // Mapear estados del frontend a Airtable
+      const estadoAirtable = editEventForm.estado === 'planificado' ? 'PRESUPUESTADA' :
+                             editEventForm.estado === 'completado' ? 'ENTREGADA' :
+                             editEventForm.estado === 'cancelado' ? 'POSPUESTA' : 'PRESUPUESTADA';
+      
+      // Verificar si la fecha cambió para actualizar fechas futuras
+      const fechaCambio = editEventForm.fecha !== editandoEvento.fecha;
+      
+      // Confirmar el efecto dominó si hay cambio de fecha
+      let updateFutureDates = false;
+      if (fechaCambio) {
+        const diasDiferencia = Math.floor((new Date(editEventForm.fecha).getTime() - new Date(editandoEvento.fecha).getTime()) / (1000 * 60 * 60 * 24));
+        const mensaje = diasDiferencia > 0 
+          ? `Se adelantará ${diasDiferencia} día(s)` 
+          : `Se atrasará ${Math.abs(diasDiferencia)} día(s)`;
+        
+        updateFutureDates = confirm(
+          `¿Actualizar también las fechas de todas las aplicaciones futuras de este paquete?\n\n${mensaje} todas las aplicaciones siguientes del mismo paquete.`
+        );
+      }
+      
+      const updateData = {
+        id: editandoEvento.id,
+        fecha: editEventForm.fecha,
+        estado: estadoAirtable,
+        updateFutureDates: updateFutureDates, // Bandera para actualizar fechas futuras (solo si el usuario confirma)
+        paqueteId: editandoEvento.paqueteId // Para identificar aplicaciones relacionadas
+      };
+
+      const response = await fetch('/api/aplicaciones-eventos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ Aplicación actualizada correctamente:', data);
+        let mensaje = 'Aplicación actualizada correctamente';
+        if (updateFutureDates && data.updatedFutureEvents > 0) {
+          mensaje += `\n\n🗓️ Efecto dominó aplicado: Se actualizaron ${data.updatedFutureEvents} aplicaciones futuras del mismo paquete`;
+        }
+        alert(mensaje);
+        closeEditEventModal();
+        fetchEventos();
+      } else {
+        console.error('❌ Error al actualizar aplicación:', data.error);
+        alert(`Error al actualizar aplicación: ${data.error || 'Error desconocido'}`);
+      }
+    } catch (error) {
+      console.error('❌ Error actualizando aplicación:', error);
+      alert(`Error al actualizar aplicación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setLoadingDetailedEvent(false);
+    }
+  };
+
   const handleUpdateEvento = async (eventoId: string, updates: Partial<ProduccionEvento>) => {
     try {
       const response = await fetch('/api/calendario-produccion', {
@@ -858,10 +914,12 @@ export default function CalendarioProduccionPage() {
     });
     setClienteSearch('');
     setShowClienteDropdown(false);
+    setEditandoEvento(null);
   };
 
   const openAddModal = (clienteDefault?: string, fechaDefault?: string) => {
     resetForm();
+    setEditandoEvento(null);
     if (clienteDefault) {
       setFormData(prev => ({ ...prev, cliente: clienteDefault }));
       setClienteSearch(clienteDefault);
@@ -870,6 +928,85 @@ export default function CalendarioProduccionPage() {
       setFormData(prev => ({ ...prev, fechaInicio: fechaDefault }));
     }
     setShowAddModal(true);
+  };
+
+  const openEditEventModal = async (evento: ProduccionEvento) => {
+    setLoadingDetailedEvent(true);
+    try {
+      console.log('🔍 Abriendo modal para evento:', evento.id);
+      
+      // Obtener datos completos del evento desde la API
+      const response = await fetch(`/api/aplicaciones-eventos?id=${evento.id}`);
+      const data = await response.json();
+      
+      console.log('📋 Respuesta de la API:', data);
+      
+      if (data.success && data.evento) {
+        const eventoCompleto = data.evento;
+        console.log('📊 Datos completos del evento:', eventoCompleto);
+        console.log('🌾 Lotes disponibles:', eventoCompleto.lotesIds);
+        console.log('🧪 Productos disponibles:', eventoCompleto.productosAplicados);
+        console.log('📏 Hectáreas disponibles:', eventoCompleto.hectareas);
+        console.log('🧬 Cantidad biológicos:', eventoCompleto.cantidadBiologicos);
+        
+        // Mapear estados correctamente
+        let estadoMapeado = 'planificado';
+        if (eventoCompleto.estado === 'ENTREGADA' || eventoCompleto.estado === 'entregada') {
+          estadoMapeado = 'completado';
+        } else if (eventoCompleto.estado === 'POSPUESTA' || eventoCompleto.estado === 'pospuesta') {
+          estadoMapeado = 'cancelado';
+        } else if (eventoCompleto.estado === 'CONFIRMADA' || eventoCompleto.estado === 'confirmada') {
+          estadoMapeado = 'en-proceso';
+        }
+        
+        setEditandoEvento({
+          ...evento,
+          ...eventoCompleto,
+          estado: estadoMapeado,
+          // Asegurar que los campos críticos estén disponibles
+          totalHectareas: eventoCompleto.totalHectareas || 'N/A',
+          cantidadBiologicos: eventoCompleto.cantidadBiologicos || 'N/A',
+          lotesIds: eventoCompleto.lotesIds || [],
+          hectareas: eventoCompleto.hectareas || [],
+          productosAplicados: eventoCompleto.productosAplicados || []
+        });
+        
+        setEditEventForm({
+          fecha: eventoCompleto.fecha || evento.fecha,
+          estado: estadoMapeado as "planificado" | "en-proceso" | "completado" | "cancelado"
+        });
+      } else {
+        console.error('❌ Error en respuesta de la API:', data);
+        // Fallback a datos básicos si no se puede obtener información completa
+        setEditandoEvento(evento);
+        setEditEventForm({
+          fecha: evento.fecha,
+          estado: evento.estado
+        });
+      }
+      
+      setShowEditEventModal(true);
+    } catch (error) {
+      console.error('❌ Error obteniendo datos del evento:', error);
+      // Fallback a datos básicos en caso de error
+      setEditandoEvento(evento);
+      setEditEventForm({
+        fecha: evento.fecha,
+        estado: evento.estado
+      });
+      setShowEditEventModal(true);
+    } finally {
+      setLoadingDetailedEvent(false);
+    }
+  };
+
+  const closeEditEventModal = () => {
+    setShowEditEventModal(false);
+    setEditandoEvento(null);
+    setEditEventForm({
+      fecha: '',
+      estado: 'planificado'
+    });
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -935,10 +1072,6 @@ export default function CalendarioProduccionPage() {
 
   const getEstadoEvento = (estado: string) => {
     return estadosEvento.find(e => e.value === estado) || estadosEvento[0];
-  };
-
-  const getPrioridad = (prioridad: string) => {
-    return prioridades.find(p => p.value === prioridad) || prioridades[1];
   };
 
   return (
@@ -1076,7 +1209,10 @@ export default function CalendarioProduccionPage() {
                               key={evento.id}
                               className={`text-xs px-2 py-1 rounded ${tipo.color} text-white truncate cursor-pointer hover:opacity-80`}
                               title={`${eventTitle}\n${eventDescription}`}
-                              onClick={() => setSelectedEvento(evento)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEvento(evento);
+                              }}
                             >
                               {tipo.emoji} {evento.titulo ? evento.titulo : tipo.label}
                             </div>
@@ -1114,12 +1250,6 @@ export default function CalendarioProduccionPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Estado
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Prioridad
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Responsable
-                      </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Acciones
                       </th>
@@ -1128,7 +1258,7 @@ export default function CalendarioProduccionPage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center">
+                        <td colSpan={5} className="px-6 py-12 text-center">
                           <div className="flex justify-center items-center">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                           </div>
@@ -1136,7 +1266,7 @@ export default function CalendarioProduccionPage() {
                       </tr>
                     ) : filteredEventos.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                           No hay eventos programados
                         </td>
                       </tr>
@@ -1146,7 +1276,6 @@ export default function CalendarioProduccionPage() {
                         .map(evento => {
                           const tipo = getTipoEvento(evento.tipo);
                           const estado = getEstadoEvento(evento.estado);
-                          const prioridad = getPrioridad(evento.prioridad);
                           
                           return (
                             <tr key={evento.id} className="hover:bg-gray-50 transition-colors">
@@ -1155,7 +1284,7 @@ export default function CalendarioProduccionPage() {
                               </td>
                               <td className="px-6 py-4">
                               <div className="text-sm font-medium text-gray-900">{getTipoEvento(evento.tipo).label} - {evento.cliente || 'Sin cliente'}</div>
-                                <div className="text-sm text-gray-500">{evento.microorganismo || 'Sin microorganismo'} - {evento.responsable || 'Sin responsable'}</div>
+                                <div className="text-sm text-gray-500">{evento.microorganismo || 'Sin microorganismo'}</div>
                                 {evento.cliente && (
                                   <div className="text-xs text-gray-400 mt-1">Cliente: {evento.cliente}</div>
                                 )}
@@ -1169,14 +1298,6 @@ export default function CalendarioProduccionPage() {
                                 <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${estado.color}`}>
                                   {estado.label}
                                 </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${prioridad.color}`}>
-                                  {prioridad.label}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {evento.responsable}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button
@@ -1213,7 +1334,7 @@ export default function CalendarioProduccionPage() {
                   
                   <div className="relative z-10 flex justify-between items-start">
                     <div className="flex-1">
-                      <h2 className="text-3xl font-bold mb-2">Agregar Evento</h2>
+                      <h2 className="text-3xl font-bold mb-2">{editandoEvento ? 'Editar Evento' : 'Agregar Evento'}</h2>
                       <p className="text-blue-100">Calendario de Producción</p>
                     </div>
                     <button
@@ -1227,7 +1348,15 @@ export default function CalendarioProduccionPage() {
 
                 {/* Modal Content - Scrollable */}
                 <div className="flex-1 overflow-y-auto px-8 py-6">
-                  <form onSubmit={handleAddEvento} className="space-y-6">
+                  <form onSubmit={editandoEvento ? (e) => {
+                    e.preventDefault();
+                    if (editandoEvento) {
+                      handleUpdateEvento(editandoEvento.id, {
+                        fecha: editEventForm.fecha,
+                        estado: editEventForm.estado
+                      });
+                    }
+                  } : handleAddEvento} className="space-y-6">
                     {/* Fila 1: Tipo de Aplicación, Cantidad de Aplicaciones y Fecha */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {/* Tipo de Aplicación */}
@@ -1620,7 +1749,6 @@ export default function CalendarioProduccionPage() {
                   </button>
                   <button
                     type="submit"
-                    onClick={handleAddEvento}
                     disabled={loadingPaquete}
                     className={`flex-1 ${
                       loadingPaquete 
@@ -1634,10 +1762,10 @@ export default function CalendarioProduccionPage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Creando Paquete...
+                        {editandoEvento ? 'Actualizando...' : 'Creando Paquete...'}
                       </>
                     ) : (
-                      'Crear Paquete de Aplicaciones'
+                      editandoEvento ? 'Actualizar Evento' : 'Crear Paquete de Aplicaciones'
                     )}
                   </button>
                 </div>
@@ -1647,8 +1775,8 @@ export default function CalendarioProduccionPage() {
 
           {/* Event Detail Modal */}
           {selectedEvento && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-6">
                     <div>
@@ -1665,17 +1793,29 @@ export default function CalendarioProduccionPage() {
                         <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getEstadoEvento(selectedEvento.estado).color}`}>
                           {getEstadoEvento(selectedEvento.estado).label}
                         </span>
-                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getPrioridad(selectedEvento.prioridad).color}`}>
-                          {getPrioridad(selectedEvento.prioridad).label}
-                        </span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setSelectedEvento(null)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      ✕
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditEventModal(selectedEvento);
+                          setSelectedEvento(null);
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
+                      >
+                        ✏️ Editar Aplicación
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedEvento(null);
+                        }}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
@@ -1684,19 +1824,7 @@ export default function CalendarioProduccionPage() {
                       <p className="text-gray-900">{formatDate(selectedEvento.fecha)}</p>
                     </div>
 
-                    {selectedEvento.responsable && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Responsable</label>
-                        <p className="text-gray-900">{selectedEvento.responsable}</p>
-                      </div>
-                    )}
 
-                    {selectedEvento.responsable && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Responsable</label>
-                        <p className="text-gray-900">{selectedEvento.responsable}</p>
-                      </div>
-                    )}
 
                     {selectedEvento.cliente && (
                       <div>
@@ -1777,12 +1905,7 @@ export default function CalendarioProduccionPage() {
                       </div>
                     )}
 
-                    {selectedEvento.observaciones && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Observaciones</label>
-                        <p className="text-gray-900">{selectedEvento.observaciones}</p>
-                      </div>
-                    )}
+
 
                     <div className="pt-4 border-t">
                       <label className="text-sm font-medium text-gray-500 mb-2 block">Cambiar Estado</label>
@@ -1963,6 +2086,310 @@ export default function CalendarioProduccionPage() {
                       className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
                     >
                       Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Individual Event Modal */}
+          {showEditEventModal && editandoEvento && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-200 rounded-t-xl">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        ✏️ Editar Aplicación Individual
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        ID: {editandoEvento.id}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeEditEventModal();
+                      }}
+                      className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {loadingDetailedEvent ? (
+                    <div className="flex justify-center items-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-3 text-gray-600">Cargando datos completos de la aplicación...</span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Información Principal */}
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                          📋 Información Principal de la Aplicación
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              📅 Fecha Programada
+                            </label>
+                            <input
+                              type="date"
+                              value={editEventForm.fecha}
+                              onChange={(e) => setEditEventForm(prev => ({...prev, fecha: e.target.value}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              🎯 Estado de Aplicación
+                            </label>
+                            <select
+                              value={editEventForm.estado}
+                              onChange={(e) => setEditEventForm(prev => ({...prev, estado: e.target.value as any}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="planificado">PLANIFICADA</option>
+                              <option value="completado">EJECUTADA</option>
+                              <option value="cancelado">CANCELADA</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              📏 Total Hectáreas
+                            </label>
+                            <input
+                              type="text"
+                              value={`${(editandoEvento as any).totalHectareas || 'N/A'} ha`}
+                              disabled
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Información de Lotes */}
+                      {(editandoEvento as any).lotesIds && (editandoEvento as any).lotesIds.length > 0 && (
+                        <div className="bg-green-50 p-4 rounded-lg">
+                          <h3 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
+                            🌾 Lotes de Aplicación ({(editandoEvento as any).lotesIds.length} lotes)
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {(editandoEvento as any).lotesIds.map((loteId: string, index: number) => (
+                              <div key={index} className="bg-white p-3 rounded-lg border shadow-sm">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
+                                      Lote #{index + 1}
+                                    </span>
+                                    <p className="font-semibold text-gray-900 mt-1">{loteId}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {(editandoEvento as any).hectareas?.[index] || 'N/A'} ha
+                                    </p>
+                                    <p className="text-xs text-gray-600">Hectáreas</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="bg-white p-3 rounded-lg mt-3 border-2 border-green-200">
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium text-green-900">📊 Resumen Total:</span>
+                              <div className="text-right">
+                                <span className="font-bold text-green-900 text-lg">
+                                  {(editandoEvento as any).lotesIds.length} lotes
+                                </span>
+                                <span className="mx-2">•</span>
+                                <span className="font-bold text-green-900 text-lg">
+                                  {(editandoEvento as any).totalHectareas || 'N/A'} ha
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Información de Productos y Biológicos */}
+                      <div className="bg-purple-50 p-4 rounded-lg">
+                        <h3 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                          🧪 Productos Biológicos y Cantidades
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div className="bg-white p-4 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-2xl">🧬</span>
+                              <h4 className="font-medium text-gray-900">Cantidad Total de Biológicos</h4>
+                            </div>
+                            <p className="text-3xl font-bold text-purple-600">
+                              {(editandoEvento as any).cantidadBiologicos || 'N/A'} <span className="text-lg">litros</span>
+                            </p>
+                          </div>
+                          
+                          <div className="bg-white p-4 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-2xl">📦</span>
+                              <h4 className="font-medium text-gray-900">Productos Registrados</h4>
+                            </div>
+                            <p className="text-3xl font-bold text-purple-600">
+                              {(editandoEvento as any).productosAplicados?.length || 0} <span className="text-lg">productos</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {(editandoEvento as any).productosAplicados && (editandoEvento as any).productosAplicados.length > 0 && (
+                          <div>
+                            <h4 className="font-medium text-purple-900 mb-2">🔗 IDs de Productos Aplicados:</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {(editandoEvento as any).productosAplicados.map((productoId: string, index: number) => (
+                                <div key={index} className="bg-white p-2 rounded border text-sm">
+                                  <span className="text-purple-600 font-mono">{productoId}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Campos Editables */}
+                      <div className="bg-orange-50 p-4 rounded-lg">
+                        <h3 className="font-semibold text-orange-900 mb-3 flex items-center gap-2">
+                          ✏️ Campos Editables
+                        </h3>
+
+                      </div>
+
+                      {/* Debug Information */}
+                      <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <h3 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                          🐛 Información de Debug (Temporal)
+                        </h3>
+                        <div className="text-xs space-y-2 text-red-800">
+                          <div><strong>ID:</strong> {editandoEvento.id}</div>
+                          <div><strong>Total Hectáreas:</strong> {JSON.stringify((editandoEvento as any).totalHectareas)}</div>
+                          <div><strong>Cantidad Biológicos:</strong> {JSON.stringify((editandoEvento as any).cantidadBiologicos)}</div>
+                          <div><strong>Lotes IDs:</strong> {(editandoEvento as any).lotesIds?.length || 0} elementos</div>
+                          <div><strong>Productos:</strong> {(editandoEvento as any).productosAplicados?.length || 0} elementos</div>
+                          <div><strong>Estado:</strong> {editandoEvento.estado}</div>
+                          {(editandoEvento as any).allFields && (
+                            <div>
+                              <strong>Campos disponibles en Airtable:</strong>
+                              <pre className="mt-1 p-2 bg-white rounded text-xs overflow-auto max-h-32">
+                                {JSON.stringify(Object.keys((editandoEvento as any).allFields), null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Información de Control de Fechas */}
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                          🕒 Control de Fechas y Trazabilidad
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-white p-3 rounded-lg border">
+                            <p className="text-sm text-gray-600">📅 Fecha de Creación del Registro</p>
+                            <p className="font-medium text-gray-900">
+                              {editandoEvento.fechaCreacion ? 
+                                new Date(editandoEvento.fechaCreacion).toLocaleString('es-ES', {
+                                  dateStyle: 'full',
+                                  timeStyle: 'short'
+                                }) : 'No disponible'}
+                            </p>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg border">
+                            <p className="text-sm text-gray-600">🔄 Última Modificación</p>
+                            <p className="font-medium text-gray-900">
+                              {(editandoEvento as any).fechaActualizacion ? 
+                                new Date((editandoEvento as any).fechaActualizacion).toLocaleString('es-ES', {
+                                  dateStyle: 'full',
+                                  timeStyle: 'short'
+                                }) : 'Sin modificaciones'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Información del Paquete */}
+                      {editandoEvento.paqueteId && (
+                        <div className="bg-indigo-50 p-4 rounded-lg">
+                          <h3 className="font-semibold text-indigo-900 mb-3 flex items-center gap-2">
+                            📦 Información del Paquete
+                          </h3>
+                          <div className="bg-white p-3 rounded-lg border">
+                            <p className="text-sm text-gray-600">ID del Paquete de Aplicaciones:</p>
+                            <p className="font-mono text-indigo-600 font-medium">{editandoEvento.paqueteId}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Aviso de Cambio de Fecha */}
+                      {editEventForm.fecha !== editandoEvento.fecha && (
+                        <div className="bg-yellow-100 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+                          <div className="flex items-start">
+                            <div className="ml-3">
+                              <div className="flex items-center gap-2 text-yellow-800">
+                                <span className="text-xl">⚠️</span>
+                                <h3 className="text-sm font-medium">Cambio de Fecha Detectado</h3>
+                              </div>
+                              <div className="mt-2 text-sm text-yellow-700">
+                                <p>
+                                  <strong>Fecha Original:</strong> {editandoEvento.fecha}
+                                </p>
+                                <p>
+                                  <strong>Nueva Fecha:</strong> {editEventForm.fecha}
+                                </p>
+                                <p className="mt-2">
+                                  ⚡ <strong>Acción Automática:</strong> Todas las aplicaciones futuras del mismo paquete 
+                                  se ajustarán automáticamente manteniendo los intervalos originales entre aplicaciones.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Botones de Acción */}
+                <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-gray-200 rounded-b-xl">
+                  <div className="flex gap-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeEditEventModal();
+                      }}
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateIndividualEvent();
+                      }}
+                      disabled={loadingDetailedEvent}
+                      className={`flex-1 px-4 py-3 rounded-lg text-white font-medium ${
+                        loadingDetailedEvent 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {loadingDetailedEvent ? 
+                        <>
+                          <span className="animate-spin mr-2">🔄</span>
+                          Actualizando...
+                        </> : 
+                        'Actualizar Aplicación'
+                      }
                     </button>
                   </div>
                 </div>
