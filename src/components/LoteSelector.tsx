@@ -81,11 +81,12 @@ export default function LoteSelector({
         });
         
         setCultivos(data.cultivos || []);
-        setLotes(data.lotes || []);
+        const lotesOrdenadosGlobal = sortLotesNumerically(data.lotes || []);
+        setLotes(lotesOrdenadosGlobal);
         
         // Pasar datos completos de lotes al padre si el callback existe
         if (onLotesDataChange) {
-          onLotesDataChange(data.lotes || []);
+          onLotesDataChange(lotesOrdenadosGlobal);
         }
         
         if ((data.cultivos?.length || 0) === 0) {
@@ -104,6 +105,35 @@ export default function LoteSelector({
 
     fetchCultivosLotes();
   }, [clienteId]);
+
+  // Helper: extraer número de parcela o código para orden numérico
+  const extractLoteNumber = (lote: Lote) => {
+    // Buscar patrón P.123, P-123 o P123 en nombreLote (ej: B.14-P.20)
+    const nombre = lote.nombreLote || '';
+    const matchP = nombre.match(/P[.\-]?(\d+)/i) || nombre.match(/\bP(\d+)\b/i);
+    if (matchP && matchP[1]) return parseInt(matchP[1], 10);
+
+    // Intentar extraer número de código LT-0123
+    const codigo = lote.codigo || '';
+    const matchLT = codigo.match(/LT[-]?0*(\d+)/i);
+    if (matchLT && matchLT[1]) return parseInt(matchLT[1], 10);
+
+    // Como fallback, intentar cualquier número en el nombre
+    const anyNum = nombre.match(/(\d+)/);
+    if (anyNum && anyNum[1]) return parseInt(anyNum[1], 10);
+
+    return Number.POSITIVE_INFINITY; // Colocar al final si no hay número
+  };
+
+  const sortLotesNumerically = (lotesArray: Lote[]) => {
+    return [...lotesArray].sort((a, b) => {
+      const na = extractLoteNumber(a);
+      const nb = extractLoteNumber(b);
+      if (na !== nb) return na - nb;
+      // Si los números son iguales o no existen, ordenar por código alfanumérico
+      return (a.nombreLote || '').localeCompare(b.nombreLote || '', undefined, { numeric: true, sensitivity: 'base' });
+    });
+  };
 
   // Agrupar lotes por cultivo
   const lotesPorCultivo = cultivos.map(cultivo => ({
@@ -313,8 +343,11 @@ export default function LoteSelector({
                 'border-l-yellow-500 bg-yellow-50'
               ];
               const colorCultivo = coloresCultivo[parseInt(cultivo.id.slice(-1), 16) % coloresCultivo.length];
+
+              // Ordenar lotes de forma numérica por nombre/código antes de renderizar
+              const lotesOrdenados = sortLotesNumerically(lotesDelCultivo);
               
-              return lotesDelCultivo.map(lote => {
+              return lotesOrdenados.map(lote => {
                 const estaSeleccionado = lotesSeleccionados.includes(lote.id);
                 
                 return (

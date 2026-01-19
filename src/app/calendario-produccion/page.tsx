@@ -2002,10 +2002,10 @@ export default function CalendarioProduccionPage() {
                                   🏢 Cliente ID: {paquete.clienteId}
                                 </span>
                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  🌱 {paquete.lotesIds.length} Lotes
+                                  🌱 {paquete.lotesIds?.length ?? 0} Lotes
                                 </span>
                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                  🧪 {paquete.microorganismos.length} Microorganismos
+                                  🧪 {paquete.microorganismos?.length ?? 0} Microorganismos
                                 </span>
                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                                   📅 {paquete.cantidadAplicacionesAno} aplicaciones/año
@@ -2046,7 +2046,7 @@ export default function CalendarioProduccionPage() {
                             <div className="text-sm text-gray-700 space-y-1">
                               <p><strong>Fecha Inicio:</strong> {new Date(paquete.fechaInicio).toLocaleDateString('es-ES')}</p>
                               <p><strong>Creado:</strong> {new Date(paquete.createdTime).toLocaleDateString('es-ES')} a las {new Date(paquete.createdTime).toLocaleTimeString('es-ES')}</p>
-                              <p><strong>Lotes IDs:</strong> {paquete.lotesIds.join(', ')}</p>
+                              <p><strong>Lotes IDs:</strong> {paquete.lotesIds?.join(', ') || '—'}</p>
                             </div>
                           </div>
 
