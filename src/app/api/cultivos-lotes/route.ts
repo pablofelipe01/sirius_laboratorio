@@ -62,17 +62,52 @@ export async function GET(request: NextRequest) {
 
     console.log('🔍 Obteniendo registro del cliente:', clienteId);
 
-    // Primero obtener el registro del cliente para acceder a sus cultivos vinculados
-    const clienteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_CLIENTES_CORE}/${clienteId}`;
+    // Determinar si clienteId es un ID de registro (formato recXXXXXXXXXXXXXX) o un ID de cliente (formato CL-XXXX)
+    const isRecordId = clienteId.startsWith('rec') && clienteId.length === 17;
+    const isClienteId = clienteId.startsWith('CL-') || clienteId.match(/^CL-\d+$/);
     
-    console.log('📡 Request URL para cliente:', clienteUrl);
+    let clienteResponse;
     
-    const clienteResponse = await fetch(clienteUrl, {
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    if (isRecordId) {
+      // Si es un ID de registro, hacer consulta directa
+      const clienteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_CLIENTES_CORE}/${clienteId}`;
+      console.log('📡 Request URL para cliente (por record ID):', clienteUrl);
+      
+      clienteResponse = await fetch(clienteUrl, {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } else if (isClienteId) {
+      // Si es un ID de cliente (CL-XXXX), buscar por campo ID
+      const clienteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_CLIENTES_CORE}`;
+      const filterFormula = `{ID} = '${clienteId}'`;
+      const fullUrl = `${clienteUrl}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+      
+      console.log('📡 Request URL para cliente (por ID de cliente):', fullUrl);
+      
+      clienteResponse = await fetch(fullUrl, {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } else {
+      // Si es un nombre u otro identificador, buscar por campos comunes
+      const clienteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_CLIENTES_CORE}`;
+      const filterFormula = `OR({ID} = '${clienteId}', {Nombre} = '${clienteId}', {Cliente} = '${clienteId}')`;
+      const fullUrl = `${clienteUrl}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+      
+      console.log('📡 Request URL para cliente (por nombre/otros):', fullUrl);
+      
+      clienteResponse = await fetch(fullUrl, {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
 
     console.log('📥 Response status cliente:', clienteResponse.status);
 
@@ -82,7 +117,9 @@ export async function GET(request: NextRequest) {
         status: clienteResponse.status,
         statusText: clienteResponse.statusText,
         error: errorText,
-        clienteId: clienteId
+        clienteId: clienteId,
+        isRecordId: isRecordId,
+        isClienteId: isClienteId
       });
       return NextResponse.json({ 
         success: false,
@@ -91,7 +128,30 @@ export async function GET(request: NextRequest) {
     }
 
     const clienteData = await clienteResponse.json();
-    const cultivoIds = clienteData.fields?.['Cultivos Core'] || [];
+    
+    // Procesar la respuesta dependiendo de si fue búsqueda por ID de registro, ID de cliente, o nombre
+    let clienteRecord;
+    if (isRecordId) {
+      // Respuesta directa del registro
+      clienteRecord = clienteData;
+    } else {
+      // Respuesta con array de registros de búsqueda (tanto para ID de cliente como para nombre)
+      if (!clienteData.records || clienteData.records.length === 0) {
+        console.log('⚠️ No se encontró cliente:', clienteId);
+        return NextResponse.json({ 
+          success: true,
+          cultivos: [], 
+          lotes: [],
+          message: `No se encontró cliente: ${clienteId}`
+        });
+      }
+      clienteRecord = clienteData.records[0]; // Tomar el primer resultado
+    }
+    
+    console.log('👤 Registro del cliente encontrado:', clienteRecord.id);
+    console.log('📋 Campos del cliente:', Object.keys(clienteRecord.fields));
+    
+    const cultivoIds = clienteRecord.fields?.['Cultivos Core'] || [];
 
     console.log(`✅ IDs de cultivos vinculados al cliente: ${cultivoIds.length}`, cultivoIds);
 

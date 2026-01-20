@@ -17,6 +17,9 @@ if (!process.env.AIRTABLE_TABLE_APLICACIONES) {
 }
 const APLICACIONES_TABLE = process.env.AIRTABLE_TABLE_APLICACIONES;
 
+// Tabla de paquetes de aplicaciones (opcional, usada para obtener información del cliente)
+const PAQUETES_APLICACIONES_TABLE = process.env.AIRTABLE_TABLE_PAQUETES_APLICACIONES || 'Paquete Aplicaciones';
+
 // Campos: usar nombres legibles por defecto o variables de entorno; NO caer de vuelta a field IDs como 'fldXXXX'
 const FIELD_FECHA_PROGRAMADA = process.env.AIRTABLE_FIELD_FECHA_PROGRAMADA || 'Fecha Programada';
 const FIELD_ESTADO_APLICACION = process.env.AIRTABLE_FIELD_ESTADO_APLICACION || 'Estado Aplicacion';
@@ -56,15 +59,43 @@ export async function GET(request: NextRequest) {
         console.log('📋 Campos disponibles en el evento:', Object.keys(event.fields));
         console.log('📊 Datos completos del evento:', event.fields);
         
+        // Obtener información del cliente del paquete de aplicaciones
+        let clienteInfo = null;
+        const paqueteId = event.fields[FIELD_PAQUETES_APLICACIONES] ? 
+                         (Array.isArray(event.fields[FIELD_PAQUETES_APLICACIONES]) ? 
+                          event.fields[FIELD_PAQUETES_APLICACIONES][0] : 
+                          event.fields[FIELD_PAQUETES_APLICACIONES]) :
+                         (event.fields[FIELD_ID_PAQUETE] || null);
+        
+        console.log('🔍 Obteniendo información del paquete:', paqueteId);
+        
+        if (paqueteId) {
+          try {
+            const paquete = await base(PAQUETES_APLICACIONES_TABLE).find(paqueteId);
+            console.log('📦 Información del paquete:', paquete.fields);
+            
+            // Obtener ID del cliente del paquete (formato CL-XXXX)
+            const clienteIdField = paquete.fields['ID Cliente'] || paquete.fields['Cliente ID'] || paquete.fields['id_cliente'];
+            if (clienteIdField) {
+              const clienteId = Array.isArray(clienteIdField) ? clienteIdField[0] : clienteIdField;
+              console.log('👤 Cliente ID encontrado:', clienteId);
+              clienteInfo = { clienteId };
+            } else {
+              console.warn('⚠️ No se encontró campo ID Cliente en el paquete');
+              console.log('🔍 Campos disponibles en el paquete:', Object.keys(paquete.fields));
+            }
+          } catch (paqueteError) {
+            console.warn('⚠️ Error obteniendo información del paquete:', paqueteError);
+          }
+        }
+        
         const eventData = {
           id: event.id,
           fecha: event.fields[FIELD_FECHA_PROGRAMADA],
           estado: event.fields[FIELD_ESTADO_APLICACION],
-          paqueteId: event.fields[FIELD_PAQUETES_APLICACIONES] ? 
-                     (Array.isArray(event.fields[FIELD_PAQUETES_APLICACIONES]) ? 
-                      event.fields[FIELD_PAQUETES_APLICACIONES][0] : 
-                      event.fields[FIELD_PAQUETES_APLICACIONES]) :
-                     (event.fields[FIELD_ID_PAQUETE] || null),
+          paqueteId,
+          // Información del cliente
+          clienteId: clienteInfo?.clienteId || null,
           cultivosLotes: event.fields[FIELD_CULTIVOS_LOTES] || [],
           hectareas: event.fields[FIELD_HECTAREAS] || [],
           lotesIds: event.fields[FIELD_ID_LOTE] || [],
@@ -76,11 +107,13 @@ export async function GET(request: NextRequest) {
           prioridad: event.fields[FIELD_PRIORIDAD] || 'media',
           responsable: event.fields[FIELD_RESPONSABLE] || '',
           observaciones: event.fields[FIELD_OBSERVACIONES] || '',
+          // Información adicional del paquete/cliente
+          paqueteInfo: clienteInfo,
           // Campos adicionales para debugging
           allFields: event.fields
         };
 
-        console.log('✅ Datos procesados del evento:', eventData);
+        console.log('✅ Datos procesados del evento con cliente:', eventData);
 
         return NextResponse.json({
           success: true,

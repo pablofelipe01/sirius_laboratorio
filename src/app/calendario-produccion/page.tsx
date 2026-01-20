@@ -6,6 +6,453 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import LoteSelector from '@/components/LoteSelector';
 
+// Interfaces
+interface ProduccionEvento {
+  id: string;
+  tipo: 'inoculacion' | 'cosecha' | 'formulacion' | 'entrega' | 'mantenimiento';
+  fecha: string;
+  titulo?: string;
+  descripcion?: string;
+  estado: 'planificado' | 'en-proceso' | 'completado' | 'cancelado';
+  cliente?: string;
+  microorganismo?: string;
+  microorganismos?: any[];
+  litros?: number;
+  paqueteId?: string;
+  fechaCreacion?: string;
+  fechaAplicacion?: string;
+  estadoAplicacion?: string;
+}
+
+interface Cliente {
+  id: string;
+  airtableId: string;
+  nombre: string;
+  nit: string;
+  ciudad: string;
+  departamento: string;
+}
+
+interface Microorganismo {
+  id: string;
+  nombre: string;
+  tipo?: string;
+}
+
+interface CalendarioStats {
+  totalEventos: number;
+  eventosPendientes: number;
+  eventosEnProceso: number;
+  eventosCompletados: number;
+}
+
+// Componente interno para Seguimiento Diario
+interface SeguimientoDiarioModalProps {
+  onClose: () => void;
+}
+
+const SeguimientoDiarioModal: React.FC<SeguimientoDiarioModalProps> = ({ onClose }) => {
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [paquetes, setPaquetes] = useState<any[]>([]);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState('');
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [mostrarListaClientes, setMostrarListaClientes] = useState(false);
+  const [paqueteSeleccionado, setPaqueteSeleccionado] = useState('');
+  const [mensaje, setMensaje] = useState('');
+  const [analisisIA, setAnalisisIA] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [procesando, setProcesando] = useState(false);
+
+  // Filtrar clientes basado en la búsqueda
+  const clientesFiltrados = clientes.filter(cliente => 
+    cliente.nombre.toLowerCase().includes(busquedaCliente.toLowerCase())
+  );
+
+  const mensajeEjemplo = `Buenas tardes 
+Don Grimaldo 
+Jueves 15-01-26
+Bloque 90 
+
+Hora de llegada a la planta 05:50 am 
+
+Control Preventivo Plagas
+Bacillus.          750.cm
+Beauveria.      750.cm
+Total 1.5 lts× hectárea 
+
+Tractor 1 Nebulizadora 
+Jorge Guatibonza 
+B 90.     P 592.       2 hts
+B 90.     P 606.     11 hts
+Hectáreas 13
+
+Tractor 2 Jacto 
+Edwin Javier Gálviz 
+B 90.   P 593.      3 hts
+B 90.   P 604.      8 hts 
+Hectáreas. 11
+
+Tractor 3 Jacto 
+Rocío Escobar 
+B 90.     P 591.      5 hts
+B 90.     P 605.      8 hts 
+Hectáreas 13
+
+HECTÁREAS APLICADAS 
+37
+
+Nota por motivo de lluvia la aplicación se empieza alas 11:30 am
+Nota de 07:00 am a 10:50 am siembra de palma
+
+Hora de salida lobor 04:00pm`;
+
+  useEffect(() => {
+    cargarClientes();
+  }, []);
+
+  useEffect(() => {
+    if (clienteSeleccionado) {
+      cargarPaquetesCliente(clienteSeleccionado);
+    } else {
+      setPaquetes([]);
+      setPaqueteSeleccionado('');
+      setBusquedaCliente(''); // Limpiar búsqueda cuando no hay cliente seleccionado
+      setMostrarListaClientes(false); // Ocultar lista
+    }
+  }, [clienteSeleccionado]);
+
+  const cargarClientes = async () => {
+    try {
+      console.log('🔍 [MODAL] Iniciando carga de clientes...');
+      setLoading(true);
+      const response = await fetch('/api/clientes/activos');
+      console.log('📡 [MODAL] Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📥 [MODAL] Datos recibidos:', data);
+      
+      if (data.clientes) {
+        setClientes(data.clientes);
+        console.log('✅ [MODAL] Clientes cargados:', data.clientes.length);
+      } else {
+        console.log('⚠️ [MODAL] No se encontraron clientes en la respuesta');
+        setClientes([]);
+      }
+    } catch (error) {
+      console.error('❌ [MODAL] Error cargando clientes:', error);
+      alert(`Error cargando clientes: ${error}`);
+      setClientes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cargarPaquetesCliente = async (clienteId: string) => {
+    try {
+      setLoading(true);
+      // Buscar el ID Cliente (CL-XXXX) del record seleccionado
+      const clienteSeleccionadoObj = clientes.find(c => c.id === clienteId);
+      const idClienteParaConsulta = clienteSeleccionadoObj?.idCliente || clienteId;
+      
+      console.log('🔍 [MODAL] Consultando paquetes para:', {
+        recordId: clienteId,
+        idCliente: idClienteParaConsulta,
+        nombre: clienteSeleccionadoObj?.nombre
+      });
+      
+      const response = await fetch(`/api/paquete-aplicaciones/cliente/${idClienteParaConsulta}`);
+      const data = await response.json();
+      if (data.paquetes) {
+        setPaquetes(data.paquetes);
+      }
+    } catch (error) {
+      console.error('Error cargando paquetes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const analizarMensaje = async () => {
+    if (!mensaje.trim() || !paqueteSeleccionado) {
+      alert('Por favor seleccione un paquete y escriba el mensaje');
+      return;
+    }
+
+    try {
+      setProcesando(true);
+      const response = await fetch('/api/planificacion-diaria/analizar-mensaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mensaje,
+          paqueteId: paqueteSeleccionado,
+          clienteId: clienteSeleccionado
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.error) {
+        alert(`Error: ${data.error}`);
+        return;
+      }
+
+      setAnalisisIA(data.analisis);
+      
+    } catch (error) {
+      console.error('Error analizando mensaje:', error);
+      alert('Error al analizar el mensaje');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const confirmarActualizacion = async () => {
+    if (!analisisIA) return;
+
+    try {
+      setProcesando(true);
+      const response = await fetch('/api/planificacion-diaria/actualizar-progreso', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paqueteId: paqueteSeleccionado,
+          clienteId: clienteSeleccionado,
+          fecha: analisisIA.fecha,
+          hectareasEjecutadas: analisisIA.hectareasTotal,
+          tractores: analisisIA.tractores,
+          productos: analisisIA.productos,
+          observaciones: analisisIA.observaciones,
+          horaInicio: analisisIA.horaInicio,
+          horaSalida: analisisIA.horaSalida
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.error) {
+        alert(`Error: ${data.error}`);
+        return;
+      }
+
+      alert(`✅ Progreso actualizado exitosamente!\n\n${data.message}`);
+      
+      // Limpiar y cerrar
+      setMensaje('');
+      setAnalisisIA(null);
+      onClose();
+
+    } catch (error) {
+      console.error('Error confirmando actualización:', error);
+      alert('Error al confirmar la actualización');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-orange-600 to-red-600 text-white">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold flex items-center">
+              📊 Seguimiento Diario de Aplicaciones
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-white hover:text-gray-200 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p className="mt-2 opacity-90">Registra el progreso real vs planificado</p>
+        </div>
+
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+          {/* Selección de Cliente y Paquete */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <div className="mb-2">
+                <label className="block text-sm font-medium text-gray-700">Cliente</label>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={busquedaCliente}
+                  onChange={(e) => {
+                    setBusquedaCliente(e.target.value);
+                    setMostrarListaClientes(e.target.value.length > 0);
+                    // Si limpia el campo, resetear la selección
+                    if (e.target.value === '') {
+                      setClienteSeleccionado('');
+                    }
+                  }}
+                  onFocus={() => {
+                    if (busquedaCliente.length > 0) {
+                      setMostrarListaClientes(true);
+                    }
+                  }}
+                  placeholder={loading ? '⏳ Cargando clientes...' : clientes.length === 0 ? 'No hay clientes disponibles' : 'Escribir nombre del cliente...'}
+                  disabled={loading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 placeholder-black text-black"
+                />
+                {mostrarListaClientes && busquedaCliente && clientesFiltrados.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {clientesFiltrados.slice(0, 10).map(cliente => (
+                      <button
+                        key={cliente.id}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('🔍 [MODAL] Seleccionando cliente:', cliente.nombre, 'ID:', cliente.id);
+                          setClienteSeleccionado(cliente.id);
+                          setBusquedaCliente(cliente.nombre);
+                          setMostrarListaClientes(false); // Ocultar lista inmediatamente
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none first:rounded-t-md last:rounded-b-md border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-black">{cliente.nombre}</div>
+                        <div className="text-sm text-gray-500">{cliente.ciudad} - {cliente.departamento}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {clientes.length === 0 && !loading && (
+                <p className="text-sm text-red-500 mt-1">
+                  ⚠️ No se encontraron clientes. Verifique que existan paquetes activos.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Paquete de Aplicación</label>
+              <select
+                value={paqueteSeleccionado}
+                onChange={(e) => setPaqueteSeleccionado(e.target.value)}
+                disabled={!clienteSeleccionado || loading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 placeholder-black text-black"
+              >
+                <option value="">Seleccione un paquete</option>
+                {paquetes.map(paquete => (
+                  <option key={paquete.id} value={paquete.id}>
+                    {paquete.nombre} - {paquete.progreso.porcentajeCompletado}% completado
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Mensaje de Campo */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Mensaje de Campo</label>
+              <button
+                onClick={() => setMensaje(mensajeEjemplo)}
+                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Usar Ejemplo
+              </button>
+            </div>
+            <textarea
+              value={mensaje}
+              onChange={(e) => setMensaje(e.target.value)}
+              placeholder="Pegue aquí el mensaje de campo..."
+              disabled={!paqueteSeleccionado}
+              className="w-full h-48 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 placeholder-black text-black font-medium"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-sm text-gray-500">{mensaje.length} caracteres</p>
+              <button
+                onClick={analizarMensaje}
+                disabled={!mensaje.trim() || !paqueteSeleccionado || procesando}
+                className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:bg-gray-300 transition-colors flex items-center"
+              >
+                {procesando ? 'Analizando...' : '🤖 Analizar con IA'}
+              </button>
+            </div>
+          </div>
+
+          {/* Resultado del Análisis */}
+          {analisisIA && (
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Resultado del Análisis</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">📋 General</h4>
+                  <div className="text-sm text-blue-800 space-y-1">
+                    <p><strong>Fecha:</strong> {analisisIA.fecha}</p>
+                    <p><strong>Bloque:</strong> {analisisIA.bloque}</p>
+                    <p><strong>Total Ha:</strong> {analisisIA.hectareasTotal}</p>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h4 className="font-medium text-green-900 mb-2">🧪 Productos</h4>
+                  <div className="text-sm text-green-800 space-y-1">
+                    {analisisIA.productos.map((producto: any, index: number) => (
+                      <p key={index}>{producto.nombre}: {producto.cantidad} {producto.unidad}</p>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 rounded-lg p-4">
+                  <h4 className="font-medium text-yellow-900 mb-2">🚜 Tractores</h4>
+                  <div className="text-sm text-yellow-800 space-y-1">
+                    {analisisIA.tractores.map((tractor: any, index: number) => (
+                      <p key={index}>T{tractor.numero}: {tractor.totalHectareas} Ha</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {analisisIA.observaciones.length > 0 && (
+                <div className="bg-orange-50 rounded-lg p-4 mb-4">
+                  <h4 className="font-medium text-orange-900 mb-2">⚠️ Observaciones</h4>
+                  <div className="text-sm text-orange-800 space-y-1">
+                    {analisisIA.observaciones.map((obs: string, index: number) => (
+                      <p key={index}>• {obs}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Botones */}
+        <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-gray-200">
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+            >
+              Cancelar
+            </button>
+            {analisisIA && (
+              <button
+                onClick={confirmarActualizacion}
+                disabled={procesando}
+                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-medium"
+              >
+                {procesando ? 'Procesando...' : '✅ Confirmar Actualización'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface ProduccionEvento {
   id: string;
   tipo: 'inoculacion' | 'cosecha' | 'formulacion' | 'entrega' | 'mantenimiento';
@@ -104,6 +551,7 @@ export default function CalendarioProduccionPage() {
   const [vistaActual, setVistaActual] = useState<'mes' | 'semana' | 'lista' | 'paquetes'>('mes');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPaquetesModal, setShowPaquetesModal] = useState(false);
+  const [showSeguimientoModal, setShowSeguimientoModal] = useState(false);
   const [paquetesAplicaciones, setPaquetesAplicaciones] = useState<any[]>([]);
   const [loadingPaquetes, setLoadingPaquetes] = useState(false);
   const [selectedEvento, setSelectedEvento] = useState<ProduccionEvento | null>(null);
@@ -113,12 +561,22 @@ export default function CalendarioProduccionPage() {
     fecha: '',
     estado: 'planificado' as ProduccionEvento['estado']
   });
+  
+  // Estados para edición de lotes
+  const [editingLotes, setEditingLotes] = useState(false);
+  const [editLotesData, setEditLotesData] = useState<Array<{id: string, nombre: string, hectareas: number}>>([]);
+  const [availableLotes, setAvailableLotes] = useState<Array<{id: string, nombre: string}>>([]);
+  const [loadingLotes, setLoadingLotes] = useState(false);
+  
   const [stats, setStats] = useState<CalendarioStats>({
     totalEventos: 0,
     eventosPendientes: 0,
     eventosEnProceso: 0,
     eventosCompletados: 0
   });
+
+  // Estado para días planificados
+  const [diasPlanificados, setDiasPlanificados] = useState<any[]>([]);
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -184,6 +642,18 @@ export default function CalendarioProduccionPage() {
       return updated;
     });
   }, []);
+
+  // Verificar si un día está planificado
+  const isDayPlanificado = (date: Date) => {
+    const dateString = date.toISOString().split('T')[0];
+    return diasPlanificados.some(dia => dia.fecha === dateString);
+  };
+
+  // Obtener información de planificación de un día específico
+  const getDayPlanificacionInfo = (date: Date) => {
+    const dateString = date.toISOString().split('T')[0];
+    return diasPlanificados.find(dia => dia.fecha === dateString);
+  };
 
   // Handler para seleccionar fecha del calendario (con opción de modal)
   const handleCalendarDateSelect = useCallback((date: Date, openModal: boolean = false) => {
@@ -383,6 +853,11 @@ export default function CalendarioProduccionPage() {
   useEffect(() => {
     applyFilters();
   }, [eventos, filtroTipo, filtroEstado, searchTerm]);
+
+  // Cargar días planificados cuando cambie el mes
+  useEffect(() => {
+    fetchDiasPlanificados(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
+  }, [currentMonth]);
 
   // Filter clientes based on search input
   useEffect(() => {
@@ -597,6 +1072,30 @@ export default function CalendarioProduccionPage() {
       console.error('Error fetching eventos:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDiasPlanificados = async (year?: number, month?: number) => {
+    try {
+      const currentDate = new Date();
+      const targetYear = year || currentDate.getFullYear();
+      const targetMonth = month || (currentDate.getMonth() + 1);
+      
+      console.log('📅 [CALENDARIO] Cargando días planificados para:', { targetYear, targetMonth });
+      
+      const response = await fetch(`/api/planificacion-diaria/dias-planificados?year=${targetYear}&month=${targetMonth}`);
+      const data = await response.json();
+      
+      if (data.diasPlanificados) {
+        setDiasPlanificados(data.diasPlanificados);
+        console.log('✅ [CALENDARIO] Días planificados cargados:', data.diasPlanificados.length);
+      } else {
+        console.log('⚠️ [CALENDARIO] No se encontraron días planificados');
+        setDiasPlanificados([]);
+      }
+    } catch (error) {
+      console.error('❌ [CALENDARIO] Error cargando días planificados:', error);
+      setDiasPlanificados([]);
     }
   };
 
@@ -1007,6 +1506,152 @@ export default function CalendarioProduccionPage() {
       fecha: '',
       estado: 'planificado'
     });
+    // Limpiar datos de edición de lotes
+    setEditingLotes(false);
+    setEditLotesData([]);
+    setAvailableLotes([]);
+  };
+
+  // Funciones para manejo de lotes
+  const initializeLotesEditing = async (evento: any) => {
+    console.log('🔄 Inicializando edición de lotes para evento:', evento);
+    
+    // Crear mapeo inicial con IDs, luego obtener nombres reales
+    const lotesData = evento.lotesIds?.map((id: string, index: number) => ({
+      id,
+      nombre: `Cargando...`, // Placeholder mientras carga el nombre real
+      hectareas: evento.hectareas?.[index] || 0
+    })) || [];
+    
+    setEditLotesData(lotesData);
+    
+    // Obtener clienteId del evento o usar el del paquete
+    const clienteIdToUse = evento.clienteId || evento.cliente || (evento as any).paqueteInfo?.clienteId;
+    console.log('🔍 Usando clienteId:', clienteIdToUse);
+    
+    if (clienteIdToUse) {
+      await loadAvailableLotes(clienteIdToUse);
+    } else {
+      console.warn('⚠️ No se pudo obtener clienteId para cargar lotes');
+      // Intentar obtener desde el nombre del cliente si está disponible
+      if (evento.cliente) {
+        console.log('🔍 Intentando buscar cliente por nombre:', evento.cliente);
+      }
+    }
+    
+    setEditingLotes(true);
+  };
+
+  const updateLoteNamesFromAvailableLotes = (lotesDisponibles: any[]) => {
+    console.log('🔄 Actualizando nombres de lotes existentes con:', lotesDisponibles);
+    
+    setEditLotesData(prevData => {
+      const updatedData = prevData.map(loteData => {
+        // Buscar el nombre real en los lotes disponibles
+        const loteEncontrado = lotesDisponibles.find(lote => lote.id === loteData.id);
+        if (loteEncontrado) {
+          console.log(`✅ Nombre encontrado para ${loteData.id}: ${loteEncontrado.nombre}`);
+          return {
+            ...loteData,
+            nombre: loteEncontrado.nombre
+          };
+        } else {
+          console.warn(`⚠️ No se encontró nombre para lote ${loteData.id}, manteniendo nombre actual: ${loteData.nombre}`);
+          return loteData;
+        }
+      });
+      
+      console.log('📋 Lotes después de actualización de nombres:', updatedData);
+      return updatedData;
+    });
+  };
+
+  const loadAvailableLotes = async (clienteId: string) => {
+    if (!clienteId) {
+      console.warn('⚠️ No se proporcionó clienteId para cargar lotes');
+      setAvailableLotes([]);
+      return;
+    }
+    
+    console.log('🔄 Iniciando carga de lotes para cliente:', clienteId);
+    setLoadingLotes(true);
+    try {
+      // Llamar a la API para obtener lotes del cliente
+      const response = await fetch(`/api/cultivos-lotes?clienteId=${clienteId}`);
+      console.log('📡 Respuesta de API:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error en respuesta de API:', errorText);
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📦 Datos recibidos:', data);
+      
+      if (data.success && data.lotes) {
+        const lotesOptions = data.lotes.map((lote: any) => ({
+          id: lote.id,
+          nombre: lote.nombreLote || lote.nombre || `Lote ${lote.id}`,
+          hectareas: lote.areaHa || lote.hectareas || 0
+        }));
+        console.log('✅ Lotes procesados:', lotesOptions);
+        setAvailableLotes(lotesOptions);
+        
+        // Después de cargar los lotes disponibles, actualizar los nombres de los lotes ya seleccionados
+        setTimeout(() => {
+          updateLoteNamesFromAvailableLotes(lotesOptions);
+        }, 100);
+      } else {
+        console.warn('⚠️ No se encontraron lotes o respuesta no exitosa:', data);
+        setAvailableLotes([]);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando lotes disponibles:', error);
+      setAvailableLotes([]);
+      // Mostrar mensaje de error al usuario
+      alert(`Error al cargar los lotes: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setLoadingLotes(false);
+    }
+  };
+
+  const addLoteFromSelection = (selectedLoteId: string) => {
+    const selectedLote = availableLotes.find(l => l.id === selectedLoteId);
+    if (selectedLote && !editLotesData.find(l => l.id === selectedLoteId)) {
+      setEditLotesData(prev => [...prev, {
+        id: selectedLote.id,
+        nombre: selectedLote.nombre,
+        hectareas: (selectedLote as any).hectareas || 0
+      }]);
+    }
+  };
+
+  const removeLote = (index: number) => {
+    setEditLotesData(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateLoteHectareas = (index: number, hectareas: number) => {
+    setEditLotesData(prev => {
+      const newData = [...prev];
+      newData[index].hectareas = hectareas;
+      return newData;
+    });
+  };
+
+  const calculateTotalHectareas = () => {
+    return editLotesData.reduce((total, lote) => total + lote.hectareas, 0);
+  };
+
+  const saveLotesChanges = () => {
+    // Aquí se implementaría la lógica para guardar los cambios en la base de datos
+    console.log('💾 Guardando cambios de lotes:', editLotesData);
+    setEditingLotes(false);
+  };
+
+  const cancelLotesEditing = () => {
+    setEditingLotes(false);
+    // Restaurar datos originales si es necesario
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -1074,6 +1719,70 @@ export default function CalendarioProduccionPage() {
     return estadosEvento.find(e => e.value === estado) || estadosEvento[0];
   };
 
+  // Función para calcular si un evento necesita confirmación (15 días antes)
+  const needsConfirmation = (evento: ProduccionEvento) => {
+    if (evento.estado !== 'planificado') return false;
+    
+    const today = new Date();
+    const eventDate = new Date(evento.fecha);
+    const diffTime = eventDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays <= 15 && diffDays > 0;
+  };
+
+  // Función para verificar si un día es hábil (lunes a viernes)
+  const isWorkingDay = (date: Date) => {
+    const day = date.getDay();
+    return day >= 1 && day <= 5; // 1 = lunes, 5 = viernes
+  };
+
+  // Función para calcular 15 días hábiles antes de una fecha
+  const getConfirmationPeriodStart = (eventDate: Date) => {
+    const startDate = new Date(eventDate);
+    let workingDaysCount = 0;
+    
+    while (workingDaysCount < 15) {
+      startDate.setDate(startDate.getDate() - 1);
+      if (isWorkingDay(startDate)) {
+        workingDaysCount++;
+      }
+    }
+    
+    return startDate;
+  };
+
+  // Función para verificar si una fecha está dentro del período de confirmación (15 días hábiles antes)
+  const isInConfirmationPeriod = (currentDate: Date, eventDate: Date) => {
+    if (!isWorkingDay(currentDate)) return false;
+    
+    const confirmationStart = getConfirmationPeriodStart(eventDate);
+    const eventDay = new Date(eventDate);
+    
+    return currentDate >= confirmationStart && currentDate < eventDay;
+  };
+
+  // Función para obtener todos los eventos que tienen días de confirmación activos
+  const getEventsNeedingConfirmation = () => {
+    return eventos.filter(evento => evento.estado === 'planificado');
+  };
+
+  // Función para obtener los días restantes
+  const getDaysLeft = (fecha: string) => {
+    const today = new Date();
+    const eventDate = new Date(fecha);
+    const diffTime = eventDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  // Función para obtener el color del evento considerando si necesita confirmación
+  const getEventColor = (evento: ProduccionEvento) => {
+    if (needsConfirmation(evento)) {
+      return 'bg-orange-500 border-2 border-orange-300 shadow-lg animate-pulse';
+    }
+    return getTipoEvento(evento.tipo).color;
+  };
+
   return (
     <>
       <Navbar />
@@ -1124,6 +1833,16 @@ export default function CalendarioProduccionPage() {
               </button>
               
               <button
+                onClick={() => setShowSeguimientoModal(true)}
+                className="px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 focus:ring-4 focus:ring-orange-500/20 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                📊 Seguimiento Diario
+              </button>
+              
+              <button
                 onClick={() => setVistaActual(vistaActual === 'mes' ? 'lista' : 'mes')}
                 className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 focus:ring-4 focus:ring-gray-500/20 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center"
               >
@@ -1138,6 +1857,23 @@ export default function CalendarioProduccionPage() {
           {/* Calendar View */}
           {vistaActual === 'mes' && (
             <div className="bg-white rounded-xl shadow-lg p-6">
+              {/* Notification Banner for Confirmation Needed */}
+              {eventos.some(evento => needsConfirmation(evento)) && (
+                <div className="mb-6 bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <span className="text-2xl">⚠️</span>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-orange-700">
+                        <strong>Eventos que requieren confirmación:</strong> Hay aplicaciones a <strong>15 días o menos</strong> que necesitan ser confirmadas.
+                        <br />
+                        <span className="text-xs">Los días en azul claro muestran el período de 15 días hábiles donde se debe confirmar la aplicación. Los eventos en naranja muestran los días restantes.</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Calendar Header */}
               <div className="flex items-center justify-between mb-6">
                 <button
@@ -1167,6 +1903,29 @@ export default function CalendarioProduccionPage() {
                 </button>
               </div>
 
+              {/* Leyenda de Colores */}
+              <div className="mb-6 bg-gray-50 p-4 rounded-lg border">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">📋 Leyenda del Calendario</h4>
+                <div className="flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-blue-100 border border-blue-300 rounded"></div>
+                    <span className="text-gray-600">Días hábiles para confirmación (15 días antes de aplicación)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                    <span className="text-gray-600">Eventos que requieren confirmación</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-orange-200 border border-orange-400 rounded"></div>
+                    <span className="text-gray-600">Días planificados</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-blue-50 border-2 border-blue-500 rounded"></div>
+                    <span className="text-gray-600">Día actual</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Days of Week */}
               <div className="grid grid-cols-7 gap-2 mb-2">
                 {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
@@ -1183,6 +1942,16 @@ export default function CalendarioProduccionPage() {
                   const isToday = day.date.toDateString() === new Date().toDateString();
                   const isSelectedInForm = formData.fechaInicio && day.date.toISOString().split('T')[0] === formData.fechaInicio;
                   
+                  // Verificar si este día está en el período de confirmación de algún evento
+                  const eventsNeedingConfirmation = getEventsNeedingConfirmation();
+                  const isConfirmationDay = eventsNeedingConfirmation.some(evento => 
+                    isInConfirmationPeriod(day.date, new Date(evento.fecha))
+                  );
+                  
+                  // Verificar si este día está planificado
+                  const isPlanificado = isDayPlanificado(day.date);
+                  const planificacionInfo = getDayPlanificacionInfo(day.date);
+                  
                   return (
                     <div
                       key={index}
@@ -1190,31 +1959,52 @@ export default function CalendarioProduccionPage() {
                         day.isCurrentMonth
                           ? 'bg-white border-gray-200'
                           : 'bg-gray-50 border-gray-100'
-                      } ${isToday ? 'ring-2 ring-blue-500 bg-blue-50' : ''} ${isSelectedInForm ? 'ring-2 ring-green-500 bg-green-50' : ''}`}
+                      } ${isToday ? 'ring-2 ring-blue-500 bg-blue-50' : ''} 
+                      ${isSelectedInForm ? 'ring-2 ring-green-500 bg-green-50' : ''}
+                      ${isConfirmationDay ? 'bg-blue-100 border-blue-300 ring-1 ring-blue-400' : ''}
+                      ${isPlanificado ? 'bg-orange-100 border-orange-300 ring-1 ring-orange-400' : ''}`}
                       onClick={() => handleCalendarDateSelect(day.date, true)}
                     >
                       <div className={`text-sm font-medium mb-1 ${
                         day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                      } ${isToday ? 'text-blue-600 font-bold' : ''}`}>
+                      } ${isToday ? 'text-blue-600 font-bold' : ''}
+                      ${isConfirmationDay ? 'text-blue-800 font-semibold' : ''}
+                      ${isPlanificado ? 'text-orange-800 font-semibold' : ''}`}>
                         {day.date.getDate()}
+                        {isConfirmationDay && (
+                          <span className="ml-1 text-[10px] bg-blue-500 text-white px-1 rounded">📋</span>
+                        )}
+                        {isPlanificado && (
+                          <span className="ml-1 text-[10px] bg-orange-500 text-white px-1 rounded">📅</span>
+                        )}
                       </div>
                       
                       <div className="space-y-1">
                         {dayEventos.slice(0, 3).map(evento => {
                           const tipo = getTipoEvento(evento.tipo);
+                          const needsConf = needsConfirmation(evento);
                           const eventTitle = evento.titulo || `${tipo.label} - ${evento.cliente || 'Sin cliente'}`;
                           const eventDescription = evento.descripcion || `${evento.litros || 0}L`;
+                          const daysLeft = getDaysLeft(evento.fecha);
+                          
                           return (
                             <div
                               key={evento.id}
-                              className={`text-xs px-2 py-1 rounded ${tipo.color} text-white truncate cursor-pointer hover:opacity-80`}
-                              title={`${eventTitle}\n${eventDescription}`}
+                              className={`text-xs px-2 py-1 rounded text-white truncate cursor-pointer hover:opacity-80 relative ${
+                                needsConf ? 'bg-orange-500 border border-orange-300 shadow-md animate-pulse' : tipo.color
+                              }`}
+                              title={`${eventTitle}\n${eventDescription}${needsConf ? `\n⚠️ Faltan ${daysLeft} días - CONFIRMAR APLICACIÓN` : ''}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedEvento(evento);
                               }}
                             >
-                              {tipo.emoji} {evento.titulo ? evento.titulo : tipo.label}
+                              {needsConf ? '⚠️' : tipo.emoji} {evento.titulo ? evento.titulo : tipo.label}
+                              {needsConf && (
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                                  {daysLeft}
+                                </span>
+                              )}
                             </div>
                           );
                         })}
@@ -1234,6 +2024,21 @@ export default function CalendarioProduccionPage() {
           {/* List View */}
           {vistaActual === 'lista' && (
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              {/* Notification Banner for List View */}
+              {eventos.some(evento => needsConfirmation(evento)) && (
+                <div className="m-6 mb-0 bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <span className="text-2xl">⚠️</span>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-orange-700">
+                        <strong>Eventos que requieren confirmación:</strong> Las filas resaltadas en naranja indican aplicaciones a <strong>15 días o menos</strong> que necesitan confirmarse.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -1276,11 +2081,22 @@ export default function CalendarioProduccionPage() {
                         .map(evento => {
                           const tipo = getTipoEvento(evento.tipo);
                           const estado = getEstadoEvento(evento.estado);
+                          const needsConf = needsConfirmation(evento);
+                          const daysLeft = getDaysLeft(evento.fecha);
                           
                           return (
-                            <tr key={evento.id} className="hover:bg-gray-50 transition-colors">
+                            <tr key={evento.id} className={`transition-colors ${
+                              needsConf ? 'bg-orange-50 hover:bg-orange-100 border-l-4 border-orange-400' : 'hover:bg-gray-50'
+                            }`}>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {formatDate(evento.fecha)}
+                                <div className="flex items-center gap-2">
+                                  {formatDate(evento.fecha)}
+                                  {needsConf && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium">
+                                      ⚠️ {daysLeft}d restantes
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-6 py-4">
                               <div className="text-sm font-medium text-gray-900">{getTipoEvento(evento.tipo).label} - {evento.cliente || 'Sin cliente'}</div>
@@ -1348,7 +2164,7 @@ export default function CalendarioProduccionPage() {
 
                 {/* Modal Content - Scrollable */}
                 <div className="flex-1 overflow-y-auto px-8 py-6">
-                  <form onSubmit={editandoEvento ? (e) => {
+                  <form id="paquete-aplicaciones-form" onSubmit={editandoEvento ? (e) => {
                     e.preventDefault();
                     if (editandoEvento) {
                       handleUpdateEvento(editandoEvento.id, {
@@ -1446,7 +2262,7 @@ export default function CalendarioProduccionPage() {
                           required
                           value={formData.fechaInicio}
                           onChange={(e) => handleFechaChange(e.target.value)}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 text-base"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white text-black placeholder-black text-base"
                         />
                       </div>
 
@@ -1585,7 +2401,7 @@ export default function CalendarioProduccionPage() {
                                     <input
                                       type="text"
                                       placeholder="Escribir microorganismo personalizado..."
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-700 mt-2 placeholder-gray-500"
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-700 mt-2 placeholder-black"
                                       onChange={(e) => {
                                         const newMicroorganismos = [...formData.microorganismos];
                                         newMicroorganismos[index].nombre = e.target.value;
@@ -1608,7 +2424,7 @@ export default function CalendarioProduccionPage() {
                                       newMicroorganismos[index].dosificacionPorHa = parseFloat(e.target.value) || 0;
                                       setFormData(prev => ({ ...prev, microorganismos: newMicroorganismos }));
                                     }}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-700"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-black placeholder-black"
                                   />
                                 </div>
                                 <div>
@@ -1749,6 +2565,7 @@ export default function CalendarioProduccionPage() {
                   </button>
                   <button
                     type="submit"
+                    form="paquete-aplicaciones-form"
                     disabled={loadingPaquete}
                     className={`flex-1 ${
                       loadingPaquete 
@@ -1880,6 +2697,17 @@ export default function CalendarioProduccionPage() {
                              selectedEvento.estadoAplicacion === 'EJECUTADA' ? '✅' : '❌'}
                             {selectedEvento.estadoAplicacion}
                           </span>
+                          {needsConfirmation(selectedEvento) && (
+                            <button
+                              onClick={() => {
+                                handleUpdateEvento(selectedEvento.id, { estado: 'en-proceso' });
+                                setSelectedEvento({ ...selectedEvento, estado: 'en-proceso' });
+                              }}
+                              className="px-3 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-xs font-medium transition-all animate-pulse"
+                            >
+                              ⚡ Confirmar Ahora ({getDaysLeft(selectedEvento.fecha)}d restantes)
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -2141,7 +2969,7 @@ export default function CalendarioProduccionPage() {
                               type="date"
                               value={editEventForm.fecha}
                               onChange={(e) => setEditEventForm(prev => ({...prev, fecha: e.target.value}))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-black text-black"
                             />
                           </div>
                           <div>
@@ -2151,11 +2979,12 @@ export default function CalendarioProduccionPage() {
                             <select
                               value={editEventForm.estado}
                               onChange={(e) => setEditEventForm(prev => ({...prev, estado: e.target.value as any}))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                             >
-                              <option value="planificado">PLANIFICADA</option>
-                              <option value="completado">EJECUTADA</option>
-                              <option value="cancelado">CANCELADA</option>
+                              <option value="planificado">PRESUPUESTADA</option>
+                              <option value="en-proceso">CONFIRMADA</option>
+                              <option value="completado">ENTREGADA</option>
+                              <option value="cancelado">POSPUESTA</option>
                             </select>
                           </div>
                           <div>
@@ -2166,48 +2995,169 @@ export default function CalendarioProduccionPage() {
                               type="text"
                               value={`${(editandoEvento as any).totalHectareas || 'N/A'} ha`}
                               disabled
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-black placeholder-black"
                             />
                           </div>
                         </div>
                       </div>
 
-                      {/* Información de Lotes */}
+                      {/* Información de Lotes - Editable */}
                       {(editandoEvento as any).lotesIds && (editandoEvento as any).lotesIds.length > 0 && (
                         <div className="bg-green-50 p-4 rounded-lg">
-                          <h3 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
-                            🌾 Lotes de Aplicación ({(editandoEvento as any).lotesIds.length} lotes)
-                          </h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {(editandoEvento as any).lotesIds.map((loteId: string, index: number) => (
-                              <div key={index} className="bg-white p-3 rounded-lg border shadow-sm">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
-                                      Lote #{index + 1}
-                                    </span>
-                                    <p className="font-semibold text-gray-900 mt-1">{loteId}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-sm font-medium text-gray-900">
-                                      {(editandoEvento as any).hectareas?.[index] || 'N/A'} ha
-                                    </p>
-                                    <p className="text-xs text-gray-600">Hectáreas</p>
+                          <div className="flex justify-between items-center mb-3">
+                            <h3 className="font-semibold text-green-900 flex items-center gap-2">
+                              🌾 Lotes de Aplicación ({editingLotes ? editLotesData.length : (editandoEvento as any).lotesIds.length} lotes)
+                            </h3>
+                            <div className="flex gap-2">
+                              {!editingLotes ? (
+                                <button
+                                  onClick={() => initializeLotesEditing(editandoEvento)}
+                                  className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                                >
+                                  ✏️ Gestionar Lotes
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={saveLotesChanges}
+                                    className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                                  >
+                                    💾 Guardar
+                                  </button>
+                                  <button
+                                    onClick={cancelLotesEditing}
+                                    className="px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                                  >
+                                    ❌ Cancelar
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Vista de solo lectura */}
+                          {!editingLotes && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {(editandoEvento as any).lotesIds.map((loteId: string, index: number) => (
+                                <div key={index} className="bg-white p-3 rounded-lg border shadow-sm">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
+                                        Lote #{index + 1}
+                                      </span>
+                                      <p className="font-semibold text-gray-900 mt-1">{loteId}</p>
+                                      <p className="text-xs text-gray-600">ID del Lote</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {(editandoEvento as any).hectareas?.[index] || 'N/A'} ha
+                                      </p>
+                                      <p className="text-xs text-gray-600">Hectáreas</p>
+                                    </div>
                                   </div>
                                 </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Vista de edición */}
+                          {editingLotes && (
+                            <div className="space-y-4">
+                              {/* Selector para agregar lotes */}
+                              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                                <label className="block text-sm font-medium text-blue-900 mb-2">
+                                  ➕ Agregar Lote del Cliente
+                                </label>
+                                <div className="flex gap-2">
+                                  <select
+                                    onChange={(e) => {
+                                      if (e.target.value) {
+                                        addLoteFromSelection(e.target.value);
+                                        e.target.value = ''; // Reset selection
+                                      }
+                                    }}
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
+                                    disabled={loadingLotes}
+                                  >
+                                    <option value="">
+                                      {loadingLotes ? 'Cargando lotes...' : 'Seleccionar lote disponible'}
+                                    </option>
+                                    {availableLotes
+                                      .filter(lote => !editLotesData.find(selected => selected.id === lote.id))
+                                      .map(lote => (
+                                        <option key={lote.id} value={lote.id}>
+                                          {lote.nombre} - {(lote as any).hectareas || 0} ha (ID: {lote.id})
+                                        </option>
+                                      ))
+                                    }
+                                  </select>
+                                </div>
+                                <p className="text-xs text-blue-700 mt-1">
+                                  Solo se muestran lotes disponibles para este cliente que no están ya seleccionados
+                                </p>
                               </div>
-                            ))}
-                          </div>
+
+                              {/* Lotes seleccionados */}
+                              <div className="space-y-3">
+                                {editLotesData.map((lote, index) => (
+                                  <div key={index} className="bg-white p-4 rounded-lg border shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium flex-shrink-0">
+                                        Lote #{index + 1}
+                                      </span>
+                                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">Nombre del Lote</label>
+                                          <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-700">
+                                            <div className="font-medium">{lote.nombre}</div>
+                                            <div className="text-xs text-gray-500 mt-1">ID: {lote.id}</div>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">Hectáreas</label>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={lote.hectareas}
+                                            onChange={(e) => updateLoteHectareas(index, parseFloat(e.target.value) || 0)}
+                                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500 text-sm text-black placeholder-black"
+                                          />
+                                          <p className="text-xs text-gray-500 mt-1">Ajustar hectáreas si es necesario</p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => removeLote(index)}
+                                        className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded flex-shrink-0"
+                                        title="Quitar lote de la aplicación"
+                                      >
+                                        🗑️
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                                
+                                {editLotesData.length === 0 && (
+                                  <div className="text-center py-6 text-gray-500">
+                                    <p>No hay lotes seleccionados</p>
+                                    <p className="text-sm">Usa el selector de arriba para agregar lotes del cliente</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Resumen Total */}
                           <div className="bg-white p-3 rounded-lg mt-3 border-2 border-green-200">
                             <div className="flex justify-between items-center">
                               <span className="font-medium text-green-900">📊 Resumen Total:</span>
                               <div className="text-right">
                                 <span className="font-bold text-green-900 text-lg">
-                                  {(editandoEvento as any).lotesIds.length} lotes
+                                  {editingLotes ? editLotesData.length : (editandoEvento as any).lotesIds.length} lotes
                                 </span>
                                 <span className="mx-2">•</span>
                                 <span className="font-bold text-green-900 text-lg">
-                                  {(editandoEvento as any).totalHectareas || 'N/A'} ha
+                                  {editingLotes ? calculateTotalHectareas().toFixed(2) : ((editandoEvento as any).totalHectareas || 'N/A')} ha
                                 </span>
                               </div>
                             </div>
@@ -2395,6 +3345,13 @@ export default function CalendarioProduccionPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Modal de Seguimiento Diario */}
+          {showSeguimientoModal && (
+            <SeguimientoDiarioModal 
+              onClose={() => setShowSeguimientoModal(false)} 
+            />
           )}
         </div>
       </div>

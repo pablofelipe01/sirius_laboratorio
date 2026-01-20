@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 
 // Simulación de base de datos en memoria
-const eventos: any[] = [];
+const eventos: Array<Record<string, unknown>> = [];
 
 // GET - Obtener todos los eventos
-export async function GET(request: Request) {
+export async function GET() {
   try {
     return NextResponse.json({
       success: true,

@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         fields: {
           'Cultivos Lotes Aplicaciones': todosCultivoLotesIds, // Todos los cultivos-lotes en cada evento
           'Fecha Programada': fecha,
-          'Estado Aplicacion': 'PLANIFICADA',
+          'Estado Aplicacion': 'PRESUPUESTADA',
           'Cantidad Total Biologicos Litros': Math.round(data.litrosTotales)
         }
       }));
@@ -137,6 +137,45 @@ export async function POST(request: NextRequest) {
       
       console.log('✅ [PAQUETE-API] Eventos creados:', eventosCreados.length);
       console.log(`📊 [PAQUETE-API] Cada evento incluye ${todosCultivoLotesIds.length} cultivos-lotes`);
+      
+      // 🚀 GENERAR PLANIFICACIÓN DIARIA AUTOMÁTICA PARA CADA EVENTO
+      if (eventosCreados.length > 0) {
+        console.log('📅 [PAQUETE-API] Generando planificación diaria automática para eventos...');
+        
+        for (const evento of eventosCreados) {
+          try {
+            const fechaEvento = evento.fields['Fecha Programada'];
+            const fechaInicioAplicacion = fechaEvento; // Por ahora usar misma fecha
+            
+            console.log(`🌱 [PAQUETE-API] Generando planificación para evento ${evento.id} fecha: ${fechaEvento}`);
+            
+            // Llamar al endpoint interno de auto-planificación
+            const autoPlanificarModule = await import('../aplicaciones-eventos/auto-planificar/route');
+            const mockRequest = {
+              json: async () => ({
+                fechaProgramada: fechaEvento,
+                fechaInicioAplicacion: fechaInicioAplicacion,
+                cultivosLotesAplicaciones: todosCultivoLotesIds,
+                capacidadDiariaHa: 50,
+                estadoAplicacion: 'PRESUPUESTADA',
+                skipCreacionEvento: true,
+                eventoExistenteId: evento.id
+              })
+            } as any;
+            
+            const planificacionResponse = await autoPlanificarModule.POST(mockRequest);
+            const planificacionData = await planificacionResponse.json();
+            
+            if (planificacionData.success) {
+              console.log(`✅ [PAQUETE-API] Planificación generada para evento ${evento.id}: ${planificacionData.planificacion?.diasCreados || 0} días`);
+            } else {
+              console.warn(`⚠️ [PAQUETE-API] Error generando planificación para evento ${evento.id}:`, planificacionData.error);
+            }
+          } catch (error) {
+            console.error(`❌ [PAQUETE-API] Error en auto-planificación para evento ${evento.id}:`, error);
+          }
+        }
+      }
       
       // Actualizar el paquete para incluir los IDs de los eventos creados
       if (eventosCreados.length > 0) {

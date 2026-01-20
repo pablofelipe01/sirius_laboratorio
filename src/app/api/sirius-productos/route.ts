@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { SIRIUS_PRODUCT_CORE_CONFIG, getSiriusProductCoreHeaders } from '@/lib/constants/airtable';
 
 interface SiriusProducto {
