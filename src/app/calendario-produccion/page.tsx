@@ -503,11 +503,11 @@ const tiposEvento = [
 // Configuración de microorganismos predeterminados por tipo de aplicación (usando nombres exactos de Sirius Product Core)
 const microorganismosPredeterminados = {
   'preventivo-pc': [
-    { nombre: 'Trichoderma Harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
+    { nombre: 'Trichoderma harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
     { nombre: 'Siriusbacter', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
   ],
   'preventivo-control-plagas': [
-    { nombre: 'Beauveria bassiana', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
+    { nombre: 'Beauveria bassiana', dosificacionPorHa: 1.5, unidad: 'L/Ha' },
     { nombre: 'Bacillus thuringiensis', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
   ],
   'control-ml': [
@@ -516,7 +516,7 @@ const microorganismosPredeterminados = {
     { nombre: 'Metarhizium anisopliae', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
   ],
   'prevencion-pestalotiopsis': [
-    { nombre: 'Trichoderma Harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
+    { nombre: 'Trichoderma harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
   ]
 };
 
@@ -953,10 +953,10 @@ export default function CalendarioProduccionPage() {
         }));
         setMicroorganismos(productosFormateados || []);
       } else {
-        console.error('Error loading productos Sirius:', data.error);
+        console.error('❌ Error loading productos Sirius:', data.error);
       }
     } catch (error) {
-      console.error('Error fetching productos Sirius:', error);
+      console.error('❌ Error fetching productos Sirius:', error);
     } finally {
       setLoadingMicroorganismos(false);
     }
@@ -994,23 +994,16 @@ export default function CalendarioProduccionPage() {
             if (evento.paqueteAplicaciones && Array.isArray(evento.paqueteAplicaciones) && evento.paqueteAplicaciones.length > 0) {
               const paqueteInfo = evento.paqueteAplicaciones[0];
               
-              // Extraer tipo de aplicación real del nombre del paquete
+              // Usar el nombre real del paquete directamente
               if (paqueteInfo.nombre) {
-                if (paqueteInfo.nombre.toLowerCase().includes('preventivo-pc')) {
-                  tipoAplicacionReal = 'Preventivo Pie de Cría';
-                } else if (paqueteInfo.nombre.toLowerCase().includes('preventivo-control-plagas')) {
-                  tipoAplicacionReal = 'Preventivo Control de Plagas';
-                } else if (paqueteInfo.nombre.toLowerCase().includes('control-ml')) {
-                  tipoAplicacionReal = 'Control Mal de Lulo';
-                } else if (paqueteInfo.nombre.toLowerCase().includes('prevencion-pestalotiopsis')) {
-                  tipoAplicacionReal = 'Prevención Pestalotiopsis';
+                // Extraer el tipo de aplicación real del nombre del paquete (formato: "Cliente - Tipo - Año")
+                const nombrePartes = paqueteInfo.nombre.split(' - ');
+                if (nombrePartes.length >= 2) {
+                  clienteReal = nombrePartes[0];
+                  tipoAplicacionReal = nombrePartes[1]; // Usar el nombre real sin mapeo inventado
                 } else {
-                  // Extraer el cliente del nombre del paquete (formato: "Cliente - Tipo - Año")
-                  const nombrePartes = paqueteInfo.nombre.split(' - ');
-                  if (nombrePartes.length >= 2) {
-                    clienteReal = nombrePartes[0];
-                    tipoAplicacionReal = nombrePartes[1] || tipoAplicacionReal;
-                  }
+                  // Si no tiene el formato esperado, usar el nombre completo del paquete
+                  tipoAplicacionReal = paqueteInfo.nombre;
                 }
               }
               
@@ -2388,14 +2381,29 @@ export default function CalendarioProduccionPage() {
                                       setFormData(prev => ({ ...prev, microorganismos: newMicroorganismos }));
                                     }}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-700 bg-white"
+                                    disabled={loadingMicroorganismos}
+                                    style={{ 
+                                      position: 'relative', 
+                                      zIndex: 1000,
+                                      appearance: 'menulist',
+                                      WebkitAppearance: 'menulist'
+                                    }}
                                   >
-                                    <option value="">Seleccionar microorganismo...</option>
+                                    <option value="">
+                                      {loadingMicroorganismos ? "Cargando microorganismos..." : "Seleccionar microorganismo..."}
+                                    </option>
                                     {microorganismos.map((microorganismo) => (
-                                      <option key={microorganismo.id} value={microorganismo.nombre}>
+                                      <option 
+                                        key={microorganismo.id} 
+                                        value={microorganismo.nombre}
+                                        style={{ padding: '8px', color: '#374151' }}
+                                      >
                                         {microorganismo.nombre} {microorganismo.tipo ? `(${microorganismo.tipo})` : ''}
                                       </option>
                                     ))}
-                                    <option value="custom">🔧 Personalizado...</option>
+                                    <option value="custom" style={{ padding: '8px', color: '#374151' }}>
+                                      🔧 Personalizado...
+                                    </option>
                                   </select>
                                   {micro.nombre === 'custom' && (
                                     <input
