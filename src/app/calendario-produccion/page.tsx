@@ -603,6 +603,11 @@ export default function CalendarioProduccionPage() {
 
   // Estado para días planificados
   const [diasPlanificados, setDiasPlanificados] = useState<any[]>([]);
+  
+  // Estado para sistema de burbujas contextuales
+  const [showDayBubbles, setShowDayBubbles] = useState(false);
+  const [selectedDayForBubbles, setSelectedDayForBubbles] = useState<Date | null>(null);
+  const [bubblePosition, setBubblePosition] = useState({ x: 0, y: 0 });
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -681,15 +686,21 @@ export default function CalendarioProduccionPage() {
     return diasPlanificados.find(dia => dia.fecha === dateString);
   };
 
-  // Handler para seleccionar fecha del calendario (con opción de modal)
-  const handleCalendarDateSelect = useCallback((date: Date, openModal: boolean = false) => {
+  // Handler para seleccionar fecha del calendario (con sistema de burbujas)
+  const handleCalendarDateSelect = useCallback((date: Date, event: React.MouseEvent) => {
     const fechaFormateada = date.toISOString().split('T')[0];
     setSelectedDate(date);
     handleFechaChange(fechaFormateada);
-    if (openModal) {
-      // Pasar la fecha seleccionada al modal
-      openAddModal(undefined, fechaFormateada);
-    }
+    
+    // Obtener posición del clic para mostrar las burbujas
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    setBubblePosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    });
+    
+    setSelectedDayForBubbles(date);
+    setShowDayBubbles(true);
   }, [handleFechaChange]);
 
   // Función para calcular fechas de aplicación flexibles
@@ -909,8 +920,20 @@ export default function CalendarioProduccionPage() {
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowDayBubbles(false);
+        setShowClienteDropdown(false);
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   // Actualizar microorganismos y aplicaciones cuando cambie el tipo de aplicación
@@ -2053,7 +2076,7 @@ export default function CalendarioProduccionPage() {
                       ${isSelectedInForm ? 'ring-2 ring-green-500 bg-green-50' : ''}
                       ${isConfirmationDay ? 'bg-blue-100 border-blue-300 ring-1 ring-blue-400' : ''}
                       ${isPlanificado ? 'bg-orange-100 border-orange-300 ring-1 ring-orange-400' : ''}`}
-                      onClick={() => handleCalendarDateSelect(day.date, true)}
+                      onClick={(e) => handleCalendarDateSelect(day.date, e)}
                     >
                       <div className={`text-sm font-medium mb-1 ${
                         day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
@@ -3623,6 +3646,177 @@ export default function CalendarioProduccionPage() {
             <SeguimientoDiarioModal 
               onClose={() => setShowSeguimientoModal(false)} 
             />
+          )}
+
+          {/* Burbujas Contextuales del Calendario */}
+          {showDayBubbles && selectedDayForBubbles && (
+            <>
+              {/* Overlay para cerrar las burbujas */}
+              <div 
+                className="fixed inset-0 z-40"
+                onClick={() => setShowDayBubbles(false)}
+              />
+              
+              {/* Contenedor de burbujas */}
+              <div 
+                className="fixed z-50 transform -translate-x-1/2 -translate-y-1/2"
+                style={{ 
+                  left: `${Math.min(Math.max(bubblePosition.x, 200), window.innerWidth - 200)}px`,
+                  top: `${Math.min(Math.max(bubblePosition.y, 100), window.innerHeight - 200)}px`
+                }}
+              >
+                {(() => {
+                  const fechaSeleccionada = selectedDayForBubbles.toISOString().split('T')[0];
+                  const eventosDelDia = getEventosForDate(selectedDayForBubbles);
+                  const diaInfo = getDayPlanificacionInfo(selectedDayForBubbles);
+                  const esDiaPlanificado = isDayPlanificado(selectedDayForBubbles);
+                  const today = new Date();
+                  const isToday = selectedDayForBubbles.toDateString() === today.toDateString();
+                  const isPast = selectedDayForBubbles < today && !isToday;
+                  
+                  // Determinar qué tipo de día es para mostrar las opciones adecuadas
+                  const tieneEventos = eventosDelDia.length > 0;
+                  const eventosPendientesConfirmacion = eventosDelDia.filter(e => needsConfirmation(e));
+                  const eventosEnProceso = eventosDelDia.filter(e => e.estadoAplicacion === 'en-proceso' || e.estadoAplicacion === 'iniciado');
+                  const eventosCompletados = eventosDelDia.filter(e => e.estadoAplicacion === 'completado');
+                  
+                  return (
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-4 min-w-[280px] max-w-[320px] transform transition-all duration-200 scale-100 opacity-100">
+                      {/* Cabecera con fecha */}
+                      <div className="text-center mb-4 pb-3 border-b border-gray-100">
+                        <h3 className="font-semibold text-gray-800">
+                          {selectedDayForBubbles.toLocaleDateString('es-ES', {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long'
+                          })}
+                        </h3>
+                        {isToday && (
+                          <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                            Hoy
+                          </span>
+                        )}
+                        {isPast && (
+                          <span className="inline-block mt-1 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                            Pasado
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Opciones contextuales */}
+                      <div className="space-y-2">
+                        {/* Si no hay eventos - Solo mostrar crear evento */}
+                        {!tieneEventos && (
+                          <button
+                            onClick={() => {
+                              setShowDayBubbles(false);
+                              openAddModal(undefined, fechaSeleccionada);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md"
+                          >
+                            <span className="text-xl">➕</span>
+                            <span>Crear Evento</span>
+                          </button>
+                        )}
+                        
+                        {/* Si hay eventos pendientes de confirmación */}
+                        {eventosPendientesConfirmacion.length > 0 && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setShowDayBubbles(false);
+                                setSelectedEvento(eventosPendientesConfirmacion[0]);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md animate-pulse"
+                            >
+                              <span className="text-xl">⚠️</span>
+                              <div className="text-left flex-1">
+                                <div>Confirmar Aplicación</div>
+                                <div className="text-xs opacity-90">
+                                  {getDaysLeft(eventosPendientesConfirmacion[0].fecha)} días restantes
+                                </div>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowDayBubbles(false);
+                                openAddModal(undefined, fechaSeleccionada);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md"
+                            >
+                              <span className="text-xl">➕</span>
+                              <span>Agregar Otro Evento</span>
+                            </button>
+                          </>
+                        )}
+                        
+                        {/* Si hay eventos programados/en proceso */}
+                        {tieneEventos && eventosPendientesConfirmacion.length === 0 && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setShowDayBubbles(false);
+                                setSelectedEvento(eventosDelDia[0]);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md"
+                            >
+                              <span className="text-xl">👁️</span>
+                              <div className="text-left flex-1">
+                                <div>Ver Aplicación</div>
+                                <div className="text-xs opacity-90">
+                                  {eventosDelDia[0]?.titulo || getTipoEvento(eventosDelDia[0]?.tipo).label}
+                                </div>
+                              </div>
+                            </button>
+                            
+                            {(eventosEnProceso.length > 0 || esDiaPlanificado || isToday) && (
+                              <button
+                                onClick={() => {
+                                  setShowDayBubbles(false);
+                                  setShowSeguimientoModal(true);
+                                }}
+                                className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md"
+                              >
+                                <span className="text-xl">📊</span>
+                                <span>Ver Progreso del Día</span>
+                              </button>
+                            )}
+                            
+                            <button
+                              onClick={() => {
+                                setShowDayBubbles(false);
+                                openAddModal(undefined, fechaSeleccionada);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] shadow-md"
+                            >
+                              <span className="text-xl">➕</span>
+                              <span>Agregar Evento</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      
+                      {/* Información adicional */}
+                      {tieneEventos && (
+                        <div className="mt-4 pt-3 border-t border-gray-100">
+                          <div className="text-xs text-gray-600 space-y-1">
+                            {eventosDelDia.length > 1 && (
+                              <div>📊 {eventosDelDia.length} eventos programados</div>
+                            )}
+                            {eventosCompletados.length > 0 && (
+                              <div className="text-green-600">✅ {eventosCompletados.length} completados</div>
+                            )}
+                            {eventosEnProceso.length > 0 && (
+                              <div className="text-blue-600">🔄 {eventosEnProceso.length} en proceso</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </>
           )}
         </div>
       </div>
