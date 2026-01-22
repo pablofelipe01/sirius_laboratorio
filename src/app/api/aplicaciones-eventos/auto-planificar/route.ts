@@ -92,81 +92,60 @@ async function getLotesInfo(cultivosLotesIds: string[]): Promise<LoteInfo[]> {
 function distribuirLotesPorDia(lotes: LoteInfo[], capacidadDiariaHa: number) {
   const totalHectareas = lotes.reduce((sum, lote) => sum + lote.hectareas, 0);
   
-  // Calcular días necesarios
+  // 1️⃣ PRIMERO: Calcular días necesarios (redondear hacia arriba)
   const diasNecesarios = Math.ceil(totalHectareas / capacidadDiariaHa);
-  const hectareasObjetivoPorDia = totalHectareas / diasNecesarios;
   
-  console.log(`📊 Cálculo de distribución:`);
+  console.log(`📊 Cálculo de días:`);
   console.log(`   Total hectáreas: ${totalHectareas} Ha`);
   console.log(`   Capacidad diaria: ${capacidadDiariaHa} Ha/día`);
-  console.log(`   Días necesarios: ${totalHectareas} ÷ ${capacidadDiariaHa} = ${totalHectareas/capacidadDiariaHa} → ${diasNecesarios} días`);
-  console.log(`   Hectáreas objetivo por día: ${totalHectareas} ÷ ${diasNecesarios} = ${hectareasObjetivoPorDia.toFixed(2)} Ha/día`);
+  console.log(`   Cálculo: ${totalHectareas} ÷ ${capacidadDiariaHa} = ${(totalHectareas/capacidadDiariaHa).toFixed(2)}`);
+  console.log(`   Días necesarios: ${diasNecesarios} días (redondeado hacia arriba)`);
   
+  // 2️⃣ SEGUNDO: Distribuir lotes en orden secuencial
   const planificacionDiaria = [];
   let diaActual = 1;
   let hectareasDelDiaActual = 0;
-  let lotesDelDiaActual: { id: string; hectareasParciales?: number }[] = [];
-  let indiceActual = 0;
-  let hectareasRestantesDelLote = lotes[0]?.hectareas || 0;
+  let lotesDelDiaActual: string[] = [];
   
-  while (diaActual <= diasNecesarios && indiceActual < lotes.length) {
-    const loteActual = lotes[indiceActual];
+  console.log(`\n📋 Distribución de lotes en orden secuencial:`);
+  
+  for (let i = 0; i < lotes.length; i++) {
+    const loteActual = lotes[i];
     
-    // Calcular cuántas hectáreas tomar del lote actual
-    const espacioDisponibleEnElDia = hectareasObjetivoPorDia - hectareasDelDiaActual;
-    const hectareasATomar = Math.min(hectareasRestantesDelLote, espacioDisponibleEnElDia);
+    // Agregar lote al día actual
+    lotesDelDiaActual.push(loteActual.id);
+    hectareasDelDiaActual += loteActual.hectareas;
     
-    // Agregar lote al día si no está ya incluido
-    const loteExistenteEnDia = lotesDelDiaActual.find(l => l.id === loteActual.id);
-    if (!loteExistenteEnDia) {
-      lotesDelDiaActual.push({ 
-        id: loteActual.id,
-        hectareasParciales: hectareasATomar < loteActual.hectareas ? hectareasATomar : undefined
-      });
-    }
+    console.log(`   Día ${diaActual}: +Lote [${loteActual.ordenSecuencia}] ${loteActual.nombre} (${loteActual.hectareas} Ha) → Total día: ${hectareasDelDiaActual.toFixed(2)} Ha`);
     
-    hectareasDelDiaActual += hectareasATomar;
-    hectareasRestantesDelLote -= hectareasATomar;
+    // Verificar si debemos cerrar el día actual
+    const esUltimoLote = (i === lotes.length - 1);
+    const alcanzaCapacidad = hectareasDelDiaActual >= capacidadDiariaHa;
+    const siguienteLoteSobrepasa = !esUltimoLote && (hectareasDelDiaActual + lotes[i + 1].hectareas) > (capacidadDiariaHa * 1.2); // 20% tolerancia
     
-    console.log(`   📝 Día ${diaActual}: +${hectareasATomar.toFixed(2)} Ha del lote [${loteActual.ordenSecuencia}] ${loteActual.nombre} (restantes: ${hectareasRestantesDelLote.toFixed(2)} Ha)`);
-    
-    // Si completamos el lote actual
-    if (hectareasRestantesDelLote <= 0.01) { // Tolerance para decimales
-      indiceActual++;
-      if (indiceActual < lotes.length) {
-        hectareasRestantesDelLote = lotes[indiceActual].hectareas;
-      }
-    }
-    
-    // Si completamos el día o es el último día
-    if (hectareasDelDiaActual >= hectareasObjetivoPorDia - 0.01 || diaActual === diasNecesarios || indiceActual >= lotes.length) {
+    if (esUltimoLote || alcanzaCapacidad || siguienteLoteSobrepasa) {
+      // Cerrar día actual
       planificacionDiaria.push({
         diaNumero: diaActual,
         hectareasObjetivo: Math.round(hectareasDelDiaActual * 100) / 100,
-        lotesProgramados: lotesDelDiaActual.map(l => l.id), // Solo los IDs para Airtable
-        lotesDetalles: lotesDelDiaActual.map(l => {
-          const loteInfo = lotes.find(lote => lote.id === l.id);
-          return {
-            id: l.id,
-            nombre: loteInfo?.nombre || 'Desconocido',
-            orden: loteInfo?.ordenSecuencia || 999,
-            hectareasParciales: l.hectareasParciales
-          };
-        })
+        lotesProgramados: [...lotesDelDiaActual]
       });
       
-      console.log(`   ✅ Día ${diaActual} completo: ${hectareasDelDiaActual.toFixed(2)} Ha en ${lotesDelDiaActual.length} lotes`);
+      console.log(`   ✅ Día ${diaActual} completo: ${hectareasDelDiaActual.toFixed(2)} Ha con ${lotesDelDiaActual.length} lotes`);
       
-      // Reiniciar para el siguiente día
-      diaActual++;
-      hectareasDelDiaActual = 0;
-      lotesDelDiaActual = [];
+      // Si no es el último lote, preparar siguiente día
+      if (!esUltimoLote) {
+        diaActual++;
+        hectareasDelDiaActual = 0;
+        lotesDelDiaActual = [];
+        console.log(``);
+      }
     }
   }
   
   // Verificación final
   const totalPlanificado = planificacionDiaria.reduce((sum, dia) => sum + dia.hectareasObjetivo, 0);
-  console.log(`✅ Distribución completada: ${totalPlanificado.toFixed(2)} Ha en ${planificacionDiaria.length} días (orden respetado)`);
+  console.log(`\n✅ Distribución completada: ${totalPlanificado.toFixed(2)} Ha en ${planificacionDiaria.length} días (orden secuencial respetado)`);
   
   return planificacionDiaria;
 }
@@ -183,7 +162,7 @@ async function crearPlanificacionDiaria(aplicacionId: string, fechaInicio: strin
         'Fecha Planificada': fechaDelDia.toISOString().split('T')[0],
         'Dia Numero': dia.diaNumero,
         'Hectareas Objetivo': dia.hectareasObjetivo,
-        'Lotes Programados': dia.lotesProgramados,
+        'Lotes Programados': dia.lotesProgramados, // Lotes específicos de este día
         'Aplicacion Evento': [aplicacionId]
       });
       
@@ -216,7 +195,7 @@ export async function POST(request: NextRequest) {
       estadoAplicacion = 'PRESUPUESTADA',
       paquetesAplicaciones,
       cultivosLotesAplicaciones,
-      capacidadDiariaHa = 50,
+      capacidadDiariaHa = 60,
       fechaInicioAplicacion,
       cantidadTotalBiologicosLitros,
       idProductosAplicados,
@@ -343,7 +322,7 @@ export async function GET(request: NextRequest) {
     
     const { searchParams } = new URL(request.url);
     const cultivosLotesIds = searchParams.get('lotes')?.split(',') || [];
-    const capacidadDiariaHa = parseInt(searchParams.get('capacidad') || '50');
+    const capacidadDiariaHa = parseInt(searchParams.get('capacidad') || '60');
     const fechaInicio = searchParams.get('fechaInicio');
     
     if (cultivosLotesIds.length === 0) {

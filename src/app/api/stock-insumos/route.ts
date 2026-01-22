@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Airtable from 'airtable';
+import { debugLog } from '@/lib/debug';
 
 // Validar configuración requerida
 if (!process.env.AIRTABLE_API_KEY || !process.env.AIRTABLE_BASE_ID) {
@@ -56,20 +57,22 @@ export async function GET() {
 
     await fetchAllRecords();
 
-    console.log('📊 API STOCK-INSUMOS: Records obtenidos:', allRecords.length);
+    debugLog('📊 API STOCK-INSUMOS: Records obtenidos:', allRecords.length);
     
-    // Log de cada record para ver su estructura
-    allRecords.forEach((record: any, index: number) => {
-      console.log(`📦 API STOCK-INSUMOS: Record ${index + 1}:`, {
-        id: record.id,
-        fields: record.fields,
-        nombre: record.get('nombre'),
-        categoria: record.get('categoria_insumo'),
-        totalCantidad: record.get('Total Cantidad Producto'),
-        rangoMinimo: record.get('Rango Minimo Stock'),
-        estado: record.get('estado')
+    // Log de cada record para ver su estructura - solo en desarrollo
+    if (process.env.NODE_ENV === 'development') {
+      allRecords.forEach((record: any, index: number) => {
+        debugLog(`📦 API STOCK-INSUMOS: Record ${index + 1}:`, {
+          id: record.id,
+          fields: record.fields,
+          nombre: record.get('nombre'),
+          categoria: record.get('categoria_insumo'),
+          totalCantidad: record.get('Total Cantidad Producto'),
+          rangoMinimo: record.get('Rango Minimo Stock'),
+          estado: record.get('estado')
+        });
       });
-    });
+    }
 
     // Mapear los registros a un formato más amigable y seguro para React
     const insumos = allRecords.map((record: any) => {
@@ -121,8 +124,8 @@ export async function POST(request: NextRequest) {
     
     const insumoData = await request.json();
     
-    console.log('📋 API STOCK-INSUMOS POST: Datos recibidos:', insumoData);
-    console.log('👤 API STOCK-INSUMOS POST: Registrado por:', insumoData.realizaRegistro || 'No especificado');
+    debugLog('📋 API STOCK-INSUMOS POST: Datos recibidos:', insumoData);
+    debugLog('👤 API STOCK-INSUMOS POST: Registrado por:', insumoData.realizaRegistro || 'No especificado');
 
     const tableId = process.env.AIRTABLE_TABLE_INSUMOS_LABORATORIO;
     

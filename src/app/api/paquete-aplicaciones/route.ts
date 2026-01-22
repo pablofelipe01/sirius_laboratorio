@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
                 fechaProgramada: fechaEvento,
                 fechaInicioAplicacion: fechaInicioAplicacion,
                 cultivosLotesAplicaciones: cultivosLotesEvento, // Usar los cultivos-lotes específicos de este evento
-                capacidadDiariaHa: 50,
+                capacidadDiariaHa: 60,
                 estadoAplicacion: 'PRESUPUESTADA',
                 skipCreacionEvento: true,
                 eventoExistenteId: evento.id

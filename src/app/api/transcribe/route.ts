@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { debugLog } from '@/lib/debug';
 import OpenAI from 'openai';
 
 // Validar que la API key esté presente y sea válida
@@ -80,8 +81,8 @@ export async function POST(request: NextRequest) {
                     request.headers.get('x-real-ip') || 
                     'unknown';
     
-    console.log('🎙️ Solicitud de transcripción desde IP:', clientIP);
-    console.log('🔊 Archivo recibido:', {
+    debugLog('📝 Solicitud de transcripción desde IP:', clientIP);
+    debugLog('🔊 Archivo recibido:', {
       name: audioFile.name,
       size: audioFile.size,
       type: audioFile.type,
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
       temperature: 0.2, // Baja temperatura para mayor precisión
     });
 
-    console.log('Transcripción completada:', transcription);
+    debugLog('Transcripción completada:', transcription);
 
     if (!transcription || typeof transcription !== 'string' || transcription.trim().length === 0) {
       return NextResponse.json(

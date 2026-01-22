@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { debugLog, debugError } from '@/lib/debug';
 
 interface ActualizacionProgreso {
   paqueteId: string;
@@ -22,15 +23,16 @@ interface ActualizacionProgreso {
   observaciones: string[];
   horaInicio: string;
   horaSalida: string;
+  mensajeOriginal?: string; // Mensaje de campo original
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔄 [ACTUALIZAR-PROGRESO] Inicio de actualización de progreso');
+    debugLog('🔄 [ACTUALIZAR-PROGRESO] Inicio de actualización de progreso');
     
     const datos: ActualizacionProgreso = await request.json();
     
-    console.log('📥 [ACTUALIZAR-PROGRESO] Datos recibidos:', {
+    debugLog('📥 [ACTUALIZAR-PROGRESO] Datos recibidos:', {
       paqueteId: datos.paqueteId,
       clienteId: datos.clienteId,
       fecha: datos.fecha,
@@ -38,7 +40,12 @@ export async function POST(request: NextRequest) {
       cantidadTractores: datos.tractores?.length || 0
     });
 
-    if (!datos.paqueteId || !datos.fecha || !datos.hectareasEjecutadas) {
+    if (!datos.paqueteId || !datos.fecha || datos.hectareasEjecutadas === undefined || datos.hectareasEjecutadas === null) {
+      console.error('❌ [ACTUALIZAR-PROGRESO] Validación fallida:', {
+        tienePaqueteId: !!datos.paqueteId,
+        tieneFecha: !!datos.fecha,
+        tieneHectareas: datos.hectareasEjecutadas !== undefined && datos.hectareasEjecutadas !== null
+      });
       return NextResponse.json({
         error: 'Datos incompletos: se requiere paqueteId, fecha y hectareasEjecutadas'
       }, { status: 400 });
@@ -63,101 +70,111 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: 'No se encontró planificación diaria para la fecha especificada',
         fecha: datos.fecha,
-        paqueteId: datos.paqueteId
+        paqueteId: datos.paqueteId,
+        sugerencia: 'Verifica que exista una planificación diaria creada para esta fecha y paquete. La fecha debe estar en formato YYYY-MM-DD.'
       }, { status: 404 });
     }
 
-    console.log('📋 [ACTUALIZAR-PROGRESO] Planificación encontrada:', {
+    debugLog('📋 [ACTUALIZAR-PROGRESO] Planificación encontrada:', {
       id: planificacionRecord.id,
-      hectareasPlanificadas: planificacionRecord.fields['Hectareas Planificadas'],
-      estadoActual: planificacionRecord.fields['Estado']
+      hectareasObjetivo: planificacionRecord.fields['Hectareas Objetivo'],
+      diaNumero: planificacionRecord.fields['Dia Numero'],
+      aplicacionEvento: planificacionRecord.fields['Aplicacion Evento']
     });
 
-    // 2. Calcular desviaciones y nuevos valores
-    const hectareasPlanificadas = planificacionRecord.fields['Hectareas Planificadas'] || 0;
+    // 2. Calcular desviaciones y determinar estado
+    const hectareasPlanificadas = planificacionRecord.fields['Hectareas Objetivo'] || 0;
+    const diaNumero = planificacionRecord.fields['Dia Numero'] || 1;
+    const aplicacionEventoId = planificacionRecord.fields['Aplicacion Evento']?.[0];
     const desviacion = datos.hectareasEjecutadas - hectareasPlanificadas;
     const porcentajeCumplimiento = (datos.hectareasEjecutadas / hectareasPlanificadas) * 100;
     
-    // 3. Determinar nuevo estado basado en el progreso
-    let nuevoEstado = 'EN_PROCESO';
+    // 3. Determinar estado del día
+    let estadoDia = 'Parcial';
     if (porcentajeCumplimiento >= 95) {
-      nuevoEstado = 'COMPLETADA';
-    } else if (porcentajeCumplimiento < 50) {
-      nuevoEstado = 'ATRASADA';
+      estadoDia = 'Completado';
+    } else if (porcentajeCumplimiento === 0) {
+      estadoDia = 'No Trabajado';
     }
 
-    // 4. Preparar datos de actualización
-    const camposActualizacion = {
-      'Hectareas Ejecutadas': datos.hectareasEjecutadas,
-      'Estado': nuevoEstado,
-      'Fecha Ejecucion': datos.fecha,
-      'Desviacion Hectareas': desviacion,
-      'Porcentaje Cumplimiento': Math.round(porcentajeCumplimiento),
-      'Observaciones Ejecucion': datos.observaciones.join('; '),
-      'Hora Inicio': datos.horaInicio,
-      'Hora Fin': datos.horaSalida,
-      'Fecha Actualizacion': new Date().toISOString()
-    };
-
-    console.log('📝 [ACTUALIZAR-PROGRESO] Actualizando campos:', {
+    debugLog('📝 [ACTUALIZAR-PROGRESO] Calculando métricas:', {
       hectareasEjecutadas: datos.hectareasEjecutadas,
       hectareasPlanificadas,
       desviacion,
       porcentajeCumplimiento: Math.round(porcentajeCumplimiento),
-      nuevoEstado
+      estadoDia
     });
 
-    // 5. Actualizar registro en Airtable
-    const updateUrl = `https://api.airtable.com/v0/${baseId}/Planificacion%20Diaria%20Aplicacion/${planificacionRecord.id}`;
-    const updateResponse = await fetch(updateUrl, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${airtableApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fields: camposActualizacion
-      })
-    });
-
-    if (!updateResponse.ok) {
-      const errorText = await updateResponse.text();
-      throw new Error(`Error actualizando planificación: ${updateResponse.status} - ${errorText}`);
+    // 4. Crear registro en Mensajes Aplicacion primero (necesitamos el ID para el seguimiento)
+    let mensajeId: string | null = null;
+    if (datos.mensajeOriginal) {
+      mensajeId = await crearMensajeAplicacion(
+        baseId,
+        airtableApiKey,
+        datos.mensajeOriginal
+      );
     }
 
-    const registroActualizado = await updateResponse.json();
-
-    // 6. Crear registro de seguimiento detallado
-    await crearRegistroSeguimiento(
+    // 5. Crear registro de seguimiento en Seguimiento Diario Aplicacion
+    const seguimientoId = await crearRegistroSeguimiento(
       baseId,
       airtableApiKey,
-      datos,
-      planificacionRecord.id,
-      desviacion
+      datos.fecha,
+      diaNumero,
+      hectareasPlanificadas,
+      datos.hectareasEjecutadas,
+      estadoDia,
+      datos.observaciones.join('; '),
+      datos.tractores,
+      aplicacionEventoId,
+      mensajeId
     );
 
-    // 7. Verificar si necesita generar alertas
-    const alertas = await generarAlertasSiNecesario(datos, desviacion, porcentajeCumplimiento);
-
-    console.log('✅ [ACTUALIZAR-PROGRESO] Progreso actualizado exitosamente:', {
-      registroId: registroActualizado.id,
-      nuevoEstado,
-      alertasGeneradas: alertas.length
+    debugLog('✅ [ACTUALIZAR-PROGRESO] Registros creados:', { 
+      mensajeId, 
+      seguimientoId 
     });
+    
+    // 6. Actualizar el mensaje con la relación al seguimiento
+    if (mensajeId && seguimientoId) {
+      await actualizarMensajeConSeguimiento(
+        baseId,
+        airtableApiKey,
+        mensajeId,
+        seguimientoId
+      );
+    }
+
+    // 7. Generar alertas si hay desviaciones significativas
+    const alertas = [];
+    if (desviacion > hectareasPlanificadas * 0.2) {
+      alertas.push({
+        tipo: 'EXCESO',
+        mensaje: `Se ejecutaron ${desviacion.toFixed(2)} Ha más de lo planificado`,
+        severidad: 'INFO'
+      });
+    } else if (desviacion < -hectareasPlanificadas * 0.2) {
+      alertas.push({
+        tipo: 'DEFICIT',
+        mensaje: `Faltan ${Math.abs(desviacion).toFixed(2)} Ha por ejecutar`,
+        severidad: 'ADVERTENCIA'
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      registro: registroActualizado,
-      resumen: {
+      seguimientoId,
+      mensajeId,
+      planificacionId: planificacionRecord.id,
+      metricas: {
         hectareasPlanificadas,
         hectareasEjecutadas: datos.hectareasEjecutadas,
         desviacion,
         porcentajeCumplimiento: Math.round(porcentajeCumplimiento),
-        estadoAnterior: planificacionRecord.fields['Estado'],
-        estadoNuevo: nuevoEstado
+        estadoDia
       },
       alertas,
-      message: `Progreso actualizado: ${datos.hectareasEjecutadas} Ha ejecutadas vs ${hectareasPlanificadas} Ha planificadas`
+      message: `Seguimiento creado: ${datos.hectareasEjecutadas} Ha ejecutadas vs ${hectareasPlanificadas} Ha planificadas`
     });
 
   } catch (error) {
@@ -171,36 +188,24 @@ export async function POST(request: NextRequest) {
 
 async function buscarPlanificacionDiaria(baseId: string, apiKey: string, paqueteId: string, fecha: string) {
   try {
-    // Primero buscar eventos del paquete - usar filtro por linked record
-    const filterPaquete = encodeURIComponent(`SEARCH("${paqueteId}", ARRAYJOIN({Paquete Aplicacion}))`);
-    const eventosUrl = `https://api.airtable.com/v0/${baseId}/Aplicaciones%20Eventos?filterByFormula=${filterPaquete}`;
+    debugLog('🔍 [BUSCAR-PLANIFICACION] Búsqueda directa por fecha:', { fecha, paqueteId });
     
-    const eventosResponse = await fetch(eventosUrl, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!eventosResponse.ok) {
-      throw new Error(`Error consultando eventos: ${eventosResponse.status}`);
-    }
-
-    const eventosData = await eventosResponse.json();
-    const eventos = eventosData.records || [];
-
-    if (eventos.length === 0) {
-      console.log('⚠️ [BUSCAR-PLANIFICACION] No se encontraron eventos para el paquete');
-      return null;
-    }
-
-    // Buscar planificación para la fecha específica
-    const eventosIds = eventos.map((e: any) => e.id);
+    // Convertir fecha de YYYY-MM-DD a formato que pueda comparar con Airtable
+    // Airtable puede almacenar como "26/1/2026" entonces necesitamos usar DATESTR o IS_SAME
+    const fechaObj = new Date(fecha);
+    const dia = fechaObj.getDate();
+    const mes = fechaObj.getMonth() + 1;
+    const ano = fechaObj.getFullYear();
+    
+    // Usar IS_SAME para comparar fechas ignorando formato
     const filterPlanificacion = encodeURIComponent(
-      `AND(OR(${eventosIds.map((id: string) => `{Aplicacion Evento ID} = "${id}"`).join(',')}), {Fecha Programada} = "${fecha}")`
+      `IS_SAME({Fecha Planificada}, DATETIME_PARSE("${fecha}", "YYYY-MM-DD"), "day")`
     );
     
     const planificacionUrl = `https://api.airtable.com/v0/${baseId}/Planificacion%20Diaria%20Aplicacion?filterByFormula=${filterPlanificacion}`;
+    
+    debugLog('🌐 [BUSCAR-PLANIFICACION] URL directa:', planificacionUrl);
+    debugLog('🔎 [BUSCAR-PLANIFICACION] Filtro:', decodeURIComponent(filterPlanificacion));
     
     const planificacionResponse = await fetch(planificacionUrl, {
       headers: {
@@ -210,11 +215,42 @@ async function buscarPlanificacionDiaria(baseId: string, apiKey: string, paquete
     });
 
     if (!planificacionResponse.ok) {
-      throw new Error(`Error consultando planificación: ${planificacionResponse.status}`);
+      const errorText = await planificacionResponse.text();
+      console.error('❌ [BUSCAR-PLANIFICACION] Error planificación:', errorText);
+      throw new Error(`Error consultando planificación: ${planificacionResponse.status} - ${errorText}`);
     }
 
     const planificacionData = await planificacionResponse.json();
-    return planificacionData.records?.[0] || null;
+    const registros = planificacionData.records || [];
+    
+    console.log('📊 [BUSCAR-PLANIFICACION] Respuesta de Airtable:', {
+      status: planificacionResponse.status,
+      cantidadRegistros: registros.length,
+      registros: registros.map((r: any) => ({
+        id: r.id,
+        fechaPlanificada: r.fields['Fecha Planificada'],
+        hectareasObjetivo: r.fields['Hectareas Objetivo'],
+        diaNumero: r.fields['Dia Numero'],
+        aplicacionEvento: r.fields['Aplicacion Evento']
+      }))
+    });
+    
+    if (registros.length === 0) {
+      debugLog('⚠️ [BUSCAR-PLANIFICACION] No hay planificación para fecha:', fecha);
+      return null;
+    }
+    
+    // Si hay múltiples registros, tomar el primero
+    const planificacion = registros[0];
+    
+    console.log('✅ [BUSCAR-PLANIFICACION] Planificación encontrada:', {
+      id: planificacion.id,
+      fecha: planificacion.fields['Fecha Planificada'],
+      hectareas: planificacion.fields['Hectareas Objetivo'],
+      diaNumero: planificacion.fields['Dia Numero']
+    });
+    
+    return planificacion;
 
   } catch (error) {
     console.error('❌ [BUSCAR-PLANIFICACION] Error:', error);
@@ -224,33 +260,52 @@ async function buscarPlanificacionDiaria(baseId: string, apiKey: string, paquete
 
 async function crearRegistroSeguimiento(
   baseId: string, 
-  apiKey: string, 
-  datos: ActualizacionProgreso, 
-  planificacionId: string,
-  desviacion: number
-) {
+  apiKey: string,
+  fechaReporte: string,
+  diaSecuencia: number,
+  hectareasPlanificadas: number,
+  hectareasReales: number,
+  estadoDia: string,
+  observaciones: string,
+  tractores: any[],
+  aplicacionEventoId: string | undefined,
+  mensajeId: string | null
+): Promise<string | null> {
   try {
     console.log('📊 [SEGUIMIENTO] Creando registro de seguimiento detallado');
     
-    // Verificar si existe tabla de Seguimiento (si no existe, solo log)
-    const seguimientoUrl = `https://api.airtable.com/v0/${baseId}/Seguimiento%20Aplicaciones`;
+    // Determinar responsable del reporte (primer operador)
+    const responsable = tractores[0]?.operador || 'Sin especificar';
     
-    const registroSeguimiento = {
+    // Crear registro en Seguimiento Diario Aplicacion
+    const seguimientoUrl = `https://api.airtable.com/v0/${baseId}/Seguimiento%20Diario%20Aplicacion`;
+    
+    const registroSeguimiento: Record<string, any> = {
       fields: {
-        'Planificacion Diaria ID': [planificacionId],
-        'Fecha Seguimiento': datos.fecha,
-        'Hectareas Ejecutadas': datos.hectareasEjecutadas,
-        'Desviacion': desviacion,
-        'Tractores Utilizados': datos.tractores.length,
-        'Operadores': datos.tractores.map(t => t.operador).join(', '),
-        'Lotes Trabajados': datos.tractores.flatMap(t => t.lotes.map(l => l.codigo)).join(', '),
-        'Productos Aplicados': datos.productos.map(p => `${p.nombre}: ${p.cantidad}${p.unidad}`).join('; '),
-        'Observaciones': datos.observaciones.join('; '),
-        'Hora Inicio': datos.horaInicio,
-        'Hora Fin': datos.horaSalida,
-        'Timestamp': new Date().toISOString()
+        'Fecha Reporte': fechaReporte,
+        'Dia Secuencia': diaSecuencia,
+        'Hectareas Planificadas': hectareasPlanificadas,
+        'Hectareas Reales': hectareasReales,
+        'Estado Dia': estadoDia,
+        'Responsable': responsable,
+        'Condiciones': 'Óptimas' // Por defecto, se puede mejorar con análisis
       }
     };
+    
+    // Agregar campos opcionales
+    if (observaciones) {
+      registroSeguimiento.fields['Observaciones'] = observaciones;
+    }
+    
+    if (aplicacionEventoId) {
+      registroSeguimiento.fields['Aplicacion Evento'] = [aplicacionEventoId];
+    }
+    
+    if (mensajeId) {
+      registroSeguimiento.fields['Mensajes Aplicacion'] = [mensajeId];
+    }
+    
+    console.log('📤 [SEGUIMIENTO] Enviando datos:', registroSeguimiento);
 
     const response = await fetch(seguimientoUrl, {
       method: 'POST',
@@ -264,13 +319,93 @@ async function crearRegistroSeguimiento(
     if (response.ok) {
       const registro = await response.json();
       console.log('✅ [SEGUIMIENTO] Registro creado:', registro.id);
+      return registro.id;
     } else {
-      console.log('⚠️ [SEGUIMIENTO] Tabla de seguimiento no disponible o error al crear registro');
+      const errorText = await response.text();
+      console.log('⚠️ [SEGUIMIENTO] Error al crear registro:', errorText);
+      return null;
     }
 
   } catch (error) {
     console.log('⚠️ [SEGUIMIENTO] Error creando registro de seguimiento:', error);
-    // No fallar la operación principal por esto
+    return null;
+  }
+}
+
+// Función para crear registro en Mensajes Aplicacion
+async function crearMensajeAplicacion(
+  baseId: string,
+  apiKey: string,
+  mensajeOriginal: string
+): Promise<string | null> {
+  try {
+    console.log('💬 [MENSAJE-APLICACION] Creando registro de mensaje original');
+    
+    const mensajeUrl = `https://api.airtable.com/v0/${baseId}/Mensajes%20Aplicacion`;
+    
+    const registroMensaje = {
+      fields: {
+        'Mensaje Aplicacion': mensajeOriginal
+      }
+    };
+    
+    const response = await fetch(mensajeUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(registroMensaje)
+    });
+    
+    if (response.ok) {
+      const mensaje = await response.json();
+      console.log('✅ [MENSAJE-APLICACION] Mensaje creado:', mensaje.id);
+      return mensaje.id;
+    } else {
+      const errorText = await response.text();
+      console.log('⚠️ [MENSAJE-APLICACION] Error creando mensaje:', errorText);
+      return null;
+    }
+  } catch (error) {
+    console.log('⚠️ [MENSAJE-APLICACION] Error:', error);
+    return null;
+  }
+}
+
+// Función para actualizar mensaje con relación al seguimiento
+async function actualizarMensajeConSeguimiento(
+  baseId: string,
+  apiKey: string,
+  mensajeId: string,
+  seguimientoId: string
+): Promise<void> {
+  try {
+    console.log('🔗 [MENSAJE-APLICACION] Vinculando mensaje con seguimiento');
+    
+    const mensajeUrl = `https://api.airtable.com/v0/${baseId}/Mensajes%20Aplicacion/${mensajeId}`;
+    
+    const response = await fetch(mensajeUrl, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          'Seguimiento Diario Aplicacion': [seguimientoId]
+        }
+      })
+    });
+    
+    if (response.ok) {
+      console.log('✅ [MENSAJE-APLICACION] Mensaje vinculado con seguimiento');
+    } else {
+      const errorText = await response.text();
+      console.log('⚠️ [MENSAJE-APLICACION] Error vinculando mensaje:', errorText);
+    }
+  } catch (error) {
+    console.log('⚠️ [MENSAJE-APLICACION] Error:', error);
   }
 }
 

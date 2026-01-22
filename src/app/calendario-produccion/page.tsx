@@ -22,6 +22,19 @@ interface ProduccionEvento {
   fechaCreacion?: string;
   fechaAplicacion?: string;
   estadoAplicacion?: string;
+  // Campos adicionales de Airtable
+  totalHectareasAplicacion?: number;
+  hectareasLotes?: number[];
+  idLotes?: string[];
+  productosAplicados?: any[];
+  diasPlanificados?: number;
+  progresoAplicacion?: number;
+  estadoCronograma?: string;
+  fechaInicioAplicacion?: string;
+  fechaFinEstimada?: string;
+  totalHectareasRealizadas?: number[];
+  paqueteAplicaciones?: any[];
+  lotesDetallados?: Array<{id: string, nombre: string, hectareas: number}>;
 }
 
 interface Cliente {
@@ -228,7 +241,8 @@ Hora de salida lobor 04:00pm`;
           productos: analisisIA.productos,
           observaciones: analisisIA.observaciones,
           horaInicio: analisisIA.horaInicio,
-          horaSalida: analisisIA.horaSalida
+          horaSalida: analisisIA.horaSalida,
+          mensajeOriginal: mensaje // Enviar el mensaje original
         })
       });
 
@@ -239,7 +253,7 @@ Hora de salida lobor 04:00pm`;
         return;
       }
 
-      alert(`✅ Progreso actualizado exitosamente!\n\n${data.message}`);
+      alert(`Progreso actualizado exitosamente.\n\n${data.message}`);
       
       // Limpiar y cerrar
       setMensaje('');
@@ -260,7 +274,7 @@ Hora de salida lobor 04:00pm`;
         <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-orange-600 to-red-600 text-white">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold flex items-center">
-              📊 Seguimiento Diario de Aplicaciones
+              Seguimiento Diario de Aplicaciones
             </h2>
             <button
               onClick={onClose}
@@ -327,7 +341,7 @@ Hora de salida lobor 04:00pm`;
               </div>
               {clientes.length === 0 && !loading && (
                 <p className="text-sm text-red-500 mt-1">
-                  ⚠️ No se encontraron clientes. Verifique que existan paquetes activos.
+                  No se encontraron clientes. Verifique que existan paquetes activos.
                 </p>
               )}
             </div>
@@ -375,7 +389,7 @@ Hora de salida lobor 04:00pm`;
                 disabled={!mensaje.trim() || !paqueteSeleccionado || procesando}
                 className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:bg-gray-300 transition-colors flex items-center"
               >
-                {procesando ? 'Analizando...' : '🤖 Analizar con IA'}
+                {procesando ? 'Analizando...' : 'Analizar Mensaje'}
               </button>
             </div>
           </div>
@@ -387,7 +401,7 @@ Hora de salida lobor 04:00pm`;
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="bg-blue-50 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">📋 General</h4>
+                  <h4 className="font-medium text-blue-900 mb-2">Información General</h4>
                   <div className="text-sm text-blue-800 space-y-1">
                     <p><strong>Fecha:</strong> {analisisIA.fecha}</p>
                     <p><strong>Bloque:</strong> {analisisIA.bloque}</p>
@@ -396,7 +410,7 @@ Hora de salida lobor 04:00pm`;
                 </div>
 
                 <div className="bg-green-50 rounded-lg p-4">
-                  <h4 className="font-medium text-green-900 mb-2">🧪 Productos</h4>
+                  <h4 className="font-medium text-green-900 mb-2">Productos Aplicados</h4>
                   <div className="text-sm text-green-800 space-y-1">
                     {analisisIA.productos.map((producto: any, index: number) => (
                       <p key={index}>{producto.nombre}: {producto.cantidad} {producto.unidad}</p>
@@ -405,10 +419,10 @@ Hora de salida lobor 04:00pm`;
                 </div>
 
                 <div className="bg-yellow-50 rounded-lg p-4">
-                  <h4 className="font-medium text-yellow-900 mb-2">🚜 Tractores</h4>
+                  <h4 className="font-medium text-yellow-900 mb-2">Equipo de Trabajo</h4>
                   <div className="text-sm text-yellow-800 space-y-1">
                     {analisisIA.tractores.map((tractor: any, index: number) => (
-                      <p key={index}>T{tractor.numero}: {tractor.totalHectareas} Ha</p>
+                      <p key={index}>Tractor {tractor.numero}: {tractor.totalHectareas} Ha</p>
                     ))}
                   </div>
                 </div>
@@ -416,7 +430,7 @@ Hora de salida lobor 04:00pm`;
 
               {analisisIA.observaciones.length > 0 && (
                 <div className="bg-orange-50 rounded-lg p-4 mb-4">
-                  <h4 className="font-medium text-orange-900 mb-2">⚠️ Observaciones</h4>
+                  <h4 className="font-medium text-orange-900 mb-2">Observaciones</h4>
                   <div className="text-sm text-orange-800 space-y-1">
                     {analisisIA.observaciones.map((obs: string, index: number) => (
                       <p key={index}>• {obs}</p>
@@ -443,7 +457,7 @@ Hora de salida lobor 04:00pm`;
                 disabled={procesando}
                 className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-medium"
               >
-                {procesando ? 'Procesando...' : '✅ Confirmar Actualización'}
+                {procesando ? 'Procesando...' : 'Confirmar Actualización'}
               </button>
             )}
           </div>
@@ -468,6 +482,18 @@ interface ProduccionEvento {
   fechaCreacion?: string;
   fechaAplicacion?: string;
   estadoAplicacion?: string;
+  // Campos adicionales de Airtable
+  totalHectareasAplicacion?: number;
+  hectareasLotes?: number[];
+  idLotes?: string[];
+  productosAplicados?: any[];
+  diasPlanificados?: number;
+  progresoAplicacion?: number;
+  estadoCronograma?: string;
+  fechaInicioAplicacion?: string;
+  fechaFinEstimada?: string;
+  totalHectareasRealizadas?: number[];
+  paqueteAplicaciones?: any[];
 }
 
 interface Cliente {
@@ -969,7 +995,13 @@ export default function CalendarioProduccionPage() {
       const dataEventos = await responseEventos.json();
       
       // Obtener eventos de aplicaciones desde DataLab
-      const responseAplicaciones = await fetch('/api/aplicaciones-eventos');
+      const responseAplicaciones = await fetch('/api/aplicaciones-eventos', {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       const dataAplicaciones = await responseAplicaciones.json();
       
       let todosLosEventos: ProduccionEvento[] = [];
@@ -1008,19 +1040,20 @@ export default function CalendarioProduccionPage() {
               }
               
               // Extraer cliente real si está disponible
-              if (paqueteInfo.clienteId) {
+              if (paqueteInfo.clearlienteId) {
                 // Buscar el cliente en la lista si está disponible
                 // Por ahora usar el clienteId como referencia
                 clienteReal = paqueteInfo.clienteId;
               }
-              
-              // Construir descripción más detallada
-              const hectareas = paqueteInfo.hectareasTotales || 0;
-              const lotes = paqueteInfo.lotesIds?.length || 0;
-              const aplicaciones = paqueteInfo.cantidadAplicacionesAno || 1;
-              
-              descripcionDetallada = `${evento.cantidadLitros || 0}L • ${hectareas}ha • ${lotes} lotes • ${aplicaciones}/año`;
             }
+            
+            // Construir descripción con datos reales del evento
+            const hectareas = evento.totalHectareasAplicacion || 0;
+            const lotes = evento.idLotes?.length || 0;
+            const litros = evento.cantidadLitros || 0;
+            const aplicaciones = 1; // Por defecto 1, podría venir del paquete si está disponible
+            
+            descripcionDetallada = `${litros}L • ${hectareas.toFixed(2)}ha • ${lotes} lotes • ${aplicaciones}/año`;
             
             // Extraer microorganismos si están disponibles
             if (evento.microorganismos && Array.isArray(evento.microorganismos)) {
@@ -1045,7 +1078,20 @@ export default function CalendarioProduccionPage() {
               fechaCreacion: evento.createdTime || new Date().toISOString(),
               // Datos adicionales específicos de aplicaciones
               fechaAplicacion: evento.fechaAplicacion || '',
-              estadoAplicacion: evento.estadoAplicacion || ''
+              estadoAplicacion: evento.estadoAplicacion || '',
+              // Datos completos de Airtable
+              totalHectareasAplicacion: evento.totalHectareasAplicacion || 0,
+              hectareasLotes: evento.hectareasLotes || [],
+              idLotes: evento.idLotes || [],
+              lotesDetallados: evento.lotesDetallados || [], // ¡FALTABA ESTA LÍNEA!
+              productosAplicados: evento.productosAplicados || [],
+              diasPlanificados: evento.diasPlanificados || 0,
+              progresoAplicacion: evento.progresoAplicacion || 0,
+              estadoCronograma: evento.estadoCronograma || '',
+              fechaInicioAplicacion: evento.fechaInicioAplicacion || '',
+              fechaFinEstimada: evento.fechaFinEstimada || '',
+              totalHectareasRealizadas: evento.totalHectareasRealizadas || [],
+              paqueteAplicaciones: evento.paqueteAplicaciones || []
             };
           })
           .filter(Boolean); // Filtrar elementos null
@@ -1353,6 +1399,57 @@ export default function CalendarioProduccionPage() {
       alert(`Error al actualizar aplicación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setLoadingDetailedEvent(false);
+    }
+  };
+
+  const handleUpdateAplicacion = async (eventoId: string, nuevoEstado: string) => {
+    try {
+      console.log(`🔄 Actualizando estado de aplicación ${eventoId} a ${nuevoEstado}`);
+      
+      // Mapear estados del frontend a estados de Airtable
+      const estadosAirtable: { [key: string]: string } = {
+        'planificado': 'PRESUPUESTADA',
+        'en-proceso': 'CONFIRMADA', 
+        'completado': 'ENTREGADA',
+        'cancelado': 'POSPUESTA'
+      };
+      
+      const estadoAirtable = estadosAirtable[nuevoEstado];
+      if (!estadoAirtable) {
+        console.error('Estado no válido:', nuevoEstado);
+        return;
+      }
+
+      const response = await fetch('/api/aplicaciones-eventos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: eventoId, 
+          estadoAplicacion: estadoAirtable 
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ Estado actualizado correctamente');
+        
+        // Actualizar el estado local
+        setSelectedEvento(prev => prev ? {
+          ...prev, 
+          estado: nuevoEstado as ProduccionEvento['estado'],
+          estadoAplicacion: estadoAirtable
+        } : prev);
+        
+        // Recargar eventos para sincronizar
+        fetchEventos();
+      } else {
+        console.error('❌ Error actualizando estado:', data.error);
+        alert('Error al actualizar el estado: ' + (data.error || 'Error desconocido'));
+      }
+    } catch (error) {
+      console.error('❌ Error actualizando aplicación:', error);
+      alert('Error al actualizar el estado de la aplicación');
     }
   };
 
@@ -2601,9 +2698,10 @@ export default function CalendarioProduccionPage() {
           {/* Event Detail Modal */}
           {selectedEvento && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-6">
+              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                {/* Header Fijo */}
+                <div className="p-6 border-b border-gray-200 flex-shrink-0">
+                  <div className="flex justify-between items-start">
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900 mb-2">
                         {selectedEvento.titulo || `${getTipoEvento(selectedEvento.tipo).label} - ${selectedEvento.cliente || 'Sin cliente'}`}
@@ -2642,19 +2740,27 @@ export default function CalendarioProduccionPage() {
                       </button>
                     </div>
                   </div>
+                </div>
 
+                {/* Contenido Scrolleable */}
+                <div className="flex-1 overflow-y-auto p-6">
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Fecha</label>
-                      <p className="text-gray-900">{formatDate(selectedEvento.fecha)}</p>
+                      <label className="text-sm font-medium text-gray-500">Fecha Programada</label>
+                      <p className="text-gray-900 font-semibold text-lg">{formatDate(selectedEvento.fecha)}</p>
                     </div>
-
-
 
                     {selectedEvento.cliente && (
                       <div>
                         <label className="text-sm font-medium text-gray-500">Cliente</label>
                         <p className="text-gray-900 font-semibold">{selectedEvento.cliente}</p>
+                      </div>
+                    )}
+
+                    {selectedEvento.titulo && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Tipo de Aplicación</label>
+                        <p className="text-gray-900 font-semibold">{selectedEvento.titulo}</p>
                       </div>
                     )}
 
@@ -2664,7 +2770,7 @@ export default function CalendarioProduccionPage() {
                         <div className="flex flex-wrap gap-2 mt-1">
                           {selectedEvento.microorganismos.map((micro: any, index: number) => (
                             <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              🦠 {typeof micro === 'string' ? micro : micro.nombre || micro}
+                              {typeof micro === 'string' ? micro : micro.nombre || micro}
                             </span>
                           ))}
                         </div>
@@ -2680,29 +2786,59 @@ export default function CalendarioProduccionPage() {
 
                     {selectedEvento.litros && selectedEvento.litros > 0 && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Litros</label>
-                        <p className="text-gray-900">{selectedEvento.litros} L</p>
+                        <label className="text-sm font-medium text-gray-500">Volumen Total</label>
+                        <p className="text-gray-900 text-lg font-bold text-blue-600">{selectedEvento.litros} Litros</p>
                       </div>
                     )}
+
+                    {/* Métricas Clave */}
+                    <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+                      <label className="text-sm font-medium text-gray-700 mb-3 block">Métricas de la Aplicación</label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {selectedEvento.totalHectareasAplicacion && (
+                          <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                            <div className="text-xs text-gray-500 mb-1">Total Hectáreas</div>
+                            <div className="text-xl font-bold text-green-600">{selectedEvento.totalHectareasAplicacion.toFixed(2)} ha</div>
+                          </div>
+                        )}
+                        {selectedEvento.idLotes && selectedEvento.idLotes.length > 0 && (
+                          <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                            <div className="text-xs text-gray-500 mb-1">Cantidad de Lotes</div>
+                            <div className="text-xl font-bold text-blue-600">{selectedEvento.idLotes.length} lotes</div>
+                          </div>
+                        )}
+                        {selectedEvento.litros && selectedEvento.litros > 0 && (
+                          <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                            <div className="text-xs text-gray-500 mb-1">Biológicos</div>
+                            <div className="text-xl font-bold text-purple-600">{selectedEvento.litros} L</div>
+                          </div>
+                        )}
+                        {selectedEvento.diasPlanificados && (
+                          <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                            <div className="text-xs text-gray-500 mb-1">Días Planificados</div>
+                            <div className="text-xl font-bold text-orange-600">{selectedEvento.diasPlanificados} días</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
                     {selectedEvento.paqueteId && (
                       <div>
                         <label className="text-sm font-medium text-gray-500">ID del Paquete</label>
-                        <p className="text-gray-900 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{selectedEvento.paqueteId}</p>
+                        <p className="text-gray-900 font-mono text-sm bg-gray-100 px-3 py-2 rounded border border-gray-300">{selectedEvento.paqueteId}</p>
                       </div>
                     )}
 
                     {selectedEvento.estadoAplicacion && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Estado de la Aplicación</label>
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                            selectedEvento.estadoAplicacion === 'PLANIFICADA' ? 'bg-yellow-100 text-yellow-800' :
-                            selectedEvento.estadoAplicacion === 'EJECUTADA' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
+                        <label className="text-sm font-medium text-gray-500 mb-2 block">Estado de la Aplicación</label>
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-bold ${
+                            selectedEvento.estadoAplicacion === 'CONFIRMADA' ? 'bg-green-100 text-green-800 border border-green-300' :
+                            selectedEvento.estadoAplicacion === 'ENTREGADA' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                            selectedEvento.estadoAplicacion === 'POSPUESTA' ? 'bg-gray-100 text-gray-800 border border-gray-300' :
+                            'bg-yellow-100 text-yellow-800 border border-yellow-300'
                           }`}>
-                            {selectedEvento.estadoAplicacion === 'PLANIFICADA' ? '⏱️' :
-                             selectedEvento.estadoAplicacion === 'EJECUTADA' ? '✅' : '❌'}
                             {selectedEvento.estadoAplicacion}
                           </span>
                           {needsConfirmation(selectedEvento) && (
@@ -2711,9 +2847,9 @@ export default function CalendarioProduccionPage() {
                                 handleUpdateEvento(selectedEvento.id, { estado: 'en-proceso' });
                                 setSelectedEvento({ ...selectedEvento, estado: 'en-proceso' });
                               }}
-                              className="px-3 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-xs font-medium transition-all animate-pulse"
+                              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium transition-all animate-pulse shadow-lg"
                             >
-                              ⚡ Confirmar Ahora ({getDaysLeft(selectedEvento.fecha)}d restantes)
+                              Confirmar Ahora ({getDaysLeft(selectedEvento.fecha)}d restantes)
                             </button>
                           )}
                         </div>
@@ -2723,25 +2859,143 @@ export default function CalendarioProduccionPage() {
                     {selectedEvento.fechaAplicacion && selectedEvento.fechaAplicacion !== selectedEvento.fecha && (
                       <div>
                         <label className="text-sm font-medium text-gray-500">Fecha de Ejecución Real</label>
-                        <p className="text-gray-900">{formatDate(selectedEvento.fechaAplicacion)}</p>
+                        <p className="text-gray-900 font-semibold">{formatDate(selectedEvento.fechaAplicacion)}</p>
                       </div>
                     )}
 
-                    {selectedEvento.descripcion && selectedEvento.descripcion.includes('•') && (
+                    {selectedEvento.fechaCreacion && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Detalles de la Aplicación</label>
-                        <div className="text-gray-900 bg-blue-50 p-3 rounded-lg">
-                          {selectedEvento.descripcion.split('•').map((detail, index) => (
-                            <div key={index} className="flex items-center gap-2 text-sm">
-                              {index === 0 ? '💧' : index === 1 ? '🌾' : index === 2 ? '📍' : '📅'}
-                              <span>{detail.trim()}</span>
+                        <label className="text-sm font-medium text-gray-500">Fecha de Creación</label>
+                        <p className="text-gray-700 text-sm">{new Date(selectedEvento.fechaCreacion).toLocaleString('es-CO', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</p>
+                      </div>
+                    )}
+
+                    {/* Productos Aplicados */}
+                    {selectedEvento.productosAplicados && selectedEvento.productosAplicados.length > 0 && (
+                      <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                        <label className="text-sm font-medium text-gray-700 mb-3 block">Microorganismos y Dosificaciones</label>
+                        <div className="space-y-2">
+                          {selectedEvento.productosAplicados.map((producto: any, index: number) => (
+                            <div key={index} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="font-bold text-gray-900 text-base">{producto.nombre}</div>
+                                  {producto.tipoProducto && (
+                                    <div className="text-xs text-gray-500 mt-1">{producto.tipoProducto}</div>
+                                  )}
+                                </div>
+                                <div className="text-right ml-4">
+                                  <div className="text-lg font-bold text-purple-600">{producto.litrosTotales || 0} L</div>
+                                  {producto.dosificacionPorHa > 0 && (
+                                    <div className="text-xs text-gray-600 mt-1 font-medium">{producto.dosificacionPorHa} L/ha</div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           ))}
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-purple-200">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-700">Total Biológicos</span>
+                            <span className="text-xl font-bold text-purple-600">{selectedEvento.litros || 0} L</span>
+                          </div>
                         </div>
                       </div>
                     )}
 
+                    {/* Progreso y Estado Cronograma */}
+                    {(selectedEvento.progresoAplicacion !== undefined || selectedEvento.estadoCronograma) && (
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <label className="text-sm font-medium text-gray-700 mb-3 block">Estado del Progreso</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {selectedEvento.progresoAplicacion !== undefined && (
+                            <div className="bg-white p-4 rounded-lg shadow-sm">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm text-gray-600">Progreso de Aplicación</span>
+                                <span className="text-lg font-bold text-blue-600">{selectedEvento.progresoAplicacion}%</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-3">
+                                <div 
+                                  className="bg-blue-600 h-3 rounded-full transition-all duration-500"
+                                  style={{ width: `${Math.min(selectedEvento.progresoAplicacion, 100)}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          )}
+                          {selectedEvento.estadoCronograma && (
+                            <div className="bg-white p-4 rounded-lg shadow-sm">
+                              <div className="text-sm text-gray-600 mb-2">Estado del Cronograma</div>
+                              <div className="text-lg font-bold">
+                                <span className={`px-3 py-1 rounded-full ${
+                                  selectedEvento.estadoCronograma.includes('En Tiempo') ? 'bg-green-100 text-green-800' :
+                                  selectedEvento.estadoCronograma.includes('Moderado') ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {selectedEvento.estadoCronograma}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
+                    {/* Lotes Detallados */}
+                    {selectedEvento.lotesDetallados && selectedEvento.lotesDetallados.length > 0 ? (
+                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <label className="text-sm font-medium text-gray-700 mb-3 block">Distribución por Lotes ({selectedEvento.lotesDetallados.length} lotes)</label>
+                        <div className="max-h-60 overflow-y-auto">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {selectedEvento.lotesDetallados.map((lote: any, index: number) => (
+                              <div key={index} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex-1">
+                                    <div className="font-bold text-gray-900 text-sm">{lote.nombre}</div>
+                                    <div className="text-xs text-gray-500 mt-1">{lote.id}</div>
+                                  </div>
+                                  <div className="text-right ml-2">
+                                    <div className="font-semibold text-green-600">{lote.hectareas} ha</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : selectedEvento.idLotes && selectedEvento.idLotes.length > 0 ? (
+                      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <label className="text-sm font-medium text-yellow-700 mb-3 block">
+                          Lotes sin nombres ({selectedEvento.idLotes.length} lotes)
+                        </label>
+                        <div className="max-h-60 overflow-y-auto">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {selectedEvento.idLotes.map((loteId: string, index: number) => (
+                              <div key={index} className="bg-white p-3 rounded-lg border border-yellow-200 shadow-sm">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex-1">
+                                    <div className="font-bold text-gray-900 text-sm">{loteId}</div>
+                                    <div className="text-xs text-gray-500 mt-1">ID: {loteId}</div>
+                                  </div>
+                                  <div className="text-right ml-2">
+                                    <div className="font-semibold text-green-600">{selectedEvento.hectareasLotes?.[index] || 0} ha</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <label className="text-sm font-medium text-red-700">No hay información de lotes disponible</label>
+                      </div>
+                    )}
 
                     <div className="pt-4 border-t">
                       <label className="text-sm font-medium text-gray-500 mb-2 block">Cambiar Estado</label>
@@ -2750,8 +3004,14 @@ export default function CalendarioProduccionPage() {
                           <button
                             key={estado.value}
                             onClick={() => {
-                              handleUpdateEvento(selectedEvento.id, { estado: estado.value as ProduccionEvento['estado'] });
-                              setSelectedEvento({ ...selectedEvento, estado: estado.value as ProduccionEvento['estado'] });
+                              // Si es un evento de aplicación (tiene estadoAplicacion), usar la función específica
+                              if (selectedEvento.estadoAplicacion) {
+                                handleUpdateAplicacion(selectedEvento.id, estado.value);
+                              } else {
+                                // Para eventos regulares, usar la función original
+                                handleUpdateEvento(selectedEvento.id, { estado: estado.value as ProduccionEvento['estado'] });
+                                setSelectedEvento({ ...selectedEvento, estado: estado.value as ProduccionEvento['estado'] });
+                              }
                             }}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                               selectedEvento.estado === estado.value
@@ -2765,11 +3025,14 @@ export default function CalendarioProduccionPage() {
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex gap-3 mt-6 pt-4 border-t">
+                {/* Footer Fijo */}
+                <div className="p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+                  <div className="flex gap-3">
                     <button
                       onClick={() => setSelectedEvento(null)}
-                      className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
+                      className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium"
                     >
                       Cerrar
                     </button>
@@ -2778,7 +3041,7 @@ export default function CalendarioProduccionPage() {
                         handleDeleteEvento(selectedEvento.id);
                         setSelectedEvento(null);
                       }}
-                      className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+                      className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-medium"
                     >
                       Eliminar
                     </button>

@@ -96,90 +96,195 @@ export async function POST(request: NextRequest) {
 }
 
 function analizarMensajeConIA(mensaje: string): MensajeAnalizado {
-  // Análisis básico por regex - luego reemplazaremos con OpenAI
+  console.log('🤖 [ANALISIS] Analizando mensaje completo:', mensaje);
   
-  // Extraer fecha
-  const fechaMatch = mensaje.match(/(\w+)\s+(\d{1,2}-\d{1,2}-\d{2})/);
-  const fecha = fechaMatch ? `2026-01-${fechaMatch[2].split('-')[0].padStart(2, '0')}` : new Date().toISOString().split('T')[0];
+  // Extraer fecha - mejorado para detectar varios formatos
+  let fecha = new Date().toISOString().split('T')[0];
+  
+  // Formato DD/MM/YYYY o DD/MM/YY
+  const fechaMatch1 = mensaje.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  // Formato DD-MM-YY o DD-MM-YYYY
+  const fechaMatch2 = mensaje.match(/(\d{1,2})-(\d{1,2})-(\d{2,4})/);
+  
+  const fechaMatch = fechaMatch1 || fechaMatch2;
+  
+  if (fechaMatch) {
+    const [, dia, mes, ano] = fechaMatch;
+    let anoCompleto = ano.length === 2 ? `20${ano}` : ano;
+    
+    // Si el año resulta en una fecha pasada, usar 2026
+    const fechaTemporal = new Date(`${anoCompleto}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`);
+    const ahora = new Date();
+    if (fechaTemporal < ahora && parseInt(anoCompleto) < 2026) {
+      anoCompleto = '2026';
+      console.log('⚠️ [ANALISIS] Fecha en el pasado, ajustando a 2026');
+    }
+    
+    fecha = `${anoCompleto}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    console.log('📅 [ANALISIS] Fecha detectada:', fecha, 'desde', fechaMatch[0]);
+  }
   
   // Extraer bloque
-  const bloqueMatch = mensaje.match(/Bloque\s+(\d+)/i);
-  const bloque = bloqueMatch ? bloqueMatch[1] : '';
+  const bloqueMatch = mensaje.match(/Bloque[s]?\s*(?:en proceso)?[:.]?\s*([B\d\s–\-,]+)/i);
+  const bloque = bloqueMatch ? bloqueMatch[1].trim() : '';
+  console.log('📦 [ANALISIS] Bloque detectado:', bloque);
   
-  // Extraer horarios
-  const horaInicioMatch = mensaje.match(/se empieza alas (\d{1,2}:\d{2})/i) || mensaje.match(/(\d{1,2}:\d{2})\s*am.*llegada/i);
-  const horaSalidaMatch = mensaje.match(/salida.*?(\d{1,2}:\d{2})\s*pm/i);
+  // Extraer horarios - mejorado para varios formatos
+  let horaInicio = '';
+  let horaSalida = '';
   
-  const horaInicio = horaInicioMatch ? horaInicioMatch[1] : '';
-  const horaSalida = horaSalidaMatch ? horaSalidaMatch[1] : '';
+  const horaLlegadaMatch = mensaje.match(/llegada.*?(\d{1,2}):(\d{2})\s*(?:a\.?\s*m\.?|am)/i);
+  const horaInicioMatch = mensaje.match(/(?:inicio|empieza).*?(\d{1,2}):(\d{2})/i);
+  const horaSalidaMatch = mensaje.match(/salida.*?(\d{1,2}):(\d{2})\s*(?:p\.?\s*m\.?|pm)/i);
   
-  // Extraer productos
+  if (horaInicioMatch) {
+    horaInicio = `${horaInicioMatch[1].padStart(2, '0')}:${horaInicioMatch[2]}`;
+  } else if (horaLlegadaMatch) {
+    horaInicio = `${horaLlegadaMatch[1].padStart(2, '0')}:${horaLlegadaMatch[2]}`;
+  }
+  
+  if (horaSalidaMatch) {
+    horaSalida = `${horaSalidaMatch[1].padStart(2, '0')}:${horaSalidaMatch[2]}`;
+  }
+  
+  console.log('⏰ [ANALISIS] Horarios:', { inicio: horaInicio, salida: horaSalida });
+  
+  // Extraer productos - mejorado para detectar cc, ml, cm
   const productos: ProductoAplicado[] = [];
-  const bacillusMatch = mensaje.match(/Bacillus\.?\s*(\d+)\.?(\w+)/i);
-  const beauveriaMatch = mensaje.match(/Beauveria\.?\s*(\d+)\.?(\w+)/i);
   
+  // Buscar Bacillus o Baci
+  const bacillusMatch = mensaje.match(/Bacillus\.?:?\s*(\d+)\s*(cc|cm|ml|lts?)/i);
   if (bacillusMatch) {
-    productos.push({
-      nombre: 'Bacillus',
-      cantidad: parseInt(bacillusMatch[1]),
-      unidad: bacillusMatch[2] === 'cm' ? 'ml' : bacillusMatch[2]
-    });
+    const cantidad = parseInt(bacillusMatch[1]);
+    let unidad = bacillusMatch[2].toLowerCase();
+    if (unidad === 'cc' || unidad === 'cm') unidad = 'ml';
+    productos.push({ nombre: 'Bacillus', cantidad, unidad });
+    console.log('🧪 [ANALISIS] Bacillus detectado:', cantidad, unidad);
   }
   
+  // Buscar Beauveria
+  const beauveriaMatch = mensaje.match(/Beauveria\.?:?\s*(\d+)\s*(cc|cm|ml|lts?)/i);
   if (beauveriaMatch) {
-    productos.push({
-      nombre: 'Beauveria bassiana',
-      cantidad: parseInt(beauveriaMatch[1]),
-      unidad: beauveriaMatch[2] === 'cm' ? 'ml' : beauveriaMatch[2]
-    });
+    const cantidad = parseInt(beauveriaMatch[1]);
+    let unidad = beauveriaMatch[2].toLowerCase();
+    if (unidad === 'cc' || unidad === 'cm') unidad = 'ml';
+    productos.push({ nombre: 'Beauveria bassiana', cantidad, unidad });
+    console.log('🧪 [ANALISIS] Beauveria detectado:', cantidad, unidad);
   }
   
-  // Extraer información de tractores
+  // Extraer información de tractores - mejorado para múltiples formatos
   const tractores: TractorInfo[] = [];
-  const tractorSections = mensaje.split(/Tractor\s+(\d+)/i).slice(1);
   
-  for (let i = 0; i < tractorSections.length; i += 2) {
-    const numero = parseInt(tractorSections[i]);
-    const content = tractorSections[i + 1];
+  // Buscar secciones de tractores
+  const tractorSections = mensaje.split(/Tractor\s+(\d+)|Equipo\s+(\d+)/i);
+  
+  console.log('🚜 [ANALISIS] Secciones encontradas:', tractorSections.length);
+  
+  for (let i = 1; i < tractorSections.length; i += 3) {
+    const numeroStr = tractorSections[i] || tractorSections[i + 1];
+    if (!numeroStr) continue;
     
-    // Extraer operador
-    const operadorMatch = content.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
-    const operador = operadorMatch ? operadorMatch[1] : '';
+    const numero = parseInt(numeroStr);
+    if (isNaN(numero)) continue;
     
-    // Extraer lotes y hectáreas
+    const content = tractorSections[i + 2] || '';
+    if (!content.trim()) continue;
+    
+    console.log(`🔍 [ANALISIS] Procesando tractor ${numero}, contenido:`, content.substring(0, 100));
+    
+    // Extraer operador - mejorado para capturar el nombre después de "Operador:"
+    let operador = '';
+    const operadorMatch = content.match(/Operador[a]?[:.\s]+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+)/i);
+    if (operadorMatch) {
+      operador = operadorMatch[1].trim();
+    }
+    
+    // Extraer lotes y hectáreas - múltiples formatos
     const lotes: Array<{codigo: string, hectareas: number}> = [];
-    const loteMatches = content.matchAll(/[BP]\s*(\d+)\.?\s*(\d+)\s*hts?/gi);
+    
+    // Formato principal: "B11 – P16\n18 hectáreas" o "B12 – P7\n14 hectáreas"
+    // Buscar patrón: B## [– nombre –] P## [–##] ... ## hectáreas
+    const lotePattern = /B\s*(\d+)\s*(?:–\s*[^–\n]*?)?\s*–?\s*P\s*(\d+)(?:–\d+)?\s*[\r\n]+.*?(\d+(?:\.\d+)?)\s*hectárea/gi;
+    const loteMatches = content.matchAll(lotePattern);
     
     for (const match of loteMatches) {
+      const bloque = match[1];
+      const parcela = match[2];
+      const hectareas = parseFloat(match[3]);
       lotes.push({
-        codigo: `P${match[1]}`,
-        hectareas: parseInt(match[2])
+        codigo: `B${bloque}-P${parcela}`,
+        hectareas
       });
+      console.log(`  📍 Lote detectado: B${bloque}-P${parcela} = ${hectareas} ha`);
+    }
+    
+    // Formato alternativo simple: "300 litros = 6 hectáreas" (primera línea)
+    if (lotes.length === 0) {
+      const hectareasSimple = content.match(/(\d+)\s*litros\s*=\s*(\d+(?:\.\d+)?)\s*hectárea/i);
+      if (hectareasSimple) {
+        lotes.push({
+          codigo: 'Sin especificar',
+          hectareas: parseFloat(hectareasSimple[2])
+        });
+      }
     }
     
     const totalHectareas = lotes.reduce((sum, lote) => sum + lote.hectareas, 0);
     
-    tractores.push({
-      numero,
-      operador,
-      lotes,
-      totalHectareas
-    });
+    if (lotes.length > 0 || operador) {
+      console.log(`✅ [ANALISIS] Tractor ${numero}:`, { operador, lotes: lotes.length, totalHectareas });
+      
+      tractores.push({
+        numero,
+        operador,
+        lotes,
+        totalHectareas
+      });
+    }
   }
   
-  // Extraer hectáreas total
-  const hectareasTotalMatch = mensaje.match(/HECTÁREAS APLICADAS\s*(\d+)/i);
-  const hectareasTotal = hectareasTotalMatch ? parseInt(hectareasTotalMatch[1]) : 
-    tractores.reduce((sum, tractor) => sum + tractor.totalHectareas, 0);
+  // Extraer hectáreas total - buscar en varias ubicaciones
+  let hectareasTotal = 0;
+  
+  // Prioridad 1: "Total avance día: 88 hectáreas"
+  const totalAvanceMatch = mensaje.match(/Total.*?(?:avance|día)[:.\s]+(\d+(?:\.\d+)?)\s*(?:ha|hectárea)/i);
+  if (totalAvanceMatch) {
+    hectareasTotal = parseFloat(totalAvanceMatch[1]);
+    console.log('📊 [ANALISIS] Total extraído de "Total avance día":', hectareasTotal);
+  }
+  
+  // Prioridad 2: "Hectáreas aplicadas: 82 ha" (en resumen)
+  if (hectareasTotal === 0) {
+    const resumenMatch = mensaje.match(/Resumen.*?Hectáreas aplicadas[:.\s]+(\d+(?:\.\d+)?)\s*ha/i);
+    if (resumenMatch) {
+      hectareasTotal = parseFloat(resumenMatch[1]);
+      console.log('📊 [ANALISIS] Total extraído de resumen:', hectareasTotal);
+    }
+  }
+  
+  // Prioridad 3: Sumar todos los tractores
+  if (hectareasTotal === 0) {
+    hectareasTotal = tractores.reduce((sum, tractor) => sum + tractor.totalHectareas, 0);
+    console.log('📊 [ANALISIS] Total calculado de tractores:', hectareasTotal);
+  }
+  
+  console.log('📊 [ANALISIS] Total hectáreas FINAL:', hectareasTotal);
+  console.log('📊 [ANALISIS] Tractores procesados:', tractores.length);
+  console.log('📊 [ANALISIS] Productos detectados:', productos.length);
   
   // Extraer observaciones
   const observaciones: string[] = [];
-  if (mensaje.includes('lluvia')) {
-    observaciones.push('Retraso por lluvia');
+  if (mensaje.match(/lluvia/i)) {
+    observaciones.push('Condiciones climáticas: lluvia');
   }
-  if (mensaje.includes('siembra')) {
-    observaciones.push('Siembra de palma en paralelo');
+  if (mensaje.match(/siembra/i)) {
+    observaciones.push('Actividad paralela: siembra');
   }
+  if (mensaje.match(/retraso|demora/i)) {
+    observaciones.push('Retraso reportado');
+  }
+  
+  console.log('📝 [ANALISIS] Observaciones:', observaciones);
   
   return {
     fecha,
