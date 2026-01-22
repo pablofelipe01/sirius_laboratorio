@@ -78,76 +78,89 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [PAQUETE-API] Paquete Aplicaciones creado:', paqueteRecord.id);
 
-    // Crear registros en Cultivos Lotes Aplicaciones para cada lote
-    console.log('🔄 [PAQUETE-API] Creando registros de Cultivos Lotes Aplicaciones...');
-    const cultivoLotesData = data.lotesIds.map(loteId => {
-      // Buscar las hectáreas del lote en los datos enviados
-      const loteInfo = data.lotesData?.find(lote => lote.id === loteId);
-      const hectareasLote = loteInfo?.areaHa || 0;
-      
-      return {
-        fields: {
-          'Nombre Cultivo Lote': `${data.cultivoId}-${loteId}`,
-          'ID Cultivo': data.cultivoId,
-          'ID Lote': loteId,
-          'Hectareas Lotes': hectareasLote
-        }
-      };
-    });
-
-    const cultivoLotesCreados = [];
-    if (cultivoLotesData.length > 0) {
-      // Crear registros en lotes de máximo 10 (límite de Airtable)
-      const batchSize = 10;
-      for (let i = 0; i < cultivoLotesData.length; i += batchSize) {
-        const batch = cultivoLotesData.slice(i, i + batchSize);
-        console.log(`📦 [PAQUETE-API] Creando batch de cultivos-lotes ${Math.floor(i/batchSize) + 1} con ${batch.length} registros`);
-        const batchResults = await base('Cultivos Lotes Aplicaciones').create(batch);
-        cultivoLotesCreados.push(...batchResults);
-      }
-      console.log('✅ [PAQUETE-API] Registros Cultivos-Lotes creados:', cultivoLotesCreados.length);
-    }
-
-    // Crear los eventos de aplicación programados relacionados con todos los cultivos-lotes
+    // 🔄 NUEVA LÓGICA: Crear cultivos-lotes POR CADA fecha programada
+    // Esto permite ajustar hectáreas/lotes de forma independiente para cada aplicación
+    console.log('🔄 [PAQUETE-API] Creando registros de Cultivos Lotes Aplicaciones por fecha...');
+    console.log(`📊 [PAQUETE-API] Se crearán: ${data.lotesIds.length} lotes × ${data.fechasCalculadas?.length || 0} fechas = ${data.lotesIds.length * (data.fechasCalculadas?.length || 0)} registros`);
+    
     const eventosCreados = [];
-    if (data.fechasCalculadas && data.fechasCalculadas.length > 0 && cultivoLotesCreados.length > 0) {
-      console.log('🔄 [PAQUETE-API] Creando eventos programados...');
-      
-      // Obtener todos los IDs de los registros de cultivos-lotes creados
-      const todosCultivoLotesIds = cultivoLotesCreados.map(record => record.id);
-      
-      // Para cada fecha programada, crear UN evento que incluya TODOS los cultivos-lotes
-      const eventosData = data.fechasCalculadas.map(fecha => ({
-        fields: {
-          'Cultivos Lotes Aplicaciones': todosCultivoLotesIds, // Todos los cultivos-lotes en cada evento
+    const todosCultivoLotesCreados = [];
+    
+    // Validar que hay fechas calculadas
+    if (!data.fechasCalculadas || data.fechasCalculadas.length === 0) {
+      console.warn('⚠️ [PAQUETE-API] No hay fechas calculadas, no se crearán eventos ni cultivos-lotes');
+    } else {
+      // Por cada fecha programada, crear un grupo independiente de cultivos-lotes
+      for (let indexFecha = 0; indexFecha < data.fechasCalculadas.length; indexFecha++) {
+        const fecha = data.fechasCalculadas[indexFecha];
+        console.log(`\n📅 [PAQUETE-API] Procesando fecha ${indexFecha + 1}/${data.fechasCalculadas.length}: ${fecha}`);
+        
+        // Crear registros de cultivos-lotes para esta fecha específica
+        const cultivoLotesDataFecha = data.lotesIds.map((loteId, indexLote) => {
+          const loteInfo = data.lotesData?.find(lote => lote.id === loteId);
+          const hectareasLote = loteInfo?.areaHa || 0;
+          const ordenSecuencia = indexLote + 1; // Orden secuencial basado en el orden de selección
+          
+          return {
+            fields: {
+              'Nombre Cultivo Lote': `${data.cultivoId}-${loteId}-F${indexFecha + 1}`, // Agregar indicador de fecha
+              'ID Cultivo': data.cultivoId,
+              'ID Lote': loteId,
+              'Hectareas Lotes': hectareasLote,
+              'Orden Secuencia': ordenSecuencia // Orden en que se seleccionó el lote
+            }
+          };
+        });
+        
+        // Crear los cultivos-lotes para esta fecha en lotes de máximo 10
+        const cultivoLotesFechaCreados = [];
+        const batchSize = 10;
+        for (let i = 0; i < cultivoLotesDataFecha.length; i += batchSize) {
+          const batch = cultivoLotesDataFecha.slice(i, i + batchSize);
+          console.log(`  📦 [PAQUETE-API] Creando batch ${Math.floor(i/batchSize) + 1} de cultivos-lotes para fecha ${indexFecha + 1}: ${batch.length} registros`);
+          const batchResults = await base('Cultivos Lotes Aplicaciones').create(batch);
+          cultivoLotesFechaCreados.push(...batchResults);
+        }
+        
+        console.log(`  ✅ [PAQUETE-API] Cultivos-Lotes creados para fecha ${indexFecha + 1}: ${cultivoLotesFechaCreados.length}`);
+        todosCultivoLotesCreados.push(...cultivoLotesFechaCreados);
+        
+        // Crear el evento SOLO para este grupo de cultivos-lotes
+        const cultivoLotesIdsFecha = cultivoLotesFechaCreados.map(record => record.id);
+        
+        const eventoRecord = await base('Aplicaciones Eventos').create({
+          'Cultivos Lotes Aplicaciones': cultivoLotesIdsFecha, // Solo los cultivos-lotes de esta fecha
           'Fecha Programada': fecha,
           'Estado Aplicacion': 'PRESUPUESTADA',
           'Cantidad Total Biologicos Litros': Math.round(data.litrosTotales)
-        }
-      }));
-
-      // Crear eventos en lotes de máximo 10 (límite de Airtable)
-      const batchSize = 10;
-      for (let i = 0; i < eventosData.length; i += batchSize) {
-        const batch = eventosData.slice(i, i + batchSize);
-        console.log(`📦 [PAQUETE-API] Creando batch de eventos ${Math.floor(i/batchSize) + 1} con ${batch.length} eventos`);
-        const batchResults = await base('Aplicaciones Eventos').create(batch);
-        eventosCreados.push(...batchResults);
+        });
+        
+        eventosCreados.push(eventoRecord);
+        console.log(`  ✅ [PAQUETE-API] Evento creado para fecha ${indexFecha + 1}: ${eventoRecord.id} (${cultivoLotesIdsFecha.length} cultivos-lotes)`);
       }
       
-      console.log('✅ [PAQUETE-API] Eventos creados:', eventosCreados.length);
-      console.log(`📊 [PAQUETE-API] Cada evento incluye ${todosCultivoLotesIds.length} cultivos-lotes`);
+      console.log('\n📊 [PAQUETE-API] Resumen de creación:');
+      console.log(`  - Total Cultivos-Lotes creados: ${todosCultivoLotesCreados.length}`);
+      console.log(`  - Total Eventos creados: ${eventosCreados.length}`);
+      console.log(`  - Cultivos-Lotes por evento: ${data.lotesIds.length}`);
       
       // 🚀 GENERAR PLANIFICACIÓN DIARIA AUTOMÁTICA PARA CADA EVENTO
       if (eventosCreados.length > 0) {
-        console.log('📅 [PAQUETE-API] Generando planificación diaria automática para eventos...');
+        console.log('\n📅 [PAQUETE-API] Generando planificación diaria automática para eventos...');
         
-        for (const evento of eventosCreados) {
+        for (let i = 0; i < eventosCreados.length; i++) {
+          const evento = eventosCreados[i];
           try {
             const fechaEvento = evento.fields['Fecha Programada'];
-            const fechaInicioAplicacion = fechaEvento; // Por ahora usar misma fecha
+            const fechaInicioAplicacion = fechaEvento;
             
-            console.log(`🌱 [PAQUETE-API] Generando planificación para evento ${evento.id} fecha: ${fechaEvento}`);
+            // Obtener los IDs de cultivos-lotes específicos de este evento
+            const cultivosLotesEventoRaw = evento.fields['Cultivos Lotes Aplicaciones'];
+            const cultivosLotesEvento = Array.isArray(cultivosLotesEventoRaw) ? cultivosLotesEventoRaw : [];
+            
+            console.log(`\n🌱 [PAQUETE-API] Evento ${i + 1}/${eventosCreados.length}: ${evento.id}`);
+            console.log(`  - Fecha: ${fechaEvento}`);
+            console.log(`  - Cultivos-Lotes: ${cultivosLotesEvento.length}`);
             
             // Llamar al endpoint interno de auto-planificación
             const autoPlanificarModule = await import('../aplicaciones-eventos/auto-planificar/route');
@@ -155,7 +168,7 @@ export async function POST(request: NextRequest) {
               json: async () => ({
                 fechaProgramada: fechaEvento,
                 fechaInicioAplicacion: fechaInicioAplicacion,
-                cultivosLotesAplicaciones: todosCultivoLotesIds,
+                cultivosLotesAplicaciones: cultivosLotesEvento, // Usar los cultivos-lotes específicos de este evento
                 capacidadDiariaHa: 50,
                 estadoAplicacion: 'PRESUPUESTADA',
                 skipCreacionEvento: true,
@@ -167,19 +180,19 @@ export async function POST(request: NextRequest) {
             const planificacionData = await planificacionResponse.json();
             
             if (planificacionData.success) {
-              console.log(`✅ [PAQUETE-API] Planificación generada para evento ${evento.id}: ${planificacionData.planificacion?.diasCreados || 0} días`);
+              console.log(`  ✅ Planificación generada: ${planificacionData.planificacion?.diasCreados || 0} días`);
             } else {
-              console.warn(`⚠️ [PAQUETE-API] Error generando planificación para evento ${evento.id}:`, planificacionData.error);
+              console.warn(`  ⚠️ Error en planificación:`, planificacionData.error);
             }
           } catch (error) {
-            console.error(`❌ [PAQUETE-API] Error en auto-planificación para evento ${evento.id}:`, error);
+            console.error(`  ❌ Error en auto-planificación para evento ${evento.id}:`, error);
           }
         }
       }
       
       // Actualizar el paquete para incluir los IDs de los eventos creados
       if (eventosCreados.length > 0) {
-        console.log('🔗 [PAQUETE-API] Actualizando paquete con eventos relacionados...');
+        console.log('\n🔗 [PAQUETE-API] Actualizando paquete con eventos relacionados...');
         const eventosIds = eventosCreados.map(evento => evento.id);
         
         await base('Paquete Aplicaciones').update(paqueteRecord.id, {
@@ -189,7 +202,7 @@ export async function POST(request: NextRequest) {
         console.log('✅ [PAQUETE-API] Paquete actualizado con eventos:', eventosIds.length);
         
         // Crear registros en la tabla Productos Aplicacion
-        console.log('🔄 [PAQUETE-API] Creando registros de Productos Aplicacion...');
+        console.log('\n🔄 [PAQUETE-API] Creando registros de Productos Aplicacion...');
         console.log('🔍 [PAQUETE-API] Microorganismos con dosificación recibidos:', JSON.stringify(data.microorganismos, null, 2));
         console.log('🔍 [PAQUETE-API] Hectáreas totales:', data.hectareasTotales);
         
@@ -331,10 +344,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       paqueteId: paqueteRecord.id,
-      cultivoLotesCount: cultivoLotesCreados.length,
+      cultivoLotesCount: todosCultivoLotesCreados.length,
       eventosCount: eventosCreados.length,
       productosAplicacionCount: eventosCreados.length * data.microorganismos.length,
-      message: `Paquete "${data.nombre}" creado exitosamente con ${cultivoLotesCreados.length} cultivos-lotes, ${eventosCreados.length} aplicaciones programadas y ${eventosCreados.length * data.microorganismos.length} registros de productos aplicacion`
+      message: `Paquete "${data.nombre}" creado exitosamente con ${todosCultivoLotesCreados.length} cultivos-lotes (${data.lotesIds.length} lotes × ${eventosCreados.length} fechas), ${eventosCreados.length} aplicaciones programadas y ${eventosCreados.length * data.microorganismos.length} registros de productos aplicacion`
     });
 
   } catch (error) {
