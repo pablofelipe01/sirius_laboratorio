@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertCircle, CheckCircle2, Clock, TrendingUp, Users, MapPin } from 'lucide-react';
 
 interface Cliente {
   id: string;
@@ -273,7 +272,7 @@ Hora de salida lobor 04:00pm`;
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-lg p-6 sticky top-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Users className="mr-2 h-5 w-5 text-blue-500" />
+                <span className="mr-2 text-lg" role="img" aria-label="usuarios">👥</span>
                 Selección de Cliente y Paquete
               </h2>
 
@@ -347,7 +346,7 @@ Hora de salida lobor 04:00pm`;
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                  <MapPin className="mr-2 h-5 w-5 text-green-500" />
+                  <span className="mr-2 text-lg" role="img" aria-label="ubicación">📍</span>
                   Mensaje de Campo
                 </h2>
                 <div className="space-x-2">
@@ -385,12 +384,12 @@ Hora de salida lobor 04:00pm`;
                 >
                   {procesando ? (
                     <>
-                      <Clock className="mr-2 h-4 w-4 animate-spin" />
+                      <span className="mr-2 text-sm animate-pulse" role="img" aria-label="procesando">⏳</span>
                       Analizando...
                     </>
                   ) : (
                     <>
-                      <TrendingUp className="mr-2 h-4 w-4" />
+                      <span className="mr-2 text-sm" role="img" aria-label="analizar">📊</span>
                       Analizar con IA
                     </>
                   )}
@@ -403,7 +402,7 @@ Hora de salida lobor 04:00pm`;
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                    <CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />
+                    <span className="mr-2 text-lg text-green-500" role="img" aria-label="éxito">✅</span>
                     Análisis Completado
                   </h2>
                   <button
@@ -413,12 +412,12 @@ Hora de salida lobor 04:00pm`;
                   >
                     {procesando ? (
                       <>
-                        <Clock className="mr-2 h-4 w-4 animate-spin" />
+                        <span className="mr-2 text-sm animate-pulse" role="img" aria-label="procesando">⏳</span>
                         Procesando...
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        <span className="mr-2 text-sm" role="img" aria-label="confirmar">✅</span>
                         Confirmar Actualización
                       </>
                     )}
@@ -468,7 +467,7 @@ Hora de salida lobor 04:00pm`;
                 {analisisIA.observaciones.length > 0 && (
                   <div className="mt-4 bg-orange-50 rounded-lg p-4">
                     <h3 className="font-medium text-orange-900 mb-2 flex items-center">
-                      <AlertCircle className="mr-2 h-4 w-4" />
+                      <span className="mr-2 text-sm" role="img" aria-label="observaciones">⚠️</span>
                       Observaciones Especiales
                     </h3>
                     <div className="text-sm text-orange-800 space-y-1">
