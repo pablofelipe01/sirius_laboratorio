@@ -1295,8 +1295,9 @@ export default function CalendarioProduccionPage() {
         lotesIds: lotesSeleccionados,
         lotesData: lotesData.filter(lote => lotesSeleccionados.includes(lote.id)).map(lote => ({
           id: lote.id,
-          areaHa: lote.areaHa
-        })), // Datos completos de lotes con hectáreas
+          areaHa: lote.areaHa,
+          nombre: lote.nombreLote || lote.nombre || `Lote ${lote.id}` // Incluir el nombre del lote
+        })), // Datos completos de lotes con hectáreas y nombre
         microorganismos: formData.microorganismos, // Enviar datos completos con dosificación
         cantidadAplicacionesAno: formData.cantidadAplicacionesAno,
         periodicidadMeses: formData.periodicidadMeses,

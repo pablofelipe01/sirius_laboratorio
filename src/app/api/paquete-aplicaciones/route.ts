@@ -16,7 +16,7 @@ interface PaqueteAplicacionData {
   clienteId: string;
   cultivoId: string;
   lotesIds: string[]; // Array de IDs de lotes
-  lotesData?: Array<{id: string, areaHa: number}>; // Datos completos de lotes con hectáreas
+  lotesData?: Array<{id: string, areaHa: number, nombre?: string}>; // Datos completos de lotes con hectáreas y nombre
   microorganismos: Array<{id: string, nombre: string, dosificacionPorHa: number, unidad: string}>; // Datos completos con dosificación
   cantidadAplicacionesAno: number;
   periodicidadMeses: number;
@@ -99,11 +99,15 @@ export async function POST(request: NextRequest) {
         const cultivoLotesDataFecha = data.lotesIds.map((loteId, indexLote) => {
           const loteInfo = data.lotesData?.find(lote => lote.id === loteId);
           const hectareasLote = loteInfo?.areaHa || 0;
+          const nombreLote = loteInfo?.nombre || `Lote ${loteId}`; // Obtener el nombre real del lote
           const ordenSecuencia = indexLote + 1; // Orden secuencial basado en el orden de selección
+          
+          console.log(`  📍 [PAQUETE-API] Procesando lote ${indexLote + 1}: ID=${loteId}, Nombre="${nombreLote}", Hectáreas=${hectareasLote}`);
           
           return {
             fields: {
               'Nombre Cultivo Lote': `${data.cultivoId}-${loteId}-F${indexFecha + 1}`, // Agregar indicador de fecha
+              'Nombre Lote': nombreLote, // Campo con el nombre original del bloque/lote
               'ID Cultivo': data.cultivoId,
               'ID Lote': loteId,
               'Hectareas Lotes': hectareasLote,
