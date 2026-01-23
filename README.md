@@ -5,6 +5,7 @@
 **DataLab** es una aplicación avanzada desarrollada por **Sirius Regenerative Solutions S.A.S ZOMAC** para la gestión integral de todos los procesos de producción de laboratorio, implementando tecnologías de Inteligencia Artificial y herramientas de análisis avanzadas.
 
 ---
+---
 
 ## ⚖️ **AVISO DE PROPIEDAD INTELECTUAL**
 
