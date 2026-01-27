@@ -68,19 +68,31 @@ export async function GET() {
       fechaCreacion: record.createdTime
     }));
 
-    // Filtrar solo productos activos y que sean hongos o bacterias (no fertilizantes)
-    const productosActivos = productos.filter(producto => 
-      producto.activo && 
-      (producto.tipo === 'Hongo' || producto.tipo === 'Bacteria')
-    );
+    // Filtrar solo productos activos, que sean hongos Y líquidos
+    const productosActivos = productos.filter(producto => {
+      // Verificar si es activo y tipo hongo
+      const esActivoYHongo = producto.activo && producto.tipo === 'Hongo';
+      if (!esActivoYHongo) return false;
+      
+      // Verificar si es líquido por diferentes criterios
+      const esLiquido = 
+        producto.unidadBase === 'L' || // Unidad en litros
+        (Array.isArray(producto.categoria) && 
+         producto.categoria.some(cat => cat && cat.toLowerCase().includes('liquid'))) || // Categoría líquida
+        producto.nombre.toLowerCase().includes('liquid') || // Nombre contiene líquido
+        (producto.observaciones && producto.observaciones.toLowerCase().includes('liquid')); // Observaciones contiene líquido
+      
+      return esLiquido;
+    });
 
-    console.log('📦 Productos procesados:', {
+    console.log('🍄 Productos procesados (Hongos Líquidos):', {
       total: productos.length,
-      activos: productosActivos.length,
+      hongosLiquidos: productosActivos.length,
       productos: productosActivos.slice(0, 3).map(p => ({ 
         nombre: p.nombre, 
         tipo: p.tipo,
-        codigo: p.codigo 
+        codigo: p.codigo,
+        unidad: p.unidadBase
       }))
     });
 
@@ -88,7 +100,7 @@ export async function GET() {
       success: true,
       productos: productosActivos,
       total: productosActivos.length,
-      message: `${productosActivos.length} productos activos obtenidos exitosamente`
+      message: `${productosActivos.length} hongos líquidos activos obtenidos exitosamente`
     });
 
   } catch (error) {

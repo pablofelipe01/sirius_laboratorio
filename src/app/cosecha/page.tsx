@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
+import { ProductoMicroorganismoMappingService } from '@/lib/services/ProductoMicroorganismoMappingService';
+
 interface Microorganismo {
   id: string;
   nombre: string;
@@ -19,7 +21,11 @@ interface Cliente {
   id: string;
   nombre: string;
   nit: string;
+  codigo: string; // CL-0001, etc.
   contacto: string;
+  direccion?: string;
+  ciudad?: string;
+  estado: string;
 }
 
 interface LoteData {
@@ -122,16 +128,23 @@ export default function CosechaPage() {
   const fetchMicroorganismos = async () => {
     setLoadingMicroorganismos(true);
     try {
-      const response = await fetch('/api/microorganismos');
+      // Consultar productos de Sirius Product Core
+      const response = await fetch('/api/sirius-productos');
       const data = await response.json();
       
       if (data.success) {
-        setMicroorganismos(data.microorganismos);
+        // Mapear productos a la interfaz Microorganismo existente
+        const productosComoMicroorganismos = data.productos.map((producto: any) => ({
+          id: producto.id,
+          nombre: producto.nombre // Campo 'Nombre Comercial' de Sirius Product Core
+        }));
+        setMicroorganismos(productosComoMicroorganismos);
+        console.log('🍄 Productos cargados desde Sirius Product Core:', productosComoMicroorganismos.length);
       } else {
-        console.error('Error loading microorganismos:', data.error);
+        console.error('Error loading productos:', data.error);
       }
     } catch (error) {
-      console.error('Error fetching microorganismos:', error);
+      console.error('Error fetching productos:', error);
     } finally {
       setLoadingMicroorganismos(false);
     }
@@ -140,7 +153,7 @@ export default function CosechaPage() {
   const fetchClientes = async () => {
     setLoadingClientes(true);
     try {
-      const response = await fetch('/api/clientes-laboratorio');
+      const response = await fetch('/api/clientes-core');
       const data = await response.json();
       
       if (data.success) {
@@ -178,7 +191,10 @@ export default function CosechaPage() {
     try {
       const params = new URLSearchParams();
       if (hongo) {
-        params.append('microorganismo', hongo);
+        // Mapear producto Sirius a microorganismo DataLab
+        const microorganismoDataLab = ProductoMicroorganismoMappingService.mapProductoToMicroorganismo(hongo);
+        console.log(`🔄 Mapeando producto "${hongo}" → microorganismo "${microorganismoDataLab}"`);
+        params.append('microorganismo', microorganismoDataLab);
       }
 
       const response = await fetch(`/api/inoculacion-disponible?${params}`);
@@ -205,7 +221,10 @@ export default function CosechaPage() {
     try {
       const params = new URLSearchParams();
       if (hongo) {
-        params.append('microorganismo', hongo);
+        // Mapear producto Sirius a microorganismo DataLab
+        const microorganismoDataLab = ProductoMicroorganismoMappingService.mapProductoToMicroorganismo(hongo);
+        console.log(`🧫 Mapeando producto "${hongo}" → microorganismo "${microorganismoDataLab}" para cepas`);
+        params.append('microorganismo', microorganismoDataLab);
       }
 
       const response = await fetch(`/api/cepas-disponibles?${params}`);
@@ -366,9 +385,9 @@ export default function CosechaPage() {
 
       // Si es un cliente nuevo, primero lo registramos
       if (cliente === 'nuevo') {
-        console.log('🏢 Registrando nuevo cliente:', nuevoCliente);
+        console.log('🏢 Registrando nuevo cliente en Sirius Client Core:', nuevoCliente);
         
-        const clienteResponse = await fetch('/api/clientes-laboratorio', {
+        const clienteResponse = await fetch('/api/clientes-core', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -383,7 +402,7 @@ export default function CosechaPage() {
         const clienteResult = await clienteResponse.json();
 
         if (clienteResponse.ok && clienteResult.success) {
-          console.log('✅ Cliente registrado exitosamente:', clienteResult.cliente);
+          console.log('✅ Cliente registrado exitosamente en Sirius Core:', clienteResult.cliente);
           clienteNombre = nuevoCliente;
           
           // Refrescar la lista de clientes para incluir el nuevo

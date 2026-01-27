@@ -11,6 +11,92 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY
 }).base(process.env.AIRTABLE_BASE_ID);
 
+// ============================================================================
+// ROLLBACK SYSTEM - Para evitar registros huérfanos
+// ============================================================================
+
+interface CreatedRecords {
+  paqueteId: string | null;
+  cultivosLotesIds: string[];
+  eventosIds: string[];
+  productosAplicacionIds: string[];
+  planificacionDiariaIds: string[];
+}
+
+/**
+ * Elimina registros de Airtable en lotes de 10 (límite de Airtable)
+ */
+async function deleteRecordsBatch(tableName: string, recordIds: string[]): Promise<number> {
+  if (recordIds.length === 0) return 0;
+  
+  const batchSize = 10;
+  let deletedCount = 0;
+  
+  for (let i = 0; i < recordIds.length; i += batchSize) {
+    const batch = recordIds.slice(i, i + batchSize);
+    try {
+      await base(tableName).destroy(batch);
+      deletedCount += batch.length;
+      console.log(`🗑️ [ROLLBACK] Eliminados ${batch.length} registros de ${tableName}`);
+    } catch (error) {
+      console.error(`❌ [ROLLBACK] Error eliminando registros de ${tableName}:`, error);
+      // Continuar con el siguiente batch aunque falle uno
+    }
+  }
+  
+  return deletedCount;
+}
+
+/**
+ * Ejecuta rollback de todos los registros creados
+ */
+async function executeRollback(createdRecords: CreatedRecords): Promise<void> {
+  console.log('\n🔄 [ROLLBACK] Iniciando rollback de registros creados...');
+  console.log('📊 [ROLLBACK] Registros a eliminar:', {
+    paquete: createdRecords.paqueteId ? 1 : 0,
+    cultivosLotes: createdRecords.cultivosLotesIds.length,
+    eventos: createdRecords.eventosIds.length,
+    productosAplicacion: createdRecords.productosAplicacionIds.length,
+    planificacionDiaria: createdRecords.planificacionDiariaIds.length
+  });
+  
+  // Eliminar en orden inverso a la creación (dependencias primero)
+  
+  // 1. Eliminar Planificación Diaria
+  if (createdRecords.planificacionDiariaIds.length > 0) {
+    await deleteRecordsBatch('Planificacion Diaria Aplicacion', createdRecords.planificacionDiariaIds);
+  }
+  
+  // 2. Eliminar Productos Aplicacion
+  if (createdRecords.productosAplicacionIds.length > 0) {
+    await deleteRecordsBatch(process.env.AIRTABLE_TABLE_PRODUCTOS_APLICACION!, createdRecords.productosAplicacionIds);
+  }
+  
+  // 3. Eliminar Aplicaciones Eventos
+  if (createdRecords.eventosIds.length > 0) {
+    await deleteRecordsBatch('Aplicaciones Eventos', createdRecords.eventosIds);
+  }
+  
+  // 4. Eliminar Cultivos Lotes Aplicaciones
+  if (createdRecords.cultivosLotesIds.length > 0) {
+    await deleteRecordsBatch('Cultivos Lotes Aplicaciones', createdRecords.cultivosLotesIds);
+  }
+  
+  // 5. Eliminar Paquete Aplicaciones
+  if (createdRecords.paqueteId) {
+    try {
+      await base('Paquete Aplicaciones').destroy([createdRecords.paqueteId]);
+      console.log(`🗑️ [ROLLBACK] Eliminado paquete: ${createdRecords.paqueteId}`);
+    } catch (error) {
+      console.error(`❌ [ROLLBACK] Error eliminando paquete:`, error);
+    }
+  }
+  
+  console.log('✅ [ROLLBACK] Rollback completado\n');
+}
+
+// ============================================================================
+
 interface PaqueteAplicacionData {
   nombre: string;
   clienteId: string;
@@ -29,6 +115,15 @@ interface PaqueteAplicacionData {
 }
 
 export async function POST(request: NextRequest) {
+  // Inicializar tracking de registros creados para rollback
+  const createdRecords: CreatedRecords = {
+    paqueteId: null,
+    cultivosLotesIds: [],
+    eventosIds: [],
+    productosAplicacionIds: [],
+    planificacionDiariaIds: []
+  };
+  
   try {
     console.log('🔵 [PAQUETE-API] Inicio de POST request');
     
@@ -63,8 +158,10 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [PAQUETE-API] Validaciones básicas pasadas');
 
-    // Crear el registro en la tabla Paquete Aplicaciones
-    console.log('🔄 [PAQUETE-API] Creando registro en Airtable...');
+    // ========================================================================
+    // PASO 1: Crear el registro en la tabla Paquete Aplicaciones
+    // ========================================================================
+    console.log('🔄 [PAQUETE-API] [PASO 1/4] Creando Paquete Aplicaciones...');
     
     const paqueteRecord = await base('Paquete Aplicaciones').create({
       'Tipo Aplicacion': data.nombre, // Usar como identificador del paquete
@@ -76,15 +173,18 @@ export async function POST(request: NextRequest) {
       'Realiza Registro': data.userName || 'Usuario Desconocido'
     });
 
+    // 🔒 ROLLBACK: Registrar paquete creado
+    createdRecords.paqueteId = paqueteRecord.id;
     console.log('✅ [PAQUETE-API] Paquete Aplicaciones creado:', paqueteRecord.id);
 
-    // 🔄 NUEVA LÓGICA: Crear cultivos-lotes POR CADA fecha programada
-    // Esto permite ajustar hectáreas/lotes de forma independiente para cada aplicación
-    console.log('🔄 [PAQUETE-API] Creando registros de Cultivos Lotes Aplicaciones por fecha...');
+    // ========================================================================
+    // PASO 2: Crear Cultivos Lotes y Eventos por cada fecha
+    // ========================================================================
+    console.log('🔄 [PAQUETE-API] [PASO 2/4] Creando Cultivos Lotes Aplicaciones por fecha...');
     console.log(`📊 [PAQUETE-API] Se crearán: ${data.lotesIds.length} lotes × ${data.fechasCalculadas?.length || 0} fechas = ${data.lotesIds.length * (data.fechasCalculadas?.length || 0)} registros`);
     
-    const eventosCreados = [];
-    const todosCultivoLotesCreados = [];
+    const eventosCreados: any[] = [];
+    const todosCultivoLotesCreados: any[] = [];
     
     // Validar que hay fechas calculadas
     if (!data.fechasCalculadas || data.fechasCalculadas.length === 0) {
@@ -117,20 +217,23 @@ export async function POST(request: NextRequest) {
         });
         
         // Crear los cultivos-lotes para esta fecha en lotes de máximo 10
-        const cultivoLotesFechaCreados = [];
+        const cultivoLotesFechaCreados: any[] = [];
         const batchSize = 10;
         for (let i = 0; i < cultivoLotesDataFecha.length; i += batchSize) {
           const batch = cultivoLotesDataFecha.slice(i, i + batchSize);
           console.log(`  📦 [PAQUETE-API] Creando batch ${Math.floor(i/batchSize) + 1} de cultivos-lotes para fecha ${indexFecha + 1}: ${batch.length} registros`);
           const batchResults = await base('Cultivos Lotes Aplicaciones').create(batch);
           cultivoLotesFechaCreados.push(...batchResults);
+          
+          // 🔒 ROLLBACK: Registrar cultivos-lotes creados
+          createdRecords.cultivosLotesIds.push(...batchResults.map((r: any) => r.id));
         }
         
         console.log(`  ✅ [PAQUETE-API] Cultivos-Lotes creados para fecha ${indexFecha + 1}: ${cultivoLotesFechaCreados.length}`);
         todosCultivoLotesCreados.push(...cultivoLotesFechaCreados);
         
         // Crear el evento SOLO para este grupo de cultivos-lotes
-        const cultivoLotesIdsFecha = cultivoLotesFechaCreados.map(record => record.id);
+        const cultivoLotesIdsFecha = cultivoLotesFechaCreados.map((record: any) => record.id);
         
         const eventoRecord = await base('Aplicaciones Eventos').create({
           'Cultivos Lotes Aplicaciones': cultivoLotesIdsFecha, // Solo los cultivos-lotes de esta fecha
@@ -138,6 +241,9 @@ export async function POST(request: NextRequest) {
           'Estado Aplicacion': 'PRESUPUESTADA',
           'Cantidad Total Biologicos Litros': Math.round(data.litrosTotales)
         });
+        
+        // 🔒 ROLLBACK: Registrar evento creado
+        createdRecords.eventosIds.push(eventoRecord.id);
         
         eventosCreados.push(eventoRecord);
         console.log(`  ✅ [PAQUETE-API] Evento creado para fecha ${indexFecha + 1}: ${eventoRecord.id} (${cultivoLotesIdsFecha.length} cultivos-lotes)`);
@@ -148,9 +254,11 @@ export async function POST(request: NextRequest) {
       console.log(`  - Total Eventos creados: ${eventosCreados.length}`);
       console.log(`  - Cultivos-Lotes por evento: ${data.lotesIds.length}`);
       
-      // 🚀 GENERAR PLANIFICACIÓN DIARIA AUTOMÁTICA PARA CADA EVENTO
+      // ========================================================================
+      // PASO 3: Generar planificación diaria automática para cada evento
+      // ========================================================================
       if (eventosCreados.length > 0) {
-        console.log('\n📅 [PAQUETE-API] Generando planificación diaria automática para eventos...');
+        console.log('\n🔄 [PAQUETE-API] [PASO 3/4] Generando planificación diaria automática...');
         
         for (let i = 0; i < eventosCreados.length; i++) {
           const evento = eventosCreados[i];
@@ -185,19 +293,30 @@ export async function POST(request: NextRequest) {
             
             if (planificacionData.success) {
               console.log(`  ✅ Planificación generada: ${planificacionData.planificacion?.diasCreados || 0} días`);
+              
+              // 🔒 ROLLBACK: Registrar planificación diaria creada (si el endpoint devuelve IDs)
+              if (planificacionData.planificacion?.diasIds) {
+                createdRecords.planificacionDiariaIds.push(...planificacionData.planificacion.diasIds);
+              }
             } else {
-              console.warn(`  ⚠️ Error en planificación:`, planificacionData.error);
+              // ⚠️ Error en planificación - hacer rollback
+              console.error(`  ❌ Error crítico en planificación para evento ${evento.id}:`, planificacionData.error);
+              throw new Error(`Error en auto-planificación para evento ${evento.id}: ${planificacionData.error}`);
             }
           } catch (error) {
+            // Re-lanzar el error para activar el rollback
             console.error(`  ❌ Error en auto-planificación para evento ${evento.id}:`, error);
+            throw error;
           }
         }
       }
       
-      // Actualizar el paquete para incluir los IDs de los eventos creados
+      // ========================================================================
+      // PASO 4: Crear Productos Aplicación
+      // ========================================================================
       if (eventosCreados.length > 0) {
-        console.log('\n🔗 [PAQUETE-API] Actualizando paquete con eventos relacionados...');
-        const eventosIds = eventosCreados.map(evento => evento.id);
+        console.log('\n🔄 [PAQUETE-API] [PASO 4/4] Actualizando paquete y creando Productos Aplicacion...');
+        const eventosIds = eventosCreados.map((evento: any) => evento.id);
         
         await base('Paquete Aplicaciones').update(paqueteRecord.id, {
           'Aplicaciones Eventos': eventosIds
@@ -206,12 +325,11 @@ export async function POST(request: NextRequest) {
         console.log('✅ [PAQUETE-API] Paquete actualizado con eventos:', eventosIds.length);
         
         // Crear registros en la tabla Productos Aplicacion
-        console.log('\n🔄 [PAQUETE-API] Creando registros de Productos Aplicacion...');
         console.log('🔍 [PAQUETE-API] Microorganismos con dosificación recibidos:', JSON.stringify(data.microorganismos, null, 2));
         console.log('🔍 [PAQUETE-API] Hectáreas totales:', data.hectareasTotales);
         
         // Obtener códigos de producto de Sirius Product Core para cada microorganismo
-        const microorganismosCompletos = [];
+        const microorganismosCompletos: any[] = [];
         for (const microorganismo of data.microorganismos) {
           try {
             console.log(`🔍 [PAQUETE-API] Obteniendo código de producto para: ${microorganismo.nombre} (${microorganismo.id})`);
@@ -316,7 +434,7 @@ export async function POST(request: NextRequest) {
         console.log(`🔍 [PAQUETE-API] Ejemplo de registro a crear:`, JSON.stringify(productosAplicacionData[0], null, 2));
         
         // Crear registros en lotes de máximo 10
-        const productosAplicacionCreados = [];
+        const productosAplicacionCreados: any[] = [];
         const batchSizeProductos = 10;
         for (let i = 0; i < productosAplicacionData.length; i += batchSizeProductos) {
           const batch = productosAplicacionData.slice(i, i + batchSizeProductos);
@@ -325,6 +443,10 @@ export async function POST(request: NextRequest) {
           try {
             const batchResults = await base(process.env.AIRTABLE_TABLE_PRODUCTOS_APLICACION!).create(batch);
             productosAplicacionCreados.push(...batchResults);
+            
+            // 🔒 ROLLBACK: Registrar productos aplicación creados
+            createdRecords.productosAplicacionIds.push(...batchResults.map((r: any) => r.id));
+            
             console.log(`✅ [PAQUETE-API] Batch ${Math.floor(i/batchSizeProductos) + 1} creado exitosamente: ${batchResults.length} registros`);
             
             // Log del primer registro creado para verificar datos
@@ -337,6 +459,7 @@ export async function POST(request: NextRequest) {
           } catch (batchError) {
             console.error('❌ [PAQUETE-API] Error creando batch de productos aplicacion:', batchError);
             console.error('📦 [PAQUETE-API] Batch que falló:', JSON.stringify(batch, null, 2));
+            // Re-lanzar para activar rollback
             throw batchError;
           }
         }
@@ -344,6 +467,18 @@ export async function POST(request: NextRequest) {
         console.log('✅ [PAQUETE-API] Registros Productos Aplicacion creados:', productosAplicacionCreados.length);
       }
     }
+    
+    // ========================================================================
+    // ✅ ÉXITO - Todos los registros fueron creados correctamente
+    // ========================================================================
+    console.log('\n🎉 [PAQUETE-API] Paquete de aplicaciones creado exitosamente');
+    console.log('📊 [PAQUETE-API] Resumen final:', {
+      paqueteId: paqueteRecord.id,
+      cultivosLotes: createdRecords.cultivosLotesIds.length,
+      eventos: createdRecords.eventosIds.length,
+      productosAplicacion: createdRecords.productosAplicacionIds.length,
+      planificacionDiaria: createdRecords.planificacionDiariaIds.length
+    });
 
     return NextResponse.json({
       success: true,
@@ -355,13 +490,26 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ [PAQUETE-API] Error completo creando paquete aplicaciones:', {
+    // ========================================================================
+    // ❌ ERROR - Ejecutar rollback para eliminar registros huérfanos
+    // ========================================================================
+    console.error('\n❌ [PAQUETE-API] Error creando paquete aplicaciones - INICIANDO ROLLBACK');
+    console.error('❌ [PAQUETE-API] Detalle del error:', {
       error,
       message: error instanceof Error ? error.message : 'Error desconocido',
       stack: error instanceof Error ? error.stack : undefined,
       type: typeof error,
       timestamp: new Date().toISOString()
     });
+    
+    // 🔄 EJECUTAR ROLLBACK
+    try {
+      await executeRollback(createdRecords);
+      console.log('✅ [PAQUETE-API] Rollback ejecutado exitosamente - No hay registros huérfanos');
+    } catch (rollbackError) {
+      console.error('❌ [PAQUETE-API] Error durante el rollback:', rollbackError);
+      console.error('⚠️ [PAQUETE-API] ADVERTENCIA: Pueden haber quedado registros huérfanos. IDs creados:', createdRecords);
+    }
     
     // Error específico de Airtable
     if (error && typeof error === 'object' && 'error' in error) {
@@ -375,8 +523,16 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       success: false,
-      error: 'Error interno del servidor',
+      error: 'Error interno del servidor - Se ejecutó rollback para evitar registros huérfanos',
       details: error instanceof Error ? error.message : 'Error desconocido',
+      rollbackExecuted: true,
+      recordsRolledBack: {
+        paquete: createdRecords.paqueteId ? 1 : 0,
+        cultivosLotes: createdRecords.cultivosLotesIds.length,
+        eventos: createdRecords.eventosIds.length,
+        productosAplicacion: createdRecords.productosAplicacionIds.length,
+        planificacionDiaria: createdRecords.planificacionDiariaIds.length
+      },
       timestamp: new Date().toISOString()
     }, { 
       status: 500 

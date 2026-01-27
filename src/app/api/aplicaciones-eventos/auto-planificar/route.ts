@@ -282,6 +282,9 @@ export async function POST(request: NextRequest) {
     
     console.log('🎉 Auto-planificación completada exitosamente');
     
+    // Extraer IDs de los registros de planificación creados para soporte de rollback
+    const diasIds = registrosPlanificacion.map((reg: any) => reg.id);
+    
     return NextResponse.json({
       success: true,
       message: skipCreacionEvento ? 'Planificación automática generada para evento existente' : 'Aplicación creada con planificación automática',
@@ -297,6 +300,7 @@ export async function POST(request: NextRequest) {
       },
       planificacion: {
         diasCreados: registrosPlanificacion.length,
+        diasIds: diasIds, // IDs para soporte de rollback
         registros: registrosPlanificacion
       },
       detalles: {
