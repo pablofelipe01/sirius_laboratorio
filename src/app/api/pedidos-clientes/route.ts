@@ -339,6 +339,8 @@ export async function POST(request: NextRequest) {
     for (const producto of body.productos) {
       try {
         // El productoId viene del catálogo principal (Sirius Product Core)
+        // Obtener el Codigo Producto (SIRIUS-PRODUCT-XXXX) directamente
+        let codigoProducto: string | null = null;
         
         if (producto.productoId) {
           const infoProducto = await obtenerIdLegibleProducto(producto.productoId);
@@ -360,6 +362,11 @@ export async function POST(request: NextRequest) {
         const subtotal = cantidad * precioUnitario;
 
         // Campos de la tabla Detalles del Pedido:
+        // - 'Pedido': Link to Pedidos
+        // - 'ID Producto Core': Código del producto (SIRIUS-PRODUCT-XXXX)
+        // - 'Cantidad': Número
+        // - 'Precio unitario en el momento del pedido': Currency
+        const detalleData = {
           fields: {
             'Pedido': [pedidoCreado.id],
             'ID Producto Core': codigoProducto,
