@@ -1978,316 +1978,169 @@ export default function CalendarioProduccionPage() {
             </div>
           </div>
 
-          {/* Calendar View - Professional Design */}
+          {/* Calendar View */}
           {vistaActual === 'mes' && (
-            <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-white rounded-xl shadow-lg p-6">
               {/* Notification Banner for Confirmation Needed */}
               {eventos.some(evento => needsConfirmation(evento)) && (
-                <div className="mx-6 mt-6 bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 p-4 rounded-xl shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                      <span className="text-xl">⚠️</span>
+                <div className="mb-6 bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <span className="text-2xl">⚠️</span>
                     </div>
-                    <div>
-                      <p className="font-semibold text-amber-800">Eventos que requieren confirmación</p>
-                      <p className="text-sm text-amber-700">
-                        Hay aplicaciones a <strong>15 días o menos</strong> que necesitan ser confirmadas.
+                    <div className="ml-3">
+                      <p className="text-sm text-orange-700">
+                        <strong>Eventos que requieren confirmación:</strong> Hay aplicaciones a <strong>15 días o menos</strong> que necesitan ser confirmadas.
+                        <br />
+                        <span className="text-xs">Los días en azul claro muestran el período de 15 días hábiles donde se debe confirmar la aplicación. Los eventos en naranja muestran los días restantes.</span>
                       </p>
                     </div>
                   </div>
                 </div>
               )}
-
-              {/* Professional Calendar Header */}
-              <div className="px-6 py-5 bg-gradient-to-r from-slate-800 to-slate-900">
-                <div className="flex items-center justify-between">
+              {/* Calendar Header */}
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={previousMonth}
+                  className="px-4 py-2 bg-gray-600 text-white hover:bg-gray-700 rounded-lg transition-all shadow-md font-medium"
+                >
+                  ← Anterior
+                </button>
+                
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {currentMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                  </h2>
                   <button
-                    onClick={previousMonth}
-                    className="group flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/10"
+                    onClick={goToToday}
+                    className="text-sm text-blue-600 hover:text-blue-700 mt-1 font-medium"
                   >
-                    <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    <span className="font-medium">Anterior</span>
-                  </button>
-                  
-                  <div className="text-center">
-                    <h2 className="text-3xl font-bold text-white capitalize tracking-wide">
-                      {currentMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                    </h2>
-                    <button
-                      onClick={goToToday}
-                      className="mt-2 text-sm text-blue-300 hover:text-blue-200 font-medium flex items-center gap-1.5 mx-auto transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Ir a hoy
-                    </button>
-                  </div>
-                  
-                  <button
-                    onClick={nextMonth}
-                    className="group flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/10"
-                  >
-                    <span className="font-medium">Siguiente</span>
-                    <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    Ir a hoy
                   </button>
                 </div>
+                
+                <button
+                  onClick={nextMonth}
+                  className="px-4 py-2 bg-gray-600 text-white hover:bg-gray-700 rounded-lg transition-all shadow-md font-medium"
+                >
+                  Siguiente →
+                </button>
               </div>
 
-              {/* Leyenda de Colores - Redesigned */}
-              <div className="mx-6 my-4 p-4 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <h4 className="text-sm font-semibold text-gray-700">Leyenda del Calendario</h4>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                  <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full shadow-sm"></div>
-                    <span className="text-gray-700 font-medium">Hoy</span>
+              {/* Leyenda de Colores */}
+              <div className="mb-6 bg-gray-50 p-4 rounded-lg border">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">📋 Leyenda del Calendario</h4>
+                <div className="flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-blue-100 border border-blue-300 rounded"></div>
+                    <span className="text-gray-600">Días hábiles para confirmación (15 días antes de aplicación)</span>
                   </div>
-                  <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-amber-50 to-amber-100 rounded-lg">
-                    <div className="w-3 h-3 bg-amber-500 rounded-full shadow-sm animate-pulse"></div>
-                    <span className="text-gray-700 font-medium">Requiere confirmar</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                    <span className="text-gray-600">Eventos que requieren confirmación</span>
                   </div>
-                  <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg">
-                    <div className="w-3 h-3 bg-orange-400 rounded-full shadow-sm"></div>
-                    <span className="text-gray-700 font-medium">Día planificado</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-orange-200 border border-orange-400 rounded"></div>
+                    <span className="text-gray-600">Días planificados</span>
                   </div>
-                  <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-lg">
-                    <div className="w-3 h-3 bg-emerald-500 rounded-full shadow-sm"></div>
-                    <span className="text-gray-700 font-medium">Aplicación programada</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-blue-50 border-2 border-blue-500 rounded"></div>
+                    <span className="text-gray-600">Día actual</span>
                   </div>
                 </div>
               </div>
 
-              {/* Days of Week Header - Professional */}
-              <div className="px-6">
-                <div className="grid grid-cols-7 gap-2 mb-2">
-                  {['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map((day, idx) => (
-                    <div 
-                      key={day} 
-                      className={`text-center py-3 font-semibold text-sm rounded-lg ${
-                        idx === 0 || idx === 6 
-                          ? 'bg-slate-100 text-slate-500' 
-                          : 'bg-slate-700 text-white'
-                      }`}
+              {/* Days of Week */}
+              <div className="grid grid-cols-7 gap-2 mb-2">
+                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
+                  <div key={day} className="text-center font-semibold text-gray-600 py-2">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-2">
+                {getDaysInMonth(currentMonth).map((day, index) => {
+                  const dayEventos = getEventosForDate(day.date);
+                  const isToday = day.date.toDateString() === new Date().toDateString();
+                  const isSelectedInForm = formData.fechaInicio && day.date.toISOString().split('T')[0] === formData.fechaInicio;
+                  
+                  // Verificar si este día está en el período de confirmación de algún evento
+                  const eventsNeedingConfirmation = getEventsNeedingConfirmation();
+                  const isConfirmationDay = eventsNeedingConfirmation.some(evento => 
+                    isInConfirmationPeriod(day.date, new Date(evento.fecha))
+                  );
+                  
+                  // Verificar si este día está planificado
+                  const isPlanificado = isDayPlanificado(day.date);
+                  const planificacionInfo = getDayPlanificacionInfo(day.date);
+                  
+                  return (
+                    <div
+                      key={index}
+                      className={`min-h-[120px] p-2 border rounded-lg transition-all cursor-pointer hover:shadow-md hover:ring-2 hover:ring-blue-300 ${
+                        day.isCurrentMonth
+                          ? 'bg-white border-gray-200'
+                          : 'bg-gray-50 border-gray-100'
+                      } ${isToday ? 'ring-2 ring-blue-500 bg-blue-50' : ''} 
+                      ${isSelectedInForm ? 'ring-2 ring-green-500 bg-green-50' : ''}
+                      ${isConfirmationDay ? 'bg-blue-100 border-blue-300 ring-1 ring-blue-400' : ''}
+                      ${isPlanificado ? 'bg-orange-100 border-orange-300 ring-1 ring-orange-400' : ''}`}
+                      onClick={(e) => handleCalendarDateSelect(day.date, e)}
                     >
-                      <span className="hidden md:inline">{day}</span>
-                      <span className="md:hidden">{day.slice(0, 3)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Calendar Grid - Modern Design */}
-              <div className="px-6 pb-6">
-                <div className="grid grid-cols-7 gap-2">
-                  {getDaysInMonth(currentMonth).map((day, index) => {
-                    const dayEventos = getEventosForDate(day.date);
-                    const isToday = day.date.toDateString() === new Date().toDateString();
-                    const isSelectedInForm = formData.fechaInicio && day.date.toISOString().split('T')[0] === formData.fechaInicio;
-                    const isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6;
-                    
-                    // Verificar si este día está en el período de confirmación de algún evento
-                    const eventsNeedingConfirmation = getEventsNeedingConfirmation();
-                    const isConfirmationDay = eventsNeedingConfirmation.some(evento => 
-                      isInConfirmationPeriod(day.date, new Date(evento.fecha))
-                    );
-                    
-                    // Verificar si este día está planificado
-                    const isPlanificado = isDayPlanificado(day.date);
-                    const planificacionInfo = getDayPlanificacionInfo(day.date);
-                    
-                    // Determinar estilos del día
-                    let dayBgClass = 'bg-white hover:bg-gray-50';
-                    let dayBorderClass = 'border-gray-100';
-                    let numberBgClass = '';
-                    
-                    if (!day.isCurrentMonth) {
-                      dayBgClass = 'bg-gray-50/50';
-                    } else if (isToday) {
-                      dayBgClass = 'bg-gradient-to-br from-blue-50 to-indigo-100';
-                      dayBorderClass = 'border-blue-400 ring-2 ring-blue-400/50';
-                      numberBgClass = 'bg-blue-600 text-white';
-                    } else if (isPlanificado) {
-                      dayBgClass = 'bg-gradient-to-br from-orange-50 to-amber-100';
-                      dayBorderClass = 'border-orange-300';
-                      numberBgClass = 'bg-orange-500 text-white';
-                    } else if (isConfirmationDay) {
-                      dayBgClass = 'bg-gradient-to-br from-sky-50 to-blue-100';
-                      dayBorderClass = 'border-sky-300';
-                    } else if (isWeekend) {
-                      dayBgClass = 'bg-slate-50/80';
-                    }
-                    
-                    if (isSelectedInForm) {
-                      dayBorderClass = 'border-emerald-400 ring-2 ring-emerald-400/50';
-                      dayBgClass = 'bg-gradient-to-br from-emerald-50 to-green-100';
-                    }
-                    
-                    return (
-                      <div
-                        key={index}
-                        className={`min-h-[130px] p-2 border-2 rounded-xl transition-all duration-200 cursor-pointer 
-                          hover:shadow-lg hover:scale-[1.02] hover:z-10 relative group
-                          ${dayBgClass} ${dayBorderClass}`}
-                        onClick={(e) => handleCalendarDateSelect(day.date, e)}
-                      >
-                        {/* Day Number */}
-                        <div className="flex items-start justify-between mb-2">
-                          <div className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold text-sm transition-all
-                            ${numberBgClass || (day.isCurrentMonth ? 'text-gray-800' : 'text-gray-300')}
-                            ${!numberBgClass && 'group-hover:bg-gray-100'}`}
-                          >
-                            {day.date.getDate()}
-                          </div>
-                          
-                          {/* Status Indicators */}
-                          <div className="flex gap-1">
-                            {isPlanificado && (
-                              <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center shadow-md" 
-                                   title={`Día ${planificacionInfo?.diaNumero || ''} - ${planificacionInfo?.hectareasObjetivo || 0} Ha`}>
-                                <span className="text-white text-xs">📅</span>
-                              </div>
-                            )}
-                            {isConfirmationDay && !isPlanificado && (
-                              <div className="w-6 h-6 bg-sky-500 rounded-full flex items-center justify-center shadow-md"
-                                   title="Período de confirmación">
-                                <span className="text-white text-xs">📋</span>
-                              </div>
-                            )}
-                            {dayEventos.length > 0 && (
-                              <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center shadow-md text-white text-xs font-bold">
-                                {dayEventos.length}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Planificación Info Badge */}
-                        {isPlanificado && planificacionInfo && (
-                          <div className="mb-2 px-2 py-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs rounded-lg shadow-sm">
-                            <div className="flex items-center justify-between">
-                              <span className="font-semibold">Día {planificacionInfo.diaNumero}</span>
-                              <span className="font-bold">{planificacionInfo.hectareasObjetivo} Ha</span>
-                            </div>
-                          </div>
+                      <div className={`text-sm font-medium mb-1 ${
+                        day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                      } ${isToday ? 'text-blue-600 font-bold' : ''}
+                      ${isConfirmationDay ? 'text-blue-800 font-semibold' : ''}
+                      ${isPlanificado ? 'text-orange-800 font-semibold' : ''}`}>
+                        {day.date.getDate()}
+                        {isConfirmationDay && (
+                          <span className="ml-1 text-[10px] bg-blue-500 text-white px-1 rounded">📋</span>
                         )}
-                        
-                        {/* Events */}
-                        <div className="space-y-1.5">
-                          {dayEventos.slice(0, 2).map(evento => {
-                            const tipo = getTipoEvento(evento.tipo);
-                            const needsConf = needsConfirmation(evento);
-                            const daysLeft = getDaysLeft(evento.fecha);
-                            
-                            return (
-                              <div
-                                key={evento.id}
-                                className={`group/event relative text-xs px-2.5 py-1.5 rounded-lg text-white truncate cursor-pointer 
-                                  transition-all duration-200 hover:scale-[1.02] shadow-sm hover:shadow-md
-                                  ${needsConf 
-                                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse' 
-                                    : `bg-gradient-to-r ${tipo.value === 'inoculacion' ? 'from-emerald-500 to-green-600' : 
-                                       tipo.value === 'cosecha' ? 'from-yellow-500 to-amber-600' : 
-                                       tipo.value === 'formulacion' ? 'from-purple-500 to-violet-600' : 
-                                       tipo.value === 'entrega' ? 'from-blue-500 to-indigo-600' : 
-                                       'from-gray-500 to-slate-600'}`
-                                  }`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedEvento(evento);
-                                }}
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span>{needsConf ? '⚠️' : tipo.emoji}</span>
-                                  <span className="truncate font-medium">
-                                    {evento.cliente || tipo.label}
-                                  </span>
-                                </div>
-                                
-                                {/* Countdown Badge */}
-                                {needsConf && (
-                                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-600 text-white text-[10px] 
-                                    rounded-full flex items-center justify-center font-bold shadow-lg border-2 border-white">
-                                    {daysLeft}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                        {isPlanificado && (
+                          <span className="ml-1 text-[10px] bg-orange-500 text-white px-1 rounded">📅</span>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-1">
+                        {dayEventos.slice(0, 3).map(evento => {
+                          const tipo = getTipoEvento(evento.tipo);
+                          const needsConf = needsConfirmation(evento);
+                          const eventTitle = evento.titulo || `${tipo.label} - ${evento.cliente || 'Sin cliente'}`;
+                          const eventDescription = evento.descripcion || `${evento.litros || 0}L`;
+                          const daysLeft = getDaysLeft(evento.fecha);
                           
-                          {dayEventos.length > 2 && (
-                            <div className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded-lg text-center font-medium">
-                              +{dayEventos.length - 2} más
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Hover Tooltip Preview */}
-                        {(dayEventos.length > 0 || isPlanificado) && (
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 
-                            transition-opacity duration-200 pointer-events-none z-50 w-64">
-                            <div className="bg-slate-800 text-white text-xs rounded-lg shadow-xl p-3">
-                              <div className="font-semibold mb-2 pb-2 border-b border-slate-600">
-                                {day.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-                              </div>
-                              {isPlanificado && planificacionInfo && (
-                                <div className="mb-2 p-2 bg-orange-500/20 rounded">
-                                  <span className="font-medium text-orange-300">📅 Día planificado #{planificacionInfo.diaNumero}</span>
-                                  <br />
-                                  <span className="text-orange-200">{planificacionInfo.hectareasObjetivo} hectáreas objetivo</span>
-                                </div>
+                          return (
+                            <div
+                              key={evento.id}
+                              className={`text-xs px-2 py-1 rounded text-white truncate cursor-pointer hover:opacity-80 relative ${
+                                needsConf ? 'bg-orange-500 border border-orange-300 shadow-md animate-pulse' : tipo.color
+                              }`}
+                              title={`${eventTitle}\n${eventDescription}${needsConf ? `\n⚠️ Faltan ${daysLeft} días - CONFIRMAR APLICACIÓN` : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEvento(evento);
+                              }}
+                            >
+                              {needsConf ? '⚠️' : tipo.emoji} {evento.titulo ? evento.titulo : tipo.label}
+                              {needsConf && (
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                                  {daysLeft}
+                                </span>
                               )}
-                              {dayEventos.length > 0 && (
-                                <div className="space-y-1">
-                                  <span className="text-gray-300">Eventos:</span>
-                                  {dayEventos.slice(0, 3).map(ev => (
-                                    <div key={ev.id} className="text-gray-100">
-                                      • {ev.cliente || ev.titulo || getTipoEvento(ev.tipo).label}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {/* Arrow */}
-                              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 
-                                border-l-8 border-r-8 border-t-8 
-                                border-l-transparent border-r-transparent border-t-slate-800"></div>
                             </div>
+                          );
+                        })}
+                        {dayEventos.length > 3 && (
+                          <div className="text-xs text-gray-500 px-2">
+                            +{dayEventos.length - 3} más
                           </div>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Calendar Footer - Quick Stats */}
-              <div className="px-6 py-4 bg-slate-800 border-t border-slate-700">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-                    <div className="text-2xl font-bold text-white">{eventos.length}</div>
-                    <div className="text-sm text-slate-300">Total Eventos</div>
-                  </div>
-                  <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-                    <div className="text-2xl font-bold text-emerald-400">{eventos.filter(e => e.estado === 'completado').length}</div>
-                    <div className="text-sm text-slate-300">Completados</div>
-                  </div>
-                  <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-                    <div className="text-2xl font-bold text-amber-400">{eventos.filter(e => needsConfirmation(e)).length}</div>
-                    <div className="text-sm text-slate-300">Por Confirmar</div>
-                  </div>
-                  <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-                    <div className="text-2xl font-bold text-orange-400">{diasPlanificados.length}</div>
-                    <div className="text-sm text-slate-300">Días Planificados</div>
-                  </div>
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -3636,7 +3489,7 @@ export default function CalendarioProduccionPage() {
                           <div className="bg-white p-4 rounded-lg border">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-2xl">📦</span>
-                              <span className="text-gray-600 text-sm">Productos</span>
+                              <h4 className="font-medium text-gray-900">Productos Aplicados</h4>
                             </div>
                             <p className="text-3xl font-bold text-purple-600">
                               {(editandoEvento as any).productosAplicados?.length || 0} <span className="text-lg">productos</span>

@@ -15,7 +15,7 @@ const base = new Airtable({
 // Configurar Airtable Sirius Product Core
 const baseSiriusProductCore = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE || process.env.AIRTABLE_API_KEY
-}).base(process.env.AIRTABLE_BASE_SIRIUS_PRODUCT_CORE || '');
+}).base(process.env.AIRTABLE_BASE_ID_SIRIUS_PRODUCT_CORE || '');
 
 // Configurar Airtable Sirius Client Core
 const baseSiriusClientCore = new Airtable({
@@ -277,7 +277,14 @@ export async function GET(request: NextRequest) {
                 // Buscar el producto en Sirius Product Core por Codigo Producto
                 debugLog(`🔍 [APLICACIONES-API] Buscando en Sirius Product Core por código: ${codigoProductoSirius}`);
                 
-                const productosSirius = await baseSiriusProductCore('Productos')
+                // Debug configuración
+                debugLog(`🔧 [APLICACIONES-API] Configuración Sirius Product Core:`, {
+                  baseId: process.env.AIRTABLE_BASE_ID_SIRIUS_PRODUCT_CORE ? 'Configurado' : 'FALTANTE',
+                  apiKey: process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE ? 'Configurado' : 'FALTANTE',
+                  tabla: process.env.AIRTABLE_TABLE_PRODUCTOS
+                });
+                
+                const productosSirius = await baseSiriusProductCore(process.env.AIRTABLE_TABLE_PRODUCTOS!)
                   .select({
                     filterByFormula: `{Codigo Producto} = '${codigoProductoSirius}'`,
                     maxRecords: 1

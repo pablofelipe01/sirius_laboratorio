@@ -192,7 +192,7 @@ const Navbar: React.FC = () => {
                       { href: "/almacenamiento", label: "Almacenamiento", emoji: "📦", color: "bg-orange-50" },
                       { href: "/descartes", label: "Descartes", emoji: "🗑️", color: "bg-red-50" },
                       { href: "/stock-insumos", label: "Stock Insumos", emoji: "📋", color: "bg-teal-50" },
-                      { href: "/clientes", label: "Clientes", emoji: "🛒", color: "bg-emerald-50" },
+                      { href: "/pedidos-clientes", label: "Pedidos Clientes", emoji: "🛒", color: "bg-emerald-50" },
                       { href: "/bitacora-laboratorio", label: "Bitácora", emoji: "📝", color: "bg-indigo-50" },
                       { href: "/calendario-produccion", label: "Calendario de Producción", emoji: "📅", color: "bg-pink-50" },
                     ]}
@@ -465,12 +465,12 @@ const Navbar: React.FC = () => {
                         </Link>
                         
                         <Link
-                          href="/clientes"
+                          href="/pedidos-clientes"
                           onClick={closeMobileMenu}
                           className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 dark:text-gray-200 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-400"
                         >
                           <span className="text-xl">🛒</span>
-                          <span className="font-medium">Clientes</span>
+                          <span className="font-medium">Pedidos Clientes</span>
                           <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>

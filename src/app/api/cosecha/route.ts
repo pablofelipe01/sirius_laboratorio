@@ -121,54 +121,8 @@ export async function POST(request: NextRequest) {
 
     console.log('📝 Datos preparados para Airtable:', fields);
 
-    // Obtener el próximo número secuencial de cosecha ANTES de crear el registro
-    let nextCosechaNumber = '0001';
-    let cosechaCode = 'LAB-COSE-0001';
-    
-    try {
-      // Obtener el último registro para calcular el próximo número
-      console.log('🔍 Consultando último registro de cosecha...');
-      const countResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_COSECHA_LABORATORIO}?maxRecords=1&sort%5B0%5D%5Bfield%5D=${process.env.AIRTABLE_FIELD_COSECHA_ID_2}&sort%5B0%5D%5Bdirection%5D=desc`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('📊 Status de consulta última cosecha:', countResponse.status);
-      
-      if (countResponse.ok) {
-        const countData = await countResponse.json();
-        console.log('📊 Registros encontrados:', countData.records?.length || 0);
-        
-        if (countData.records && countData.records.length > 0) {
-          const lastRecord = countData.records[0];
-          console.log('📊 Último registro:', {
-            id: lastRecord.id,
-            fields: lastRecord.fields
-          });
-          
-          const lastId2 = lastRecord.fields[process.env.AIRTABLE_FIELD_COSECHA_ID_2!] as number;
-          console.log('📊 Último ID 2:', lastId2);
-          
-          if (lastId2) {
-            const nextNumber = (lastId2 + 1); // lastId2 ya es número
-            nextCosechaNumber = nextNumber.toString().padStart(4, '0');
-            cosechaCode = `LAB-COSE-${nextCosechaNumber}`;
-            console.log('📊 Número calculado:', nextNumber, '→', cosechaCode);
-          } else {
-            console.log('⚠️ Campo ID secuencial está vacío o undefined');
-          }
-        } else {
-          console.log('⚠️ No se encontraron registros de cosecha');
-        }
-      } else {
-        console.log('❌ Error en consulta:', countResponse.status);
-      }
-      console.log('🏷️ Código de cosecha pre-calculado:', cosechaCode);
-    } catch (error) {
-      console.log('⚠️ No se pudo pre-calcular código, usando por defecto. Error:', error);
-    }
+    // Variable para almacenar el código de cosecha (se actualizará después de crear el registro)
+    let cosechaCode = '';
 
     // Crear el registro en Airtable
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_COSECHA_LABORATORIO}`, {
@@ -190,8 +144,54 @@ export async function POST(request: NextRequest) {
 
     const result = await response.json();
 
+    // Los campos calculados/fórmula NO se devuelven en respuesta POST, hacer GET
+    console.log('🔄 Consultando registro para obtener campo ID (fórmula)...');
+    try {
+      const getRecordResponse = await fetch(
+        `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_COSECHA_LABORATORIO}/${result.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (getRecordResponse.ok) {
+        const fullRecord = await getRecordResponse.json();
+        
+        // DEBUG: Ver todos los campos que devuelve Airtable
+        console.log('🔍 Campos disponibles en el registro:', Object.keys(fullRecord.fields));
+        console.log('📋 Valores de campos relevantes:', {
+          'ID (por nombre)': fullRecord.fields['ID'],
+          'ID (por field ID)': fullRecord.fields[process.env.AIRTABLE_FIELD_COSECHA_ID!],
+          'FIELD_ID usado': process.env.AIRTABLE_FIELD_COSECHA_ID,
+        });
+        
+        // Intentar primero por nombre del campo "ID", luego por field ID
+        const cosechaIdFormula = fullRecord.fields['ID'] || fullRecord.fields[process.env.AIRTABLE_FIELD_COSECHA_ID!] as string;
+        console.log('📊 Campo ID (fórmula) obtenido:', cosechaIdFormula);
+        
+        if (cosechaIdFormula) {
+          cosechaCode = cosechaIdFormula;
+          console.log('🏷️ Código de cosecha obtenido de fórmula:', cosechaCode);
+        } else {
+          // Fallback: usar el ID de Airtable como parte del código
+          cosechaCode = `LAB-COSE-${result.id}`;
+          console.log('⚠️ Campo ID no disponible, usando ID de registro:', cosechaCode);
+        }
+      } else {
+        console.log('⚠️ Error en GET:', getRecordResponse.status);
+        cosechaCode = `LAB-COSE-${result.id}`;
+      }
+    } catch (error) {
+      console.log('⚠️ Error al consultar registro:', error);
+      cosechaCode = `LAB-COSE-${result.id}`;
+    }
+
     console.log('✅ Cosecha creada exitosamente:', {
       id: result.id,
+      cosechaCode: cosechaCode,
       cliente: body.cliente,
       timestamp: new Date().toISOString()
     });
