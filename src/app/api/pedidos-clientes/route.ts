@@ -17,12 +17,12 @@ import {
 interface DetallePedidoAirtable {
   id: string;
   fields: {
+    'ID'?: string; // Fórmula: "DET-PED-1"
     'Detalle del Pedido'?: number;
     'Pedido'?: string[];
-    'Producto'?: string[];
+    'ID Producto Core'?: string; // Código del producto: "SIRIUS-PRODUCT-0004"
     'Cantidad'?: number;
     'Precio unitario en el momento del pedido'?: number;
-    'Subtotal'?: number;
     'Notas del detalle'?: string;
   };
 }
@@ -76,10 +76,9 @@ interface DetallePedidoFormateado {
   id: string;
   detalleNumero: number;
   pedidoId: string;
-  productoId: string;
+  idProductoCore: string; // Código del producto: "SIRIUS-PRODUCT-0004"
   cantidad: number;
   precioUnitario: number;
-  subtotal: number;
   notas: string;
 }
 
@@ -155,7 +154,7 @@ export async function GET(request: NextRequest) {
 
     // Si se solicitan detalles, obtenerlos
     const detallesMap: Record<string, DetallePedidoFormateado[]> = {};
-    const productosMap: Record<string, ProductoPedidoAirtable> = {};
+    const productosMap: Record<string, { id: string; codigoProducto: string; nombre: string }> = {};
 
     if (incluirDetalles && pedidosFormateados.length > 0) {
       // Obtener todos los IDs de detalles únicos
@@ -175,23 +174,15 @@ export async function GET(request: NextRequest) {
           const detallesData = await detallesResponse.json();
           const detalles: DetallePedidoAirtable[] = detallesData.records || [];
 
-          // Obtener productos para los nombres
-          const productosUrl = buildSiriusPedidosCoreUrl(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.PRODUCTOS);
-          const productosResponse = await fetch(productosUrl, {
-            method: 'GET',
-            headers: getSiriusPedidosCoreHeaders(),
-          });
-
-          if (productosResponse.ok) {
-            const productosData = await productosResponse.json();
-            const productos: ProductoPedidoAirtable[] = productosData.records || [];
-            productos.forEach(p => {
-              productosMap[p.id] = p;
-            });
-          }
-
-          // Agrupar detalles por pedido
+          // Agrupar detalles por pedido y obtener IDs de productos
+          const todosIdsProductosCore: string[] = [];
+          
           detalles.forEach(detalle => {
+            const idProductoCore = detalle.fields['ID Producto Core'] || '';
+            if (idProductoCore && !todosIdsProductosCore.includes(idProductoCore)) {
+              todosIdsProductosCore.push(idProductoCore);
+            }
+            
             const pedidoIds = detalle.fields['Pedido'] || [];
             pedidoIds.forEach(pedidoId => {
               if (!detallesMap[pedidoId]) {
@@ -201,14 +192,45 @@ export async function GET(request: NextRequest) {
                 id: detalle.id,
                 detalleNumero: detalle.fields['Detalle del Pedido'] || 0,
                 pedidoId: pedidoId,
-                productoId: (detalle.fields['Producto'] || [])[0] || '',
+                idProductoCore: idProductoCore, // Usar el código del producto directamente
                 cantidad: detalle.fields['Cantidad'] || 0,
                 precioUnitario: detalle.fields['Precio unitario en el momento del pedido'] || 0,
-                subtotal: detalle.fields['Subtotal'] || 0,
                 notas: detalle.fields['Notas del detalle'] || '',
               });
             });
           });
+          
+          // Buscar nombres de productos en Sirius Product Core
+          if (todosIdsProductosCore.length > 0) {
+            const filterFormula = `OR(${todosIdsProductosCore.map(id => `{Codigo Producto}='${id}'`).join(',')})`;
+            const productCoreUrl = `${buildSiriusProductCoreUrl(SIRIUS_PRODUCT_CORE_CONFIG.TABLES.PRODUCTOS)}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+            
+            console.log('🔍 Buscando nombres de productos en Sirius Product Core para IDs:', todosIdsProductosCore);
+            
+            const productCoreResponse = await fetch(productCoreUrl, {
+              method: 'GET',
+              headers: getSiriusProductCoreHeaders(),
+            });
+            
+            if (productCoreResponse.ok) {
+              const productCoreData = await productCoreResponse.json();
+              const productosCore = productCoreData.records || [];
+              
+              productosCore.forEach((pc: any) => {
+                const codigoProducto = pc.fields['Codigo Producto'];
+                const nombreComercial = pc.fields['Nombre Comercial'] || pc.fields['Nombre'];
+                if (codigoProducto && nombreComercial) {
+                  productosMap[codigoProducto] = {
+                    id: pc.id,
+                    codigoProducto: codigoProducto,
+                    nombre: nombreComercial
+                  };
+                }
+              });
+              
+              console.log('✅ Nombres de productos obtenidos:', Object.keys(productosMap));
+            }
+          }
         }
       }
     }
@@ -300,16 +322,39 @@ export async function POST(request: NextRequest) {
     // ========================================================================
     const pedidoUrl = buildSiriusPedidosCoreUrl(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.PEDIDOS);
     
-    const fechaPedido = body.fechaPedido || new Date().toISOString().split('T')[0];
+    // El campo "Fecha de Pedido" en Airtable representa la fecha de ENTREGA deseada
+    // La fecha de creación del pedido se guarda automáticamente en createdTime
+    let fechaPedido = body.fechaEntrega || body.fechaPedido;
+    if (!fechaPedido) {
+      // Si no viene fecha de entrega, usar la fecha actual como fallback
+      fechaPedido = new Date().toISOString();
+    } else if (!fechaPedido.includes('T')) {
+      // Si viene solo la fecha (YYYY-MM-DD), convertir a formato ISO 8601 completo
+      fechaPedido = new Date(fechaPedido + 'T00:00:00.000Z').toISOString();
+    } else if (!fechaPedido.includes('Z') && !fechaPedido.includes('+')) {
+      // Si viene en formato datetime-local (2026-02-25T10:57), agregar zona horaria
+      fechaPedido = new Date(fechaPedido).toISOString();
+    }
     
+    console.log('📅 Fecha de Entrega/Pedido formateada:', fechaPedido);
+    
+    // Construir campos del pedido
+    const pedidoFields: Record<string, any> = {
+      'ID Cliente Core': body.clienteId,
+      'Fecha de Pedido': fechaPedido,
+      'Origen del Pedido': body.origen || 'DataLab (Laboratorio)',
+      'Estado': body.estado || 'Recibido',
+      'Notas': body.observaciones || body.notas || '',
+    };
+
+    // Agregar ID Usuario Responsable si está disponible
+    if (body.idUsuarioResponsable) {
+      pedidoFields['ID Usuario Responsable'] = body.idUsuarioResponsable;
+      console.log('👤 Usuario responsable del pedido:', body.idUsuarioResponsable);
+    }
+
     const pedidoData = {
-      fields: {
-        'ID Cliente Core': body.clienteId,
-        'Fecha de Pedido': fechaPedido,
-        'Origen del Pedido': body.origen || 'DataLab (Laboratorio)',
-        'Estado': body.estado || 'Recibido',
-        'Notas': body.observaciones || body.notas || '',
-      }
+      fields: pedidoFields
     };
 
     console.log('📤 Creando pedido en Airtable:', pedidoData);
@@ -424,7 +469,8 @@ export async function POST(request: NextRequest) {
       detalles: detallesCreados.map(d => ({
         id: d.id,
         detalleNumero: d.fields['Detalle del Pedido'],
-        subtotal: d.fields['Subtotal'],
+        idProductoCore: d.fields['ID Producto Core'],
+        cantidad: d.fields['Cantidad'],
       })),
       errores: erroresDetalles.length > 0 ? erroresDetalles : undefined,
       mensaje: todosDetallesCreados 

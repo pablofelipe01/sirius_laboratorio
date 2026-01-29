@@ -22,6 +22,7 @@ interface Pedido {
   productos: Producto[];
   total?: number;
   observaciones?: string;
+  idUsuarioResponsable?: string; // ID Empleado de quien registra el pedido
 }
 
 interface Cliente {
@@ -61,6 +62,7 @@ interface ModalPedidoProps {
   onSave: (pedido: Pedido) => void;
   pedidoEditando: Pedido | null;
   clientes: Cliente[];
+  idUsuarioResponsable?: string; // ID Empleado de quien registra el pedido
 }
 
 type ModoConfiguracion = 'seleccion' | 'manual' | 'ia' | 'confirmacion';
@@ -70,7 +72,8 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
   onClose,
   onSave,
   pedidoEditando,
-  clientes
+  clientes,
+  idUsuarioResponsable
 }) => {
   // Estado para modo de configuración
   const [modoConfiguracion, setModoConfiguracion] = useState<ModoConfiguracion>('seleccion');
@@ -92,6 +95,7 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
   const [formData, setFormData] = useState<Pedido>({
     clienteId: '',
     clienteNombre: '',
+    fechaPedido: new Date().toISOString(), // Fecha actual en formato ISO 8601
     fechaEntrega: '',
     productos: [
       {
@@ -273,7 +277,9 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
     const pedidoFinal: Pedido = {
       ...formData,
       total,
-      fechaEntrega: formData.fechaEntrega || undefined
+      fechaPedido: formData.fechaPedido || new Date().toISOString(), // Formato ISO 8601: "2026-01-29T00:00:00.000Z"
+      fechaEntrega: formData.fechaEntrega || undefined,
+      idUsuarioResponsable: idUsuarioResponsable // ID Empleado de quien registra
     };
 
     onSave(pedidoFinal);

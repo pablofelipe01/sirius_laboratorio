@@ -7,6 +7,7 @@ interface User {
   id: string;
   cedula: string;
   nombre: string;
+  idEmpleado?: string;
 }
 
 interface AuthContextType {

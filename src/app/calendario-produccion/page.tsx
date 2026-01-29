@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import LoteSelector from '@/components/LoteSelector';
+import { ModalPedido } from '@/components/ModalPedido';
 
 // Interfaces
 interface ProduccionEvento {
@@ -609,6 +610,15 @@ export default function CalendarioProduccionPage() {
   const [selectedDayForBubbles, setSelectedDayForBubbles] = useState<Date | null>(null);
   const [bubblePosition, setBubblePosition] = useState({ x: 0, y: 0 });
 
+  // Estados para el modal de pedidos
+  const [showPedidoModal, setShowPedidoModal] = useState(false);
+  const [clientesPedidos, setClientesPedidos] = useState<Array<{id: string; nombre: string; contacto?: string}>>([]);
+  const [pedidosPendientes, setPedidosPendientes] = useState<any[]>([]);
+  const [pedidosDetalles, setPedidosDetalles] = useState<Record<string, any[]>>({});
+  const [pedidosProductos, setPedidosProductos] = useState<Record<string, any>>({});
+  const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
+  const [loadingPedidos, setLoadingPedidos] = useState(false);
+
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
@@ -835,6 +845,7 @@ export default function CalendarioProduccionPage() {
     fetchEventos();
     fetchClientes();
     fetchMicroorganismos();
+    fetchPedidosPendientes(); // Cargar pedidos pendientes al iniciar
   }, []);
 
   // Inicializar microorganismos predeterminados al cargar el componente
@@ -1010,6 +1021,124 @@ export default function CalendarioProduccionPage() {
       setLoadingMicroorganismos(false);
     }
   };
+
+  // Cargar clientes para el modal de pedidos
+  const fetchClientesPedidos = async () => {
+    try {
+      const response = await fetch('/api/clientes-core');
+      const data = await response.json();
+      
+      if (data.success && data.clientes) {
+        const clientesFormateados = data.clientes.map((c: any) => ({
+          id: c.idCliente || c.id,
+          nombre: c.nombre,
+          contacto: c.telefono || c.email
+        }));
+        setClientesPedidos(clientesFormateados);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching clientes para pedidos:', error);
+    }
+  };
+
+  // Cargar pedidos pendientes
+  const fetchPedidosPendientes = async () => {
+    setLoadingPedidos(true);
+    try {
+      // Obtener todos los pedidos con detalles incluidos
+      const response = await fetch('/api/pedidos-clientes?incluirDetalles=true');
+      const data = await response.json();
+      
+      if (data.success && data.pedidos) {
+        // Filtrar solo pedidos pendientes (no completados ni cancelados)
+        const pendientes = data.pedidos.filter((p: any) => 
+          p.estado !== 'Completado' && p.estado !== 'Cancelado'
+        );
+        setPedidosPendientes(pendientes);
+        
+        // Guardar detalles y productos
+        if (data.detalles) {
+          setPedidosDetalles(data.detalles);
+        }
+        if (data.productos) {
+          setPedidosProductos(data.productos);
+        }
+        
+        // Obtener nombres de clientes
+        const clienteIds = [...new Set(pendientes.map((p: any) => p.clienteId).filter(Boolean))];
+        if (clienteIds.length > 0) {
+          const clientesResponse = await fetch('/api/clientes-core');
+          const clientesData = await clientesResponse.json();
+          
+          if (clientesData.success && clientesData.clientes) {
+            const map: Record<string, string> = {};
+            clientesData.clientes.forEach((c: any) => {
+              map[c.idCliente] = c.nombre;
+            });
+            setClientesMap(map);
+          }
+        }
+        
+        console.log('📦 Pedidos pendientes cargados:', pendientes.length, 'de', data.pedidos.length, 'totales');
+        console.log('📅 Fechas de pedidos:', pendientes.map((p: any) => ({ id: p.idPedidoCore, fecha: p.fechaPedido })));
+      } else {
+        console.log('⚠️ No se obtuvieron pedidos:', data);
+        setPedidosPendientes([]);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching pedidos pendientes:', error);
+      setPedidosPendientes([]);
+    } finally {
+      setLoadingPedidos(false);
+    }
+  };
+
+  // Obtener productos de un pedido con nombres y cantidades
+  const getProductosPedido = (pedidoId: string): Array<{nombre: string; cantidad: number}> => {
+    const detalles = pedidosDetalles[pedidoId] || [];
+    return detalles.map(detalle => {
+      // El detalle tiene idProductoCore (ej: "SIRIUS-PRODUCT-0004")
+      // pedidosProductos está indexado por ese código
+      const idProductoCore = detalle.idProductoCore || '';
+      const producto = pedidosProductos[idProductoCore];
+      const nombreProducto = producto?.nombre || idProductoCore || 'Sin nombre';
+      return {
+        nombre: nombreProducto,
+        cantidad: detalle.cantidad || 0
+      };
+    });
+  };
+
+  // Obtener nombre del cliente
+  const getNombreCliente = (clienteId: string): string => {
+    return clientesMap[clienteId] || clienteId || 'Cliente sin asignar';
+  };
+
+  // Guardar nuevo pedido
+  const handleGuardarPedido = async (pedidoData: any) => {
+    try {
+      const response = await fetch('/api/pedidos-clientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pedidoData),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ Pedido guardado exitosamente');
+        fetchPedidosPendientes(); // Recargar pedidos pendientes
+        setShowPedidoModal(false);
+      } else {
+        console.error('❌ Error guardando pedido:', data.error);
+        alert('Error guardando pedido: ' + data.error);
+      }
+    } catch (error) {
+      console.error('❌ Error guardando pedido:', error);
+      alert('Error guardando pedido');
+    }
+  };
+
   const fetchEventos = async () => {
     setLoading(true);
     try {
@@ -1803,6 +1932,16 @@ export default function CalendarioProduccionPage() {
     return filteredEventos.filter(e => e.fecha === dateStr);
   };
 
+  // Obtener pedidos para una fecha específica
+  const getPedidosForDate = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return pedidosPendientes.filter(p => {
+      // Normalizar la fecha del pedido (puede venir como ISO datetime o solo fecha)
+      const pedidoDateStr = p.fechaPedido?.split('T')[0] || '';
+      return pedidoDateStr === dateStr;
+    });
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00');
     return date.toLocaleDateString('es-ES', { 
@@ -1957,7 +2096,11 @@ export default function CalendarioProduccionPage() {
               </button>
               
               <button
-                onClick={() => alert('Funcionalidad de Agendar Pedido - Próximamente')}
+                onClick={() => {
+                  fetchClientesPedidos();
+                  fetchPedidosPendientes();
+                  setShowPedidoModal(true);
+                }}
                 className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 focus:ring-4 focus:ring-indigo-500/20 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1977,6 +2120,122 @@ export default function CalendarioProduccionPage() {
               </button>
             </div>
           </div>
+
+          {/* Pedidos Pendientes Section */}
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <span className="text-2xl">📦</span>
+                Pedidos Pendientes de Programación
+                {pedidosPendientes.length > 0 && (
+                  <span className="ml-2 px-2 py-1 bg-indigo-100 text-indigo-700 text-sm rounded-full">
+                    {pedidosPendientes.length}
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={() => fetchPedidosPendientes()}
+                className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+              >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Actualizar
+                </button>
+              </div>
+              
+            {pedidosPendientes.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pedidosPendientes.map((pedido: any) => {
+                  const productos = getProductosPedido(pedido.id);
+                  const nombreCliente = getNombreCliente(pedido.clienteId);
+                  
+                  return (
+                    <div
+                      key={pedido.id}
+                      className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-lg p-4 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-xs font-mono text-red-600 bg-red-100 px-2 py-0.5 rounded">
+                          {pedido.idPedidoCore || `#${pedido.idNumerico}` || 'Sin ID'}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          pedido.estado === 'Recibido' 
+                            ? 'bg-yellow-100 text-yellow-700' 
+                            : pedido.estado === 'Procesando'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {pedido.estado || 'Pendiente'}
+                        </span>
+                      </div>
+                      
+                      <h4 className="font-medium text-gray-900 mb-2">
+                        🏢 {nombreCliente}
+                      </h4>
+                      
+                      <div className="text-sm text-gray-600 space-y-1">
+                        {pedido.fechaPedido && (
+                          <p className="flex items-center gap-1">
+                            <span>📅</span>
+                            Pedido: {new Date(pedido.fechaPedido).toLocaleDateString('es-ES')}
+                          </p>
+                        )}
+                        
+                        {/* Lista de productos con cantidades */}
+                        {productos.length > 0 ? (
+                          <div className="mt-2 pt-2 border-t border-indigo-200">
+                            <p className="font-medium text-gray-700 mb-1">🧪 Productos:</p>
+                            <ul className="space-y-0.5 text-xs">
+                              {productos.map((prod, idx) => (
+                                <li key={idx} className="flex justify-between">
+                                  <span className="truncate flex-1">{prod.nombre}</span>
+                                  <span className="font-semibold text-indigo-600 ml-2">x{prod.cantidad}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Sin productos detallados</p>
+                        )}
+                      </div>
+                      
+                      {pedido.notas && (
+                        <p className="mt-2 text-xs text-gray-500 italic truncate border-t border-red-100 pt-2">
+                          💬 {pedido.notas}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : !loadingPedidos ? (
+              <div className="text-center py-8 text-gray-500">
+                <span className="text-4xl mb-2 block">📭</span>
+                <p>No hay pedidos pendientes de programación</p>
+                <button
+                  onClick={() => {
+                    fetchClientesPedidos();
+                    setShowPedidoModal(true);
+                  }}
+                  className="mt-3 text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  + Crear nuevo pedido
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Loading Pedidos Indicator */}
+          {loadingPedidos && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+              <svg className="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-indigo-700">Cargando pedidos pendientes...</span>
+            </div>
+          )}
 
           {/* Calendar View */}
           {vistaActual === 'mes' && (
@@ -2032,6 +2291,10 @@ export default function CalendarioProduccionPage() {
                 <h4 className="text-sm font-semibold text-gray-700 mb-3">📋 Leyenda del Calendario</h4>
                 <div className="flex flex-wrap gap-4 text-xs">
                   <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-red-500 rounded"></div>
+                    <span className="text-gray-600">Pedidos pendientes</span>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-blue-100 border border-blue-300 rounded"></div>
                     <span className="text-gray-600">Días hábiles para confirmación (15 días antes de aplicación)</span>
                   </div>
@@ -2063,6 +2326,7 @@ export default function CalendarioProduccionPage() {
               <div className="grid grid-cols-7 gap-2">
                 {getDaysInMonth(currentMonth).map((day, index) => {
                   const dayEventos = getEventosForDate(day.date);
+                  const dayPedidos = getPedidosForDate(day.date);
                   const isToday = day.date.toDateString() === new Date().toDateString();
                   const isSelectedInForm = formData.fechaInicio && day.date.toISOString().split('T')[0] === formData.fechaInicio;
                   
@@ -2076,6 +2340,9 @@ export default function CalendarioProduccionPage() {
                   const isPlanificado = isDayPlanificado(day.date);
                   const planificacionInfo = getDayPlanificacionInfo(day.date);
                   
+                  // Verificar si hay pedidos en este día
+                  const hasPedidos = dayPedidos.length > 0;
+                  
                   return (
                     <div
                       key={index}
@@ -2086,7 +2353,8 @@ export default function CalendarioProduccionPage() {
                       } ${isToday ? 'ring-2 ring-blue-500 bg-blue-50' : ''} 
                       ${isSelectedInForm ? 'ring-2 ring-green-500 bg-green-50' : ''}
                       ${isConfirmationDay ? 'bg-blue-100 border-blue-300 ring-1 ring-blue-400' : ''}
-                      ${isPlanificado ? 'bg-orange-100 border-orange-300 ring-1 ring-orange-400' : ''}`}
+                      ${isPlanificado ? 'bg-orange-100 border-orange-300 ring-1 ring-orange-400' : ''}
+                      ${hasPedidos ? 'border-red-300 ring-1 ring-red-400' : ''}`}
                       onClick={(e) => handleCalendarDateSelect(day.date, e)}
                     >
                       <div className={`text-sm font-medium mb-1 ${
@@ -2101,10 +2369,39 @@ export default function CalendarioProduccionPage() {
                         {isPlanificado && (
                           <span className="ml-1 text-[10px] bg-orange-500 text-white px-1 rounded">📅</span>
                         )}
+                        {hasPedidos && (
+                          <span className="ml-1 text-[10px] bg-red-500 text-white px-1 rounded">📦</span>
+                        )}
                       </div>
                       
                       <div className="space-y-1">
-                        {dayEventos.slice(0, 3).map(evento => {
+                        {/* Mostrar pedidos primero */}
+                        {dayPedidos.slice(0, 2).map(pedido => {
+                          const productos = getProductosPedido(pedido.id);
+                          const nombreCliente = getNombreCliente(pedido.clienteId);
+                          
+                          return (
+                            <div
+                              key={`pedido-${pedido.id}`}
+                              className="text-xs px-2 py-1 rounded bg-red-500 text-white truncate cursor-pointer hover:opacity-80"
+                              title={`📦 Pedido: ${pedido.idPedidoCore}\nCliente: ${nombreCliente}\nProductos: ${productos.map(p => `${p.nombre} x${p.cantidad}`).join(', ')}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                alert(`Pedido: ${pedido.idPedidoCore}\nCliente: ${nombreCliente}\n\nProductos:\n${productos.map(p => `• ${p.nombre} x${p.cantidad}`).join('\n')}`);
+                              }}
+                            >
+                              📦 {nombreCliente.substring(0, 15)}
+                            </div>
+                          );
+                        })}
+                        {dayPedidos.length > 2 && (
+                          <div className="text-xs text-indigo-600 px-2">
+                            +{dayPedidos.length - 2} pedido(s)
+                          </div>
+                        )}
+                        
+                        {/* Mostrar eventos */}
+                        {dayEventos.slice(0, dayPedidos.length > 0 ? 2 : 3).map(evento => {
                           const tipo = getTipoEvento(evento.tipo);
                           const needsConf = needsConfirmation(evento);
                           const eventTitle = evento.titulo || `${tipo.label} - ${evento.cliente || 'Sin cliente'}`;
@@ -2132,9 +2429,9 @@ export default function CalendarioProduccionPage() {
                             </div>
                           );
                         })}
-                        {dayEventos.length > 3 && (
+                        {(dayEventos.length > (dayPedidos.length > 0 ? 2 : 3) || (dayEventos.length + dayPedidos.length > 4)) && (
                           <div className="text-xs text-gray-500 px-2">
-                            +{dayEventos.length - 3} más
+                            +{Math.max(0, dayEventos.length - (dayPedidos.length > 0 ? 2 : 3))} más
                           </div>
                         )}
                       </div>
@@ -3829,6 +4126,17 @@ export default function CalendarioProduccionPage() {
           )}
         </div>
       </div>
+      
+      {/* Modal de Pedido */}
+      <ModalPedido
+        isOpen={showPedidoModal}
+        onClose={() => setShowPedidoModal(false)}
+        onSave={handleGuardarPedido}
+        pedidoEditando={null}
+        clientes={clientesPedidos}
+        idUsuarioResponsable={user?.idEmpleado}
+      />
+      
       <Footer />
     </>
   );

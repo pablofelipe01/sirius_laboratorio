@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
       user: {
         id: payload.userId,
         cedula: payload.cedula,
-        nombre: payload.nombre
+        nombre: payload.nombre,
+        idEmpleado: payload.idEmpleado
       }
     });
 

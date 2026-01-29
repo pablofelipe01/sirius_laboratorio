@@ -5,6 +5,9 @@ export interface JWTPayload {
   userId: string;
   cedula: string;
   nombre: string;
+  idEmpleado?: string;
+  roles?: string[];
+  accesos?: string[];
   iat?: number;
   exp?: number;
 }

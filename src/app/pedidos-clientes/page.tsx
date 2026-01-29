@@ -407,6 +407,7 @@ export default function PedidosClientesPage() {
         onSave={guardarPedido}
         pedidoEditando={pedidoEditando}
         clientes={clientes}
+        idUsuarioResponsable={user?.idEmpleado}
       />
     </>
   );
