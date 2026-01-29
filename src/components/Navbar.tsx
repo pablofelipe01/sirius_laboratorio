@@ -304,12 +304,12 @@ const Navbar: React.FC = () => {
         {/* Mobile menu */}
         <div
           ref={mobileMenuRef}
-          className={`xl:hidden fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
+          className={`xl:hidden fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col ${
             isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
           {/* Mobile menu header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3">
               <Image 
                 src="/logo.png" 
@@ -330,9 +330,9 @@ const Navbar: React.FC = () => {
             </button>
           </div>
 
-          {/* Mobile menu content */}
-          <div className="flex flex-col h-full overflow-y-auto">
-            <div className="flex-1 px-4 py-6 space-y-6">
+          {/* Mobile menu content - scrollable */}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <div className="px-4 py-4 space-y-4 pb-24">
               {isAuthenticated ? (
                 <div>
                   {/* User Info */}
@@ -353,20 +353,20 @@ const Navbar: React.FC = () => {
                   </div>
 
                   {/* Navigation Sections */}
-                  <div className="space-y-6">
+                  <div className="space-y-3 mt-3">
                     {/* Procesos Principales */}
                     <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 px-2 text-gray-500 dark:text-gray-400">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 px-2 text-gray-500 dark:text-gray-400">
                         🔬 Procesos Principales
                       </h3>
-                      <div className="space-y-1">
+                      <div className="space-y-0.5">
                         <Link
                           href="/inoculacion"
                           onClick={closeMobileMenu}
-                          className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-blue-50 hover:text-blue-700 dark:text-gray-200 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
+                          className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all duration-200 text-gray-700 hover:bg-blue-50 hover:text-blue-700 dark:text-gray-200 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
                         >
-                          <span className="text-xl">📊</span>
-                          <span className="font-medium">Inoculación</span>
+                          <span className="text-lg">📊</span>
+                          <span className="text-sm font-medium">Inoculación</span>
                           <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
@@ -590,20 +590,20 @@ const Navbar: React.FC = () => {
                 </div>
               )}
             </div>
-
-            {/* Mobile menu footer */}
-            {isAuthenticated && (
-              <div className="border-t border-gray-200 dark:border-gray-700 p-4">
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
-                >
-                  <span className="text-xl">🚪</span>
-                  <span className="font-medium">Cerrar Sesión</span>
-                </button>
-              </div>
-            )}
           </div>
+
+          {/* Mobile menu footer - fixed at bottom */}
+          {isAuthenticated && (
+            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+              >
+                <span className="text-xl">🚪</span>
+                <span className="font-medium">Cerrar Sesión</span>
+              </button>
+            </div>
+          )}
         </div>
       </nav>
 
