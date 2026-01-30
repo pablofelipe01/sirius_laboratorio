@@ -42,6 +42,10 @@ export const InoculationSchema = z.object({
   microorganismId: z.string()
     .min(1, 'ID del microorganismo es requerido'),
   
+  microorganismAbreviatura: z.string()
+    .optional()
+    .default(''), // Abreviatura del producto (ej: "BV", "MT", "TR")
+  
   inoculationDate: z.string()
     .min(1, 'La fecha de inoculación es requerida')
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD)'),
@@ -53,6 +57,10 @@ export const InoculationSchema = z.object({
   responsablesIds: z.array(z.string().min(1, 'ID de responsable no puede estar vacío'))
     .min(1, 'Debe asignar al menos un responsable')
     .max(5, 'Máximo 5 responsables por inoculación'),
+  
+  responsablesIdsCore: z.array(z.string())
+    .optional()
+    .default([]), // IDs de Sirius Nomina Core (ej: "SIRIUS-PERSONAL-0001")
   
   registradoPor: z.string()
     .min(1, 'El nombre del usuario que registra es requerido')

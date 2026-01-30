@@ -184,9 +184,11 @@ interface InoculationData {
   bagQuantity: number;
   microorganism: string;
   microorganismId: string;
+  microorganismAbreviatura: string; // Abreviatura del producto (ej: "TR", "MT")
   inoculationDate: string;
   responsables: string[];
   responsablesIds: string[];
+  responsablesIdsCore: string[]; // IDs de Sirius Nomina Core (ej: "SIRIUS-PERSONAL-0001")
   registradoPor: string;
   cepasSeleccionadas: CepaSeleccionada[];
 }
@@ -194,23 +196,33 @@ interface InoculationData {
 interface Microorganism {
   id: string;
   nombre: string;
+  abreviatura?: string; // Abreviatura del producto
 }
 
 interface Responsable {
   id: string;
+  idCore: string; // ID de Sirius Nomina Core (ej: "SIRIUS-PERSONAL-0001")
   nombre: string;
 }
 
 const MushroomInoculationForm = () => {
   const { user } = useAuth();
   
+  // Obtener fecha de hoy en formato YYYY-MM-DD
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+  
   const [formData, setFormData] = useState<InoculationData>({
     bagQuantity: 0,
     microorganism: '',
     microorganismId: '',
-    inoculationDate: '',
+    microorganismAbreviatura: '', // Abreviatura del producto
+    inoculationDate: getTodayDate(), // Inicializar con fecha de hoy
     responsables: [],
     responsablesIds: [],
+    responsablesIdsCore: [],
     registradoPor: user?.nombre || '',
     cepasSeleccionadas: [],
   });
@@ -332,18 +344,32 @@ const MushroomInoculationForm = () => {
       const selected = Array.from(e.target.selectedOptions);
       const selectedValues = selected.map(option => option.value);
       const selectedIds = selected.map(option => option.getAttribute('data-id') || '');
-      setFormData(prev => ({ 
-        ...prev, 
-        [name]: selectedValues,
-        [`${name}Ids`]: selectedIds
-      }));
+      
+      // Si es el selector de responsables, también capturar los IDs Core
+      if (name === 'responsables') {
+        const selectedIdsCore = selected.map(option => option.getAttribute('data-idcore') || '');
+        setFormData(prev => ({ 
+          ...prev, 
+          responsables: selectedValues,
+          responsablesIds: selectedIds,
+          responsablesIdsCore: selectedIdsCore
+        }));
+      } else {
+        setFormData(prev => ({ 
+          ...prev, 
+          [name]: selectedValues,
+          [`${name}Ids`]: selectedIds
+        }));
+      }
     } else if (name === 'microorganism' && e.target instanceof HTMLSelectElement) {
       const selectedOption = e.target.options[e.target.selectedIndex];
       const microorganismId = selectedOption.getAttribute('data-id') || '';
+      const microorganismAbreviatura = selectedOption.getAttribute('data-abreviatura') || '';
       setFormData(prev => ({
         ...prev,
         microorganism: value,
         microorganismId: microorganismId,
+        microorganismAbreviatura: microorganismAbreviatura,
       }));
     } else {
       setFormData(prev => ({
@@ -627,9 +653,11 @@ const MushroomInoculationForm = () => {
           bagQuantity: 0,
           microorganism: '',
           microorganismId: '',
-          inoculationDate: '',
+          microorganismAbreviatura: '',
+          inoculationDate: getTodayDate(), // Mantener fecha de hoy al resetear
           responsables: [],
           responsablesIds: [],
+          responsablesIdsCore: [],
           registradoPor: user?.nombre || '',
           cepasSeleccionadas: [],
         });
@@ -836,7 +864,7 @@ const MushroomInoculationForm = () => {
               >
                 <option value="">{loadingMicroorganisms ? 'Cargando...' : 'Seleccionar microorganismo'}</option>
                 {!loadingMicroorganisms && microorganisms && microorganisms.map((organism) => (
-                  <option key={organism.id} value={organism.nombre} data-id={organism.id}>{organism.nombre}</option>
+                  <option key={organism.id} value={organism.nombre} data-id={organism.id} data-abreviatura={organism.abreviatura || ''}>{organism.nombre}</option>
                 ))}
               </select>
             </div>
@@ -904,7 +932,7 @@ const MushroomInoculationForm = () => {
                 ) : !responsables || responsables.length === 0 ? (
                   <option>No hay responsables disponibles</option>
                 ) : responsables.map((resp) => (
-                  <option key={resp.id} value={resp.nombre} data-id={resp.id}>{resp.nombre}</option>
+                  <option key={resp.id} value={resp.nombre} data-id={resp.id} data-idcore={resp.idCore}>{resp.nombre}</option>
                 ))}
               </select>
               <p className="text-xs text-gray-700 mt-1">Puedes seleccionar varios responsables (Ctrl/Cmd + click)</p>

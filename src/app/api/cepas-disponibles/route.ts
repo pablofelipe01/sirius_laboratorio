@@ -37,10 +37,20 @@ export async function GET(request: NextRequest) {
     if (!microorganismo && !abreviatura) {
       console.log('📌 Sin filtros específicos, mostrando todas las cepas con cantidad > 0');
     } else if (microorganismo) {
-      // Simplificar la fórmula para microorganismo
-      const safeOrganism = microorganismo.replace(/['"]/g, '');
+      // Limpiar el nombre del microorganismo:
+      // - Remover sufijos de unidad como "(L)", "(Kg)", "(Bolsa)", etc.
+      // - Remover comillas
+      const safeOrganism = microorganismo
+        .replace(/['"]/g, '')
+        .replace(/\s*\(L\)\s*$/i, '')      // Remover (L) al final
+        .replace(/\s*\(Kg\)\s*$/i, '')     // Remover (Kg) al final  
+        .replace(/\s*\(Bolsa\)\s*$/i, '')  // Remover (Bolsa) al final
+        .replace(/\s*\(Unidad\)\s*$/i, '') // Remover (Unidad) al final
+        .trim();
+      
       filterFormula = `AND({Total Cantidad Bolsas} > 0, SEARCH("${safeOrganism}", ARRAYJOIN({Microorganismo (from Microorganismos)}, " ")))`;
-      console.log('🔬 Filtrado por microorganismo:', safeOrganism);
+      console.log('🔬 Filtrado por microorganismo (original):', microorganismo);
+      console.log('🔬 Filtrado por microorganismo (limpio):', safeOrganism);
     } else if (abreviatura) {
       // Simplificar la fórmula para abreviatura
       const safeAbbrev = abreviatura.replace(/['"]/g, '');

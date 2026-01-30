@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Airtable from 'airtable';
+import Airtable, { FieldSet } from 'airtable';
 import { InoculationSchema, validateData } from '@/lib/validation/schemas';
 
 // Validar configuración requerida
@@ -12,12 +12,118 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY
 }).base(process.env.AIRTABLE_BASE_ID);
 
+// Configurar Airtable para Sirius Product Core
+const productCoreBase = process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE && process.env.AIRTABLE_BASE_ID_SIRIUS_PRODUCT_CORE
+  ? new Airtable({ apiKey: process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE }).base(process.env.AIRTABLE_BASE_ID_SIRIUS_PRODUCT_CORE)
+  : null;
+
 // Nombres de campos de Airtable configurables
 const FIELD_RESPONSABLES = process.env.AIRTABLE_FIELD_INOCULACION_RESPONSABLES || 'Responsables';
+const FIELD_RESPONSABLES_CORE = 'ID Responsable Core'; // Campo de texto para IDs de Sirius Nomina Core
 const FIELD_CANTIDAD_BOLSAS = process.env.AIRTABLE_FIELD_INOCULACION_CANTIDAD_BOLSAS || 'Cantidad Bolsas Inoculadas';
-const FIELD_MICROORGANISMOS = process.env.AIRTABLE_FIELD_INOCULACION_MICROORGANISMOS || 'Microorganismos';
 const FIELD_FECHA_INOCULACION = process.env.AIRTABLE_FIELD_INOCULACION_FECHA || 'Fecha Inoculacion';
 const FIELD_REALIZA_REGISTRO = process.env.AIRTABLE_FIELD_INOCULACION_REALIZA_REGISTRO || 'Realiza Registro';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔄 Helper: Obtener código de producto desde Sirius Product Core
+// El microorganismId es el record ID de Airtable, necesitamos el código SIRIUS-PRODUCT-XXXX
+// ═══════════════════════════════════════════════════════════════════════════════
+async function getProductCodeFromProductCore(recordId: string): Promise<string | null> {
+  const productosTableId = process.env.AIRTABLE_TABLE_PRODUCTOS;
+  
+  if (!productCoreBase || !productosTableId || !recordId) {
+    console.log('⚠️ No se puede obtener código de producto: configuración faltante');
+    return null;
+  }
+
+  try {
+    console.log(`🔍 Buscando código de producto para record ID: ${recordId}`);
+    
+    // Obtener el registro directamente por ID
+    const record = await productCoreBase(productosTableId).find(recordId);
+    
+    const codigoProducto = record.fields['Codigo Producto'] as string;
+    
+    if (codigoProducto) {
+      console.log(`✅ Código de producto encontrado: ${codigoProducto}`);
+      return codigoProducto;
+    } else {
+      console.log(`⚠️ Registro encontrado pero sin código de producto`);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error obteniendo código de producto:', error);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔄 Helper: Buscar responsables en DataLab por nombre
+// Los responsables vienen de Sirius Nomina Core, pero necesitamos los IDs de DataLab
+// ═══════════════════════════════════════════════════════════════════════════════
+async function findResponsablesInDataLab(nombres: string[]): Promise<string[]> {
+  const equipoTableId = process.env.AIRTABLE_TABLE_EQUIPO_LABORATORIO;
+  
+  if (!equipoTableId || nombres.length === 0) {
+    console.log('⚠️ No hay tabla de equipo o nombres vacíos');
+    return [];
+  }
+
+  try {
+    // Obtener todos los usuarios de Equipo Laboratorio
+    const records = await base(equipoTableId)
+      .select({
+        fields: ['Nombre'],
+      })
+      .all();
+
+    // Crear un mapa de nombre -> id para búsqueda rápida
+    const nombreToId = new Map<string, string>();
+    records.forEach(record => {
+      const nombre = record.fields['Nombre'] as string;
+      if (nombre) {
+        // Guardar con nombre exacto y también normalizado (lowercase, sin espacios extras)
+        nombreToId.set(nombre, record.id);
+        nombreToId.set(nombre.toLowerCase().trim(), record.id);
+      }
+    });
+
+    // Buscar cada nombre
+    const foundIds: string[] = [];
+    for (const nombre of nombres) {
+      // Intentar búsqueda exacta primero
+      let id = nombreToId.get(nombre);
+      
+      // Si no encuentra, intentar normalizado
+      if (!id) {
+        id = nombreToId.get(nombre.toLowerCase().trim());
+      }
+      
+      // Si aún no encuentra, buscar parcialmente (primer nombre + primer apellido)
+      if (!id) {
+        const nombreParts = nombre.toLowerCase().split(' ').slice(0, 2).join(' ');
+        for (const [key, value] of nombreToId.entries()) {
+          if (key.toLowerCase().includes(nombreParts)) {
+            id = value;
+            break;
+          }
+        }
+      }
+
+      if (id) {
+        foundIds.push(id);
+        console.log(`✅ Responsable encontrado en DataLab: "${nombre}" -> ${id}`);
+      } else {
+        console.log(`⚠️ Responsable NO encontrado en DataLab: "${nombre}"`);
+      }
+    }
+
+    return foundIds;
+  } catch (error) {
+    console.error('❌ Error buscando responsables en DataLab:', error);
+    return [];
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,16 +180,67 @@ export async function POST(request: NextRequest) {
       throw new Error('Missing AIRTABLE_TABLE_INOCULACION environment variable');
     }
     
-    // Crear registro en Airtable usando variables de entorno para nombres de campos
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🔄 Buscar responsables en DataLab por nombre
+    // Los IDs vienen de Sirius Nomina Core, pero necesitamos IDs de DataLab
+    // ═══════════════════════════════════════════════════════════════════════════
+    console.log('🔍 Buscando responsables en DataLab por nombre:', data.responsables);
+    const responsablesIdsDataLab = await findResponsablesInDataLab(data.responsables || []);
+    console.log('📋 IDs de responsables en DataLab:', responsablesIdsDataLab);
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🔄 Obtener código de producto desde Sirius Product Core
+    // El microorganismId es el record ID, pero necesitamos el código SIRIUS-PRODUCT-XXXX
+    // ═══════════════════════════════════════════════════════════════════════════
+    console.log('📦 Obteniendo código de producto para ID:', data.microorganismId);
+    const codigoProductoCore = await getProductCodeFromProductCore(data.microorganismId || '');
+    console.log('📋 Código de producto obtenido:', codigoProductoCore);
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🏷️ Generar código de lote: DDMMYYAB (fecha + abreviatura del microorganismo)
+    // La abreviatura viene de Sirius Product Core (microorganismAbreviatura)
+    // Fallback: usar abreviatura de las cepas seleccionadas
+    // ═══════════════════════════════════════════════════════════════════════════
+    let codigoLote = '';
+    // Intentar obtener abreviatura: primero del producto, luego de las cepas
+    const abreviatura = data.microorganismAbreviatura || 
+                        (data.cepasSeleccionadas && data.cepasSeleccionadas[0]?.abreviatura) || 
+                        '';
+    
+    if (data.inoculationDate && abreviatura) {
+      // Convertir fecha YYYY-MM-DD a DDMMYY
+      const [year, month, day] = data.inoculationDate.split('-');
+      const fechaFormateada = `${day}${month}${year.slice(2)}`; // DDMMYY
+      
+      codigoLote = `${fechaFormateada}${abreviatura}`;
+      console.log('🏷️ Código de lote generado:', codigoLote);
+    } else {
+      console.log('⚠️ No se pudo generar código de lote: falta fecha o abreviatura del microorganismo');
+    }
+    
+    // Preparar IDs Core como string separado por comas (para referencia)
+    const responsablesIdsCore = (data.responsablesIdsCore || []).join(', ');
+    
+    // Preparar campos para Airtable
+    const fieldsToCreate: Partial<FieldSet> = {
+      [FIELD_RESPONSABLES_CORE]: responsablesIdsCore, // String con IDs de Sirius Nomina Core
+      [FIELD_CANTIDAD_BOLSAS]: data.bagQuantity, // Number
+      [FIELD_FECHA_INOCULACION]: data.inoculationDate, // Date (ISO format)
+      [FIELD_REALIZA_REGISTRO]: data.registradoPor, // Text
+      'ID Producto Core': codigoProductoCore || '', // Código del producto (ej: SIRIUS-PRODUCT-0004)
+      'Codigo Lote': codigoLote,
+    };
+    
+    // Solo agregar responsables si encontramos IDs válidos en DataLab
+    if (responsablesIdsDataLab.length > 0) {
+      fieldsToCreate[FIELD_RESPONSABLES] = responsablesIdsDataLab;
+    } else {
+      console.log('⚠️ No se encontraron responsables en DataLab, guardando sin linked records');
+    }
+    
     const record = await base(tableId).create([
       {
-        fields: {
-          [FIELD_RESPONSABLES]: data.responsablesIds, // Array de IDs
-          [FIELD_CANTIDAD_BOLSAS]: data.bagQuantity, // Number
-          [FIELD_MICROORGANISMOS]: [data.microorganismId], // Array de IDs
-          [FIELD_FECHA_INOCULACION]: data.inoculationDate, // Date (ISO format)
-          [FIELD_REALIZA_REGISTRO]: data.registradoPor // Text
-        }
+        fields: fieldsToCreate
       }
     ]);
 
@@ -92,10 +249,12 @@ export async function POST(request: NextRequest) {
       recordId: record[0].id,
       browser: browserName,
       microorganismo: data.microorganism,
-      microorganismoId: data.microorganismId,
+      codigoProductoCore: codigoProductoCore,  // Código de Sirius Product Core (SIRIUS-PRODUCT-XXXX)
+      codigoLote: codigoLote, // Código de lote generado
       bagQuantity: data.bagQuantity,
       responsables: data.responsables,
-      responsablesIds: data.responsablesIds,
+      responsablesIdsNominaCore: data.responsablesIdsCore, // IDs de Sirius Nomina Core (referencia)
+      responsablesIdsDataLab: responsablesIdsDataLab,      // IDs encontrados en DataLab
       realizaRegistro: data.registradoPor,
       cepasSeleccionadas: data.cepasSeleccionadas,
       timestamp: new Date().toISOString()
