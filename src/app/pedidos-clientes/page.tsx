@@ -36,7 +36,7 @@ interface Pedido {
   clienteNombre: string;
   fechaPedido: string;
   fechaEntrega?: string;
-  estado: string;
+  estado?: 'pendiente' | 'en_proceso' | 'completado' | 'cancelado';
   origen: string;
   notas: string;
   productos: PedidoProducto[];
@@ -221,7 +221,7 @@ export default function PedidosClientesPage() {
       pedido.clienteNombre.toLowerCase().includes(filtroCliente.toLowerCase()) ||
       pedido.idPedidoCore?.toLowerCase().includes(filtroCliente.toLowerCase()) ||
       pedido.notas?.toLowerCase().includes(filtroCliente.toLowerCase());
-    const matchEstado = !filtroEstado || pedido.estado.toLowerCase() === filtroEstado.toLowerCase();
+    const matchEstado = !filtroEstado || pedido.estado?.toLowerCase() === filtroEstado.toLowerCase();
     const matchFecha = !filtroFecha || pedido.fechaPedido.includes(filtroFecha);
     return matchCliente && matchEstado && matchFecha;
   });
@@ -229,9 +229,9 @@ export default function PedidosClientesPage() {
   // Estadísticas con estados de Airtable
   const estadisticas = {
     total: pedidos.length,
-    recibidos: pedidos.filter(p => p.estado.toLowerCase() === 'recibido').length,
-    procesando: pedidos.filter(p => p.estado.toLowerCase() === 'procesando').length,
-    entregados: pedidos.filter(p => p.estado.toLowerCase() === 'entregado' || p.estado.toLowerCase() === 'completado').length,
+    recibidos: pedidos.filter(p => p.estado?.toLowerCase() === 'recibido').length,
+    procesando: pedidos.filter(p => p.estado?.toLowerCase() === 'procesando').length,
+    entregados: pedidos.filter(p => p.estado?.toLowerCase() === 'entregado' || p.estado?.toLowerCase() === 'completado').length,
   };
 
   if (!isAuthenticated) {
@@ -427,8 +427,8 @@ export default function PedidosClientesPage() {
                         {formatearFecha(pedido.fechaPedido)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(pedido.estado)}`}>
-                          {pedido.estado.replace('_', ' ').toUpperCase()}
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(pedido.estado || 'pendiente')}`}>
+                          {(pedido.estado || 'pendiente').replace('_', ' ').toUpperCase()}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

@@ -133,7 +133,7 @@ export async function PATCH(request: Request) {
     if (hash) updateFields['Hash'] = hash;
     if (salt) updateFields['Salt'] = salt;
     
-    const updatedRecord = await base(tableId).update(recordId, updateFields);
+    const updatedRecord = await legacyBase(tableId).update(recordId, updateFields);
 
     return NextResponse.json({
       success: true,

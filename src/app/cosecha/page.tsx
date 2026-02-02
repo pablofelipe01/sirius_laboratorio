@@ -86,6 +86,7 @@ interface CosechaData {
   // IDs de Sirius Core
   idPedidoCore?: string;
   idProductoCore?: string;
+  idDetallePedido?: string; // Record ID del detalle para marcar como completado
   // Datos adicionales para trazabilidad
   lotesSeleccionados?: string[];
   cantidadesLotes?: {[key: string]: string};
