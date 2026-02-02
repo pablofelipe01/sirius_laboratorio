@@ -134,6 +134,14 @@ export const CepasSchema = z.object({
     .min(1, 'Debe asignar al menos un responsable')
     .max(5, 'Máximo 5 responsables por cepa'),
   
+  responsablesIdsCore: z.array(z.string())
+    .optional()
+    .default([]), // IDs de Sirius Nomina Core (ej: "SIRIUS-PER-0001")
+  
+  microorganismoAbreviatura: z.string()
+    .optional()
+    .default(''), // Abreviatura del producto (ej: "BV", "MT", "TR")
+  
   registradoPor: z.string()
     .min(1, 'El nombre del usuario que registra es requerido')
     .max(100, 'El nombre del usuario es demasiado largo'),

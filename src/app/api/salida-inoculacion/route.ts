@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
       cantidadBolsas, 
       loteAlteradoId,
       cepaId,
-      userName 
+      userName,
+      idResponsableCore
     } = body;
     
     console.log('🔍 Datos recibidos:', { 
@@ -24,7 +25,8 @@ export async function POST(request: NextRequest) {
       cantidadBolsas, 
       loteAlteradoId,
       cepaId,
-      userName 
+      userName,
+      idResponsableCore
     });
     
     if (!fechaEvento || !cantidadBolsas || !loteAlteradoId || !cepaId) {
@@ -40,7 +42,8 @@ export async function POST(request: NextRequest) {
       'Cantidad Bolsas': parseInt(cantidadBolsas),
       'Lote Alterado': [loteAlteradoId],
       'Cepas': [cepaId], // Vincular con la cepa creada
-      'Realiza Registro': userName || 'Usuario Desconocido'
+      'Realiza Registro': userName || 'Usuario Desconocido',
+      'ID Responsable Core': idResponsableCore || '' // Código del usuario (SIRIUS-PER-XXXX)
       // Nota: No incluimos Descartes ni Cosecha Laboratorio porque es conversión a cepas
     });
     

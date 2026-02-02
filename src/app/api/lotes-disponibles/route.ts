@@ -11,14 +11,14 @@ export async function GET(request: NextRequest) {
     console.log('📦 API LOTES-DISPONIBLES: Iniciando consulta a Inoculacion...');
     
     const { searchParams } = new URL(request.url);
-    const microorganismoId = searchParams.get('microorganismo');
+    const codigoProducto = searchParams.get('codigoProducto');
     
-    console.log('🔍 Parámetros de búsqueda:', { microorganismoId });
+    console.log('🔍 Parámetros de búsqueda:', { codigoProducto });
     
-    if (!microorganismoId) {
+    if (!codigoProducto) {
       return NextResponse.json({
         success: false,
-        error: 'Parámetro microorganismo es requerido'
+        error: 'Parámetro codigoProducto es requerido'
       }, { status: 400 });
     }
     
@@ -27,18 +27,50 @@ export async function GET(request: NextRequest) {
       throw new Error('Variable de entorno AIRTABLE_TABLE_INOCULACION no está configurada');
     }
 
+    // Sanitizar el código para evitar inyección en la fórmula
+    const safeCodigoProducto = codigoProducto.replace(/["/\\]/g, '');
+
+    // Buscar por ID Producto Core (campo de texto que guarda el código SIRIUS-PRODUCT-XXXX)
+    // Para cepas, buscamos lotes en INCUBACION o REFRIGERACIÓN con cantidad > 0
     const records = await base(process.env.AIRTABLE_TABLE_INOCULACION)
       .select({
         filterByFormula: `AND(
-          FIND("${microorganismoId}", ARRAYJOIN({Microorganismos}, ",")),
-          {Estado Lote} = "Incubacion",
-          {Total Cantidad Bolsas en Stock} > 0
+          {ID Producto Core} = "${safeCodigoProducto}",
+          OR({Estado Lote} = "Incubacion", {Estado Lote} = "Refrigeración"),
+          {Cantidad Actual Bolsas} > 0
         )`,
         sort: [{ field: "Fecha Inoculacion", direction: "asc" }]
       })
       .all();
     
     console.log(`📊 Encontrados ${records.length} lotes disponibles en Inoculacion`);
+
+    // Debug: Si no hay resultados, buscar sin el filtro de cantidad para ver cuántos lotes existen
+    if (records.length === 0) {
+      const debugRecords = await base(process.env.AIRTABLE_TABLE_INOCULACION)
+        .select({
+          filterByFormula: `{ID Producto Core} = "${safeCodigoProducto}"`,
+          maxRecords: 10
+        })
+        .all();
+      
+      console.log(`🔍 Debug: Lotes con ID Producto Core="${safeCodigoProducto}": ${debugRecords.length}`);
+      debugRecords.forEach(r => {
+        console.log(`   - ${r.fields['Codigo Lote']}: Cantidad Actual=${r.fields['Cantidad Actual Bolsas']}, Estado=${r.fields['Estado Lote']}, ID Producto Core="${r.fields['ID Producto Core']}"`);
+      });
+
+      // Si tampoco hay con el código, mostrar algunos registros para ver qué códigos existen
+      if (debugRecords.length === 0) {
+        const allRecords = await base(process.env.AIRTABLE_TABLE_INOCULACION)
+          .select({ maxRecords: 5 })
+          .all();
+        
+        console.log(`📋 Debug: Primeros registros en Inoculacion (para ver códigos disponibles):`);
+        allRecords.forEach(r => {
+          console.log(`   - ${r.fields['Codigo Lote']}: ID Producto Core="${r.fields['ID Producto Core']}"`);
+        });
+      }
+    }
     
     // Mapear los registros a formato esperado por el frontend
     const lotes = records.map(record => ({
@@ -47,7 +79,7 @@ export async function GET(request: NextRequest) {
       microorganismo: Array.isArray(record.fields['Microorganismo (from Microorganismos)']) 
         ? record.fields['Microorganismo (from Microorganismos)'][0] 
         : 'No especificado',
-      cantidadDisponible: Number(record.fields['Total Cantidad Bolsas en Stock']) || 0,
+      cantidadDisponible: Number(record.fields['Cantidad Actual Bolsas']) || 0,
       fechaProduccion: record.fields['Fecha Inoculacion'] || '',
       estado: record.fields['Estado Lote'] || 'Incubacion'
     }));

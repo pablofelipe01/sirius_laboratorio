@@ -528,22 +528,22 @@ const tiposEvento = [
 ];
 
 // Configuración de microorganismos predeterminados por tipo de aplicación (usando nombres exactos de Sirius Product Core)
-const microorganismosPredeterminados = {
+const microorganismosPredeterminados: Record<string, Array<{nombre: string, dosificacionPorHa: number, unidad: string}>> = {
   'preventivo-pc': [
-    { nombre: 'Trichoderma harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
-    { nombre: 'Siriusbacter', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
+    { nombre: 'Trichoderma harzianum (L)', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
+    { nombre: 'Siriusbacter (L)', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
   ],
   'preventivo-control-plagas': [
-    { nombre: 'Beauveria bassiana', dosificacionPorHa: 1.5, unidad: 'L/Ha' },
-    { nombre: 'Bacillus thuringiensis', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
+    { nombre: 'Beauveria bassiana (L)', dosificacionPorHa: 1.0, unidad: 'L/Ha' },
+    { nombre: 'Bacillus thuringiensis (L)', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
   ],
   'control-ml': [
-    { nombre: 'Purpureocillium lilacinum', dosificacionPorHa: 0.5, unidad: 'L/Ha' },
-    { nombre: 'Beauveria bassiana', dosificacionPorHa: 0.5, unidad: 'L/Ha' },
-    { nombre: 'Metarhizium anisopliae', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
+    { nombre: 'Purpureocillium lilacinum (L)', dosificacionPorHa: 0.5, unidad: 'L/Ha' },
+    { nombre: 'Beauveria bassiana (L)', dosificacionPorHa: 0.5, unidad: 'L/Ha' },
+    { nombre: 'Metarhizium anisopliae (L)', dosificacionPorHa: 0.5, unidad: 'L/Ha' }
   ],
   'prevencion-pestalotiopsis': [
-    { nombre: 'Trichoderma harzianum', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
+    { nombre: 'Trichoderma harzianum (L)', dosificacionPorHa: 1.0, unidad: 'L/Ha' }
   ]
 };
 
@@ -618,6 +618,8 @@ export default function CalendarioProduccionPage() {
   const [pedidosProductos, setPedidosProductos] = useState<Record<string, any>>({});
   const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
   const [loadingPedidos, setLoadingPedidos] = useState(false);
+  const [selectedPedidoDetalle, setSelectedPedidoDetalle] = useState<any | null>(null);
+  const [showPedidoDetalleModal, setShowPedidoDetalleModal] = useState(false);
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -857,14 +859,24 @@ export default function CalendarioProduccionPage() {
       const fechas = calcularFechasAplicacion(formData.fechaInicio, formData.cantidadAplicacionesAno, formData.periodicidadMeses);
       
       // Mapear los microorganismos predeterminados con los de la base de datos
-      const microorganismosDefault = configDefault.map(config => {
-        const microFromDB = microorganismos.find(m => 
-          m.nombre.toLowerCase().includes(config.nombre.split(' ')[0].toLowerCase())
+      const microorganismosDefault = configDefault.map((config, idx) => {
+        // Buscar primero por nombre exacto
+        let microFromDB = microorganismos.find(m => 
+          m.nombre.toLowerCase() === config.nombre.toLowerCase()
         );
         
+        // Si no encuentra exacto, buscar por nombre base (sin sufijo como "(L)")
+        if (!microFromDB) {
+          const nombreBase = config.nombre.replace(/\s*\([^)]*\)\s*$/, '').toLowerCase();
+          microFromDB = microorganismos.find(m => 
+            m.nombre.toLowerCase().includes(nombreBase) ||
+            nombreBase.includes(m.nombre.toLowerCase().replace(/\s*\([^)]*\)\s*$/, ''))
+          );
+        }
+        
         return {
-          id: microFromDB?.id || 'custom',
-          nombre: config.nombre,
+          id: microFromDB?.id || `custom-${idx}-${Date.now()}`,
+          nombre: microFromDB?.nombre || config.nombre,
           dosificacionPorHa: config.dosificacionPorHa,
           unidad: config.unidad
         };
@@ -955,14 +967,24 @@ export default function CalendarioProduccionPage() {
       const fechasCalculadas = calcularFechasAplicacion(formData.fechaInicio, formData.cantidadAplicacionesAno, formData.periodicidadMeses);
       
       // Mapear los microorganismos predeterminados con los productos de Sirius usando nombres exactos
-      const microorganismosDefault = configDefault.map(config => {
-        const microFromDB = microorganismos.find(m => 
-          m.nombre === config.nombre
+      const microorganismosDefault = configDefault.map((config, idx) => {
+        // Buscar primero por nombre exacto
+        let microFromDB = microorganismos.find(m => 
+          m.nombre.toLowerCase() === config.nombre.toLowerCase()
         );
         
+        // Si no encuentra exacto, buscar por nombre base (sin sufijo como "(L)")
+        if (!microFromDB) {
+          const nombreBase = config.nombre.replace(/\s*\([^)]*\)\s*$/, '').toLowerCase();
+          microFromDB = microorganismos.find(m => 
+            m.nombre.toLowerCase().includes(nombreBase) ||
+            nombreBase.includes(m.nombre.toLowerCase().replace(/\s*\([^)]*\)\s*$/, ''))
+          );
+        }
+        
         return {
-          id: microFromDB?.id || 'custom',
-          nombre: config.nombre,
+          id: microFromDB?.id || `custom-${idx}-${Date.now()}`,
+          nombre: microFromDB?.nombre || config.nombre,
           dosificacionPorHa: config.dosificacionPorHa,
           unidad: config.unidad
         };
@@ -997,7 +1019,8 @@ export default function CalendarioProduccionPage() {
   const fetchMicroorganismos = async () => {
     setLoadingMicroorganismos(true);
     try {
-      const response = await fetch('/api/sirius-productos');
+      // Usar ?todos=true para obtener todos los productos del laboratorio (hongos y bacterias)
+      const response = await fetch('/api/sirius-productos?todos=true');
       const data = await response.json();
       
       if (data.success) {
@@ -2153,7 +2176,15 @@ export default function CalendarioProduccionPage() {
                   return (
                     <div
                       key={pedido.id}
-                      className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-lg p-4 hover:shadow-md transition-all"
+                      onClick={() => {
+                        setSelectedPedidoDetalle({
+                          ...pedido,
+                          productos,
+                          nombreCliente
+                        });
+                        setShowPedidoDetalleModal(true);
+                      }}
+                      className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer hover:border-red-400"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <span className="text-xs font-mono text-red-600 bg-red-100 px-2 py-0.5 rounded">
@@ -2795,7 +2826,7 @@ export default function CalendarioProduccionPage() {
                       ) : (
                         <div className="space-y-4">
                           {formData.microorganismos.map((micro, index) => (
-                            <div key={micro.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                            <div key={`${micro.id}-${index}`} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -4126,6 +4157,196 @@ export default function CalendarioProduccionPage() {
           )}
         </div>
       </div>
+      
+      {/* Modal de Detalle del Pedido */}
+      {showPedidoDetalleModal && selectedPedidoDetalle && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    📦 Detalle del Pedido
+                  </h2>
+                  <p className="text-indigo-200 text-sm">
+                    {selectedPedidoDetalle.idPedidoCore || `#${selectedPedidoDetalle.idNumerico}` || 'Sin ID'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowPedidoDetalleModal(false);
+                    setSelectedPedidoDetalle(null);
+                  }}
+                  className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-all"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6 space-y-6">
+              {/* Estado y Fechas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Estado</h3>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedPedidoDetalle.estado === 'Recibido' 
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : selectedPedidoDetalle.estado === 'Procesando'
+                      ? 'bg-blue-100 text-blue-800'
+                      : selectedPedidoDetalle.estado === 'Completado'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {selectedPedidoDetalle.estado || 'Pendiente'}
+                  </span>
+                </div>
+                
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Fecha del Pedido</h3>
+                  <p className="text-lg font-semibold text-gray-900">
+                    📅 {selectedPedidoDetalle.fechaPedido 
+                      ? new Date(selectedPedidoDetalle.fechaPedido).toLocaleDateString('es-ES', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })
+                      : 'No especificada'}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Cliente */}
+              <div className="bg-indigo-50 rounded-xl p-4">
+                <h3 className="text-sm font-medium text-indigo-600 mb-2">🏢 Cliente</h3>
+                <p className="text-xl font-bold text-gray-900">
+                  {selectedPedidoDetalle.nombreCliente || 'Cliente no especificado'}
+                </p>
+                {selectedPedidoDetalle.clienteId && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    ID: {selectedPedidoDetalle.clienteId}
+                  </p>
+                )}
+              </div>
+              
+              {/* Productos */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  🧪 Productos del Pedido
+                  <span className="bg-indigo-100 text-indigo-700 text-sm px-2 py-0.5 rounded-full">
+                    {selectedPedidoDetalle.productos?.length || 0} productos
+                  </span>
+                </h3>
+                
+                {selectedPedidoDetalle.productos && selectedPedidoDetalle.productos.length > 0 ? (
+                  <div className="bg-gray-50 rounded-xl overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Producto</th>
+                          <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Cantidad</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Unidad</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {selectedPedidoDetalle.productos.map((prod: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-gray-100 transition-colors">
+                            <td className="px-4 py-3 text-gray-900 font-medium">
+                              {prod.nombre || 'Producto sin nombre'}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className="inline-flex items-center justify-center bg-indigo-100 text-indigo-700 font-bold px-3 py-1 rounded-full">
+                                {prod.cantidad || 0}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center text-gray-600">
+                              {prod.unidad || 'L'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    
+                    {/* Total */}
+                    <div className="bg-indigo-600 px-4 py-3 flex justify-between items-center">
+                      <span className="text-white font-medium">Total Productos</span>
+                      <span className="text-white font-bold text-lg">
+                        {selectedPedidoDetalle.productos.reduce((sum: number, p: any) => sum + (p.cantidad || 0), 0)} L
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl p-8 text-center text-gray-500">
+                    <span className="text-4xl block mb-2">📭</span>
+                    <p>No hay productos detallados para este pedido</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Notas */}
+              {selectedPedidoDetalle.notas && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-yellow-700 mb-2 flex items-center gap-2">
+                    💬 Notas del Pedido
+                  </h3>
+                  <p className="text-gray-700 whitespace-pre-wrap">
+                    {selectedPedidoDetalle.notas}
+                  </p>
+                </div>
+              )}
+              
+              {/* Información adicional */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {selectedPedidoDetalle.fechaEntregaEstimada && (
+                  <div className="bg-green-50 rounded-lg p-3">
+                    <p className="text-green-600 font-medium">📦 Entrega Estimada</p>
+                    <p className="text-gray-700">
+                      {new Date(selectedPedidoDetalle.fechaEntregaEstimada).toLocaleDateString('es-ES')}
+                    </p>
+                  </div>
+                )}
+                
+                {selectedPedidoDetalle.prioridad && (
+                  <div className={`rounded-lg p-3 ${
+                    selectedPedidoDetalle.prioridad === 'Alta' 
+                      ? 'bg-red-50' 
+                      : selectedPedidoDetalle.prioridad === 'Media'
+                      ? 'bg-yellow-50'
+                      : 'bg-gray-50'
+                  }`}>
+                    <p className={`font-medium ${
+                      selectedPedidoDetalle.prioridad === 'Alta' 
+                        ? 'text-red-600' 
+                        : selectedPedidoDetalle.prioridad === 'Media'
+                        ? 'text-yellow-600'
+                        : 'text-gray-600'
+                    }`}>⚡ Prioridad</p>
+                    <p className="text-gray-700">{selectedPedidoDetalle.prioridad}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowPedidoDetalleModal(false);
+                  setSelectedPedidoDetalle(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Modal de Pedido */}
       <ModalPedido

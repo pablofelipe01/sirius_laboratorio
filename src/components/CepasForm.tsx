@@ -9,8 +9,11 @@ interface CepasData {
   cantidadBolsas: number;
   microorganismo: string;
   microorganismoId: string;
+  microorganismoAbreviatura: string;
+  codigoProducto: string; // SIRIUS-PRODUCT-XXXX
   responsables: string[];
   responsablesIds: string[];
+  responsablesIdsCore: string[];
   registradoPor: string;
   // Campos específicos para conversión desde lote
   loteSeleccionadoId?: string;
@@ -21,11 +24,14 @@ interface CepasData {
 interface Microorganism {
   id: string;
   nombre: string;
+  abreviatura?: string;
+  codigo?: string; // Codigo Producto (SIRIUS-PRODUCT-XXXX)
 }
 
 interface Responsable {
   id: string;
   nombre: string;
+  idCore?: string;
 }
 
 interface LoteDisponible {
@@ -50,8 +56,11 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
     cantidadBolsas: 0,
     microorganismo: '',
     microorganismoId: '',
+    microorganismoAbreviatura: '',
+    codigoProducto: '',
     responsables: [],
     responsablesIds: [],
+    responsablesIdsCore: [],
     registradoPor: user?.nombre || '',
     // Campos para conversión desde lote
     loteSeleccionadoId: '',
@@ -84,10 +93,10 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
 
   // Effect para cargar lotes cuando se selecciona microorganismo y la tercera opción
   useEffect(() => {
-    if (formData.microorganismoId && formData.tipoRegistro === 'Cepa Convertida desde Lote de Producción') {
+    if (formData.codigoProducto && formData.tipoRegistro === 'Cepa Convertida desde Lote de Producción') {
       fetchLotesDisponibles();
     }
-  }, [formData.microorganismoId, formData.tipoRegistro]);
+  }, [formData.codigoProducto, formData.tipoRegistro]);
 
   // Debug effect para modal
   useEffect(() => {
@@ -121,16 +130,17 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
     }
   };
 
-  // Función para cargar lotes disponibles en estado de incubación
+  // Función para cargar lotes disponibles en estado de incubación o refrigeración
   const fetchLotesDisponibles = async () => {
-    const microorganismoIdToUse = formData.microorganismoId;
-    if (!microorganismoIdToUse) return;
+    // Usar el código del producto (SIRIUS-PRODUCT-XXXX) para buscar por ID Product Core
+    const codigoProducto = formData.codigoProducto;
+    if (!codigoProducto) return;
     
     setLoadingLotes(true);
     try {
-      console.log('📦 Cargando lotes disponibles para microorganismo ID:', microorganismoIdToUse);
+      console.log('📦 Cargando lotes disponibles para producto:', codigoProducto);
       
-      const response = await fetch(`/api/lotes-disponibles?microorganismo=${encodeURIComponent(microorganismoIdToUse)}`);
+      const response = await fetch(`/api/lotes-disponibles?codigoProducto=${encodeURIComponent(codigoProducto)}`);
       const data = await response.json();
       
       if (data.success) {
@@ -212,18 +222,34 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
       const selected = Array.from(e.target.selectedOptions);
       const selectedValues = selected.map(option => option.value);
       const selectedIds = selected.map(option => option.getAttribute('data-id') || '');
-      setFormData(prev => ({ 
-        ...prev, 
-        [name]: selectedValues,
-        [`${name}Ids`]: selectedIds
-      }));
+      
+      // Si es el selector de responsables, también capturar los IDs Core
+      if (name === 'responsables') {
+        const selectedIdsCore = selected.map(option => option.getAttribute('data-idcore') || '');
+        setFormData(prev => ({ 
+          ...prev, 
+          responsables: selectedValues,
+          responsablesIds: selectedIds,
+          responsablesIdsCore: selectedIdsCore
+        }));
+      } else {
+        setFormData(prev => ({ 
+          ...prev, 
+          [name]: selectedValues,
+          [`${name}Ids`]: selectedIds
+        }));
+      }
     } else if (name === 'microorganismo' && e.target instanceof HTMLSelectElement) {
       const selectedOption = e.target.options[e.target.selectedIndex];
       const microorganismoId = selectedOption.getAttribute('data-id') || '';
+      const microorganismoAbreviatura = selectedOption.getAttribute('data-abreviatura') || '';
+      const codigoProducto = selectedOption.getAttribute('data-codigo') || '';
       setFormData(prev => ({
         ...prev,
         microorganismo: value,
         microorganismoId: microorganismoId,
+        microorganismoAbreviatura: microorganismoAbreviatura,
+        codigoProducto: codigoProducto,
         // Limpiar lote seleccionado cuando cambia el microorganismo
         loteSeleccionadoId: '',
         loteSeleccionado: '',
@@ -401,7 +427,8 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
               cantidadBolsas: formData.cantidadDescontarLote,
               loteAlteradoId: formData.loteSeleccionadoId,
               cepaId: result.recordId,
-              userName: user?.nombre || 'Usuario Desconocido'
+              userName: user?.nombre || 'Usuario Desconocido',
+              idResponsableCore: user?.idEmpleado || '' // ID Core del usuario (SIRIUS-PER-XXXX)
             };
 
             console.log('📦 Datos de salida de inoculación a enviar:', salidaInoculacionData);
@@ -436,8 +463,11 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
           cantidadBolsas: 0,
           microorganismo: '',
           microorganismoId: '',
+          microorganismoAbreviatura: '',
+          codigoProducto: '',
           responsables: [],
           responsablesIds: [],
+          responsablesIdsCore: [],
           registradoPor: user?.nombre || '',
           // Campos para conversión desde lote
           loteSeleccionadoId: '',
@@ -650,7 +680,7 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
               >
                 <option value="">{loadingMicroorganisms ? 'Cargando...' : 'Seleccionar microorganismo'}</option>
                 {!loadingMicroorganisms && microorganisms && microorganisms.map((organism) => (
-                  <option key={organism.id} value={organism.nombre} data-id={organism.id}>{organism.nombre}</option>
+                  <option key={organism.id} value={organism.nombre} data-id={organism.id} data-abreviatura={organism.abreviatura || ''} data-codigo={organism.codigo || ''}>{organism.nombre}</option>
                 ))}
               </select>
             </div>
@@ -675,7 +705,7 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
                 ) : !responsables || responsables.length === 0 ? (
                   <option>No hay responsables disponibles</option>
                 ) : responsables.map((resp) => (
-                  <option key={resp.id} value={resp.nombre} data-id={resp.id}>{resp.nombre}</option>
+                  <option key={resp.id} value={resp.nombre} data-id={resp.id} data-idcore={resp.idCore || ''}>{resp.nombre}</option>
                 ))}
               </select>
               <p className="text-xs text-gray-700 mt-1">Puedes seleccionar varios responsables (Ctrl/Cmd + click)</p>
@@ -699,7 +729,7 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 bg-white/90 disabled:opacity-50 text-gray-900"
                   >
                     <option value="">
-                      {loadingLotes ? 'Cargando lotes...' : 'Seleccionar lote en incubación'}
+                      {loadingLotes ? 'Cargando lotes...' : 'Seleccionar lote disponible'}
                     </option>
                     {lotesDisponibles.map((lote) => (
                       <option key={lote.id} value={lote.id}>
@@ -710,10 +740,10 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
                   {lotesDisponibles.length === 0 && !loadingLotes && (
                     <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                       <p className="text-sm text-yellow-800">
-                        ⚠️ No hay lotes disponibles en estado de incubación para este tipo de microorganismo.
+                        ⚠️ No hay lotes disponibles para este tipo de microorganismo.
                       </p>
                       <p className="text-xs text-yellow-700 mt-1">
-                        Para usar esta opción, necesitas tener lotes de producción normal previamente registrados y en estado de incubación.
+                        Para usar esta opción, necesitas tener lotes de producción normal previamente registrados en estado de incubación o refrigeración con cantidad disponible.
                       </p>
                     </div>
                   )}
