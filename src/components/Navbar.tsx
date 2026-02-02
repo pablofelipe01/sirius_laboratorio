@@ -190,6 +190,7 @@ const Navbar: React.FC = () => {
                     icon="📋"
                     items={[
                       { href: "/almacenamiento", label: "Almacenamiento", emoji: "📦", color: "bg-orange-50" },
+                      { href: "/productos-secos", label: "Productos Secos", emoji: "🌾", color: "bg-amber-50" },
                       { href: "/descartes", label: "Descartes", emoji: "🗑️", color: "bg-red-50" },
                       { href: "/stock-insumos", label: "Stock Insumos", emoji: "📋", color: "bg-teal-50" },
                       { href: "/pedidos-clientes", label: "Pedidos Clientes", emoji: "🛒", color: "bg-emerald-50" },
@@ -435,6 +436,18 @@ const Navbar: React.FC = () => {
                         >
                           <span className="text-xl">📦</span>
                           <span className="font-medium">Almacenamiento</span>
+                          <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                        
+                        <Link
+                          href="/productos-secos"
+                          onClick={closeMobileMenu}
+                          className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-amber-50 hover:text-amber-700 dark:text-gray-200 dark:hover:bg-amber-900/30 dark:hover:text-amber-400"
+                        >
+                          <span className="text-xl">🌾</span>
+                          <span className="font-medium">Productos Secos</span>
                           <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>

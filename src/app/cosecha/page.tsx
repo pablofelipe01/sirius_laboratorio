@@ -14,6 +14,7 @@ interface Microorganismo {
 
 interface Responsable {
   id: string;
+  idCore?: string; // Código SIRIUS-PERSONAL-XXXX
   nombre: string;
 }
 
@@ -51,6 +52,24 @@ interface CepaDisponible {
   responsables: string[];
 }
 
+interface PedidoPendiente {
+  id: string;
+  idPedidoCore: string;
+  idNumerico: number;
+  fechaPedido: string;
+  estado: string;
+  notas: string;
+  detallesIds?: string[];
+}
+
+interface ProductoPedido {
+  id: string;
+  idProductoCore: string;
+  nombreProducto: string;
+  cantidad: number;
+  notas: string;
+}
+
 interface CosechaData {
   horaInicio: string;
   horaFin: string;
@@ -64,6 +83,9 @@ interface CosechaData {
   responsableEntregaId: string;
   registradoPor: string;
   fechaCosecha: string;
+  // IDs de Sirius Core
+  idPedidoCore?: string;
+  idProductoCore?: string;
   // Datos adicionales para trazabilidad
   lotesSeleccionados?: string[];
   cantidadesLotes?: {[key: string]: string};
@@ -78,11 +100,15 @@ export default function CosechaPage() {
   const [responsables, setResponsables] = useState<Responsable[]>([]);
   const [lotesDisponibles, setLotesDisponibles] = useState<LoteDisponible[]>([]);
   const [cepasDisponibles, setCepasDisponibles] = useState<CepaDisponible[]>([]);
+  const [pedidosPendientes, setPedidosPendientes] = useState<PedidoPendiente[]>([]);
+  const [productosPedido, setProductosPedido] = useState<ProductoPedido[]>([]);
   const [loadingMicroorganismos, setLoadingMicroorganismos] = useState(false);
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [loadingResponsables, setLoadingResponsables] = useState(false);
   const [loadingLotes, setLoadingLotes] = useState(false);
   const [loadingCepas, setLoadingCepas] = useState(false);
+  const [loadingPedidos, setLoadingPedidos] = useState(false);
+  const [loadingProductosPedido, setLoadingProductosPedido] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
@@ -91,6 +117,8 @@ export default function CosechaPage() {
   const [horaInicio, setHoraInicio] = useState('');
   const [horaFin, setHoraFin] = useState('');
   const [cliente, setCliente] = useState('');
+  const [pedidoSeleccionado, setPedidoSeleccionado] = useState('');
+  const [productoSeleccionado, setProductoSeleccionado] = useState('');
   const [nuevoCliente, setNuevoCliente] = useState('');
   const [nuevoClienteNit, setNuevoClienteNit] = useState('');
   const [hongo, setHongo] = useState('');
@@ -124,6 +152,28 @@ export default function CosechaPage() {
       setCantidadesCepas({});
     }
   }, [hongo]);
+
+  // Cargar pedidos pendientes cuando cambie el cliente
+  useEffect(() => {
+    if (cliente && cliente !== 'nuevo') {
+      fetchPedidosPendientes(cliente);
+    } else {
+      setPedidosPendientes([]);
+      setPedidoSeleccionado('');
+      setProductosPedido([]);
+      setProductoSeleccionado('');
+    }
+  }, [cliente, clientes]);
+
+  // Cargar productos cuando se seleccione un pedido
+  useEffect(() => {
+    if (pedidoSeleccionado) {
+      cargarProductosDePedido(pedidoSeleccionado);
+    } else {
+      setProductosPedido([]);
+      setProductoSeleccionado('');
+    }
+  }, [pedidoSeleccionado]);
 
   const fetchMicroorganismos = async () => {
     setLoadingMicroorganismos(true);
@@ -165,6 +215,141 @@ export default function CosechaPage() {
       console.error('Error fetching clientes:', error);
     } finally {
       setLoadingClientes(false);
+    }
+  };
+
+  // Cache de detalles y productos de pedidos
+  const [detallesCache, setDetallesCache] = useState<Record<string, any[]>>({});
+  const [productosCache, setProductosCache] = useState<Record<string, { id: string; codigoProducto: string; nombre: string }>>({});
+
+  // Cargar pedidos pendientes cuando cambie el cliente
+  const fetchPedidosPendientes = async (clienteNombre: string) => {
+    if (!clienteNombre || clienteNombre === 'nuevo') {
+      setPedidosPendientes([]);
+      setPedidoSeleccionado('');
+      setProductosPedido([]);
+      setProductoSeleccionado('');
+      return;
+    }
+
+    // Buscar el cliente seleccionado para obtener su ID (que es el código CL-XXXX)
+    const clienteSeleccionado = clientes.find(c => c.nombre === clienteNombre);
+    if (!clienteSeleccionado) {
+      console.log('⚠️ Cliente no encontrado:', clienteNombre);
+      setPedidosPendientes([]);
+      return;
+    }
+
+    setLoadingPedidos(true);
+    try {
+      // Buscar pedidos con estados "Recibido" o "Procesando" (pendientes)
+      // El campo ID del cliente contiene el código (CL-0001, etc.)
+      const response = await fetch(`/api/pedidos-clientes?clienteId=${encodeURIComponent(clienteSeleccionado.id)}&incluirDetalles=true`);
+      const data = await response.json();
+      
+      if (data.success) {
+        // Filtrar solo pedidos pendientes (Recibido o Procesando)
+        const pedidosFiltrados = (data.pedidos || []).filter((pedido: PedidoPendiente) => 
+          pedido.estado === 'Recibido' || pedido.estado === 'Procesando'
+        );
+        setPedidosPendientes(pedidosFiltrados);
+        
+        // Guardar detalles y productos en cache
+        if (data.detalles) {
+          setDetallesCache(data.detalles);
+        }
+        if (data.productos) {
+          setProductosCache(data.productos);
+        }
+        
+        console.log(`📦 Pedidos pendientes para ${clienteNombre}:`, pedidosFiltrados.length);
+      } else {
+        console.error('Error loading pedidos:', data.error);
+        setPedidosPendientes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching pedidos:', error);
+      setPedidosPendientes([]);
+    } finally {
+      setLoadingPedidos(false);
+    }
+  };
+
+  // Cargar productos cuando se seleccione un pedido
+  const cargarProductosDePedido = (pedidoId: string) => {
+    if (!pedidoId) {
+      setProductosPedido([]);
+      setProductoSeleccionado('');
+      return;
+    }
+
+    setLoadingProductosPedido(true);
+    
+    // Obtener los detalles del pedido seleccionado desde el cache
+    const detallesPedido = detallesCache[pedidoId] || [];
+    
+    // Filtrar productos que NO están listos (no han sido cosechados)
+    const detallesPendientes = detallesPedido.filter((detalle: any) => !detalle.productoListo);
+    
+    // Mapear los detalles a productos con nombres
+    const todosProductos: ProductoPedido[] = detallesPendientes.map((detalle: any) => {
+      const productoInfo = productosCache[detalle.idProductoCore] || {};
+      return {
+        id: detalle.id,
+        idProductoCore: detalle.idProductoCore,
+        nombreProducto: productoInfo.nombre || detalle.idProductoCore,
+        cantidad: detalle.cantidad,
+        notas: detalle.notas || ''
+      };
+    });
+
+    // Filtrar solo hongos líquidos (productos que coinciden con la lista de microorganismos)
+    const productosLiquidos = todosProductos.filter(producto => 
+      microorganismos.some(m => {
+        const nombreMicro = m.nombre.toLowerCase();
+        const nombreProd = producto.nombreProducto.toLowerCase();
+        return nombreMicro === nombreProd ||
+               nombreProd.includes(nombreMicro) ||
+               nombreMicro.includes(nombreProd);
+      })
+    );
+
+    setProductosPedido(productosLiquidos);
+    setLoadingProductosPedido(false);
+    console.log(`🧪 Productos del pedido ${pedidoId}:`, todosProductos.length, '-> Hongos líquidos:', productosLiquidos.length);
+  };
+
+  // Cuando se selecciona un producto, auto-seleccionar el hongo correspondiente y cantidad
+  const handleProductoSeleccionado = (productoId: string) => {
+    setProductoSeleccionado(productoId);
+    
+    if (productoId) {
+      const producto = productosPedido.find(p => p.id === productoId);
+      if (producto) {
+        // Buscar el microorganismo que coincida con el nombre del producto
+        const microorganismoEncontrado = microorganismos.find(m => 
+          m.nombre.toLowerCase() === producto.nombreProducto.toLowerCase() ||
+          producto.nombreProducto.toLowerCase().includes(m.nombre.toLowerCase()) ||
+          m.nombre.toLowerCase().includes(producto.nombreProducto.toLowerCase())
+        );
+        
+        if (microorganismoEncontrado) {
+          setHongo(microorganismoEncontrado.nombre);
+          console.log(`🍄 Auto-seleccionado hongo: ${microorganismoEncontrado.nombre}`);
+        }
+
+        // Establecer la cantidad de litros pendientes del pedido
+        if (producto.cantidad && producto.cantidad > 0) {
+          setLitros(String(producto.cantidad));
+          // Calcular bidones automáticamente
+          setBidones(Math.ceil(producto.cantidad / 20).toString());
+          console.log(`📊 Auto-establecido litros pendientes: ${producto.cantidad}, bidones: ${Math.ceil(producto.cantidad / 20)}`);
+        }
+      }
+    } else {
+      // Si se deselecciona el producto, limpiar litros y bidones
+      setLitros('');
+      setBidones('');
     }
   };
 
@@ -444,6 +629,10 @@ export default function CosechaPage() {
         responsableEntregaId,
         registradoPor: user?.nombre || '',
         fechaCosecha: new Date().toISOString().split('T')[0],
+        // IDs de Sirius Core para pedidos
+        idPedidoCore: pedidoSeleccionado ? pedidosPendientes.find(p => p.id === pedidoSeleccionado)?.idPedidoCore : undefined,
+        idProductoCore: productoSeleccionado ? productosPedido.find(p => p.id === productoSeleccionado)?.idProductoCore : undefined,
+        idDetallePedido: productoSeleccionado || undefined, // Record ID del detalle para marcar como completado
         // Datos adicionales para trazabilidad
         lotesSeleccionados: hongo ? lotesSeleccionados : [],
         cantidadesLotes: hongo ? cantidadesLotes : {},
@@ -468,6 +657,12 @@ export default function CosechaPage() {
         setHoraInicio('');
         setHoraFin('');
         setCliente('');
+        setPedidoSeleccionado('');
+        setPedidosPendientes([]);
+        setProductosPedido([]);
+        setProductoSeleccionado('');
+        setDetallesCache({});
+        setProductosCache({});
         setNuevoCliente('');
         setNuevoClienteNit('');
         setHongo('');
@@ -618,6 +813,77 @@ export default function CosechaPage() {
                               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                             />
                           </div>
+                        </div>
+                      )}
+                      
+                      {/* Dropdown de Pedidos Pendientes */}
+                      {cliente && cliente !== 'nuevo' && (
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Pedido Asociado (opcional)
+                          </label>
+                          <select
+                            value={pedidoSeleccionado}
+                            onChange={(e) => setPedidoSeleccionado(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                            disabled={loadingPedidos}
+                          >
+                            <option value="">Sin pedido asociado</option>
+                            {loadingPedidos ? (
+                              <option disabled>Cargando pedidos...</option>
+                            ) : pedidosPendientes.length === 0 ? (
+                              <option disabled>No hay pedidos pendientes</option>
+                            ) : (
+                              pedidosPendientes.map((pedido) => (
+                                <option key={pedido.id} value={pedido.id}>
+                                  {pedido.idPedidoCore} - {new Date(pedido.fechaPedido).toLocaleDateString('es-CO')} ({pedido.estado})
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          {pedidosPendientes.length > 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              📦 {pedidosPendientes.length} pedido(s) pendiente(s) para este cliente
+                            </p>
+                          )}
+                          {pedidosPendientes.length === 0 && !loadingPedidos && cliente && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              ⚠️ Este cliente no tiene pedidos pendientes
+                            </p>
+                          )}
+
+                          {/* Dropdown de Productos del Pedido */}
+                          {pedidoSeleccionado && (
+                            <div className="mt-4">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Producto a Cosechar
+                              </label>
+                              <select
+                                value={productoSeleccionado}
+                                onChange={(e) => handleProductoSeleccionado(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
+                                disabled={loadingProductosPedido}
+                              >
+                                <option value="">Seleccionar producto...</option>
+                                {loadingProductosPedido ? (
+                                  <option disabled>Cargando productos...</option>
+                                ) : productosPedido.length === 0 ? (
+                                  <option disabled>No hay hongos líquidos en este pedido</option>
+                                ) : (
+                                  productosPedido.map((producto) => (
+                                    <option key={producto.id} value={producto.id}>
+                                      {producto.nombreProducto} - Cantidad: {producto.cantidad}
+                                    </option>
+                                  ))
+                                )}
+                              </select>
+                              {productosPedido.length > 0 && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  🧪 {productosPedido.length} hongo(s) líquido(s) en este pedido
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -951,10 +1217,11 @@ export default function CosechaPage() {
                       onChange={(e) => {
                         const selectedResponsable = e.target.value;
                         const selectedOption = e.target.options[e.target.selectedIndex];
-                        const selectedId = selectedOption.getAttribute('data-id') || '';
+                        // Usar idCore (SIRIUS-PER-XXXX) para guardar en campo de texto
+                        const selectedIdCore = selectedOption.getAttribute('data-idcore') || '';
                         
                         setResponsableEntrega(selectedResponsable);
-                        setResponsableEntregaId(selectedId);
+                        setResponsableEntregaId(selectedIdCore);
                       }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                       required
@@ -964,7 +1231,7 @@ export default function CosechaPage() {
                         {loadingResponsables ? 'Cargando responsables...' : 'Seleccione una persona'}
                       </option>
                       {responsables.map((responsable) => (
-                        <option key={responsable.id} value={responsable.nombre} data-id={responsable.id}>
+                        <option key={responsable.id} value={responsable.nombre} data-idcore={responsable.idCore || ''}>
                           {responsable.nombre}
                         </option>
                       ))}

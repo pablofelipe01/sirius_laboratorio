@@ -54,6 +54,13 @@ export const AIRTABLE_CONFIG = {
     CEPAS: process.env.AIRTABLE_TABLE_CEPAS!,
     SALIDA_FERMENTACION: process.env.AIRTABLE_TABLE_SALIDA_FERMENTACION,
     PRODUCTOS_APLICACION: process.env.AIRTABLE_TABLE_PRODUCTOS_APLICACION,
+  },
+  
+  // Field IDs para tabla Cosecha Laboratorio
+  FIELDS_COSECHA: {
+    ID_RESPONSABLE_CORE: process.env.AIRTABLE_FIELD_COSECHA_ID_RESPONSABLE_CORE!, // Texto con SIRIUS-PER-XXXX
+    ID_PEDIDO_CORE: process.env.AIRTABLE_FIELD_COSECHA_ID_PEDIDO_CORE!, // Texto con SIRIUS-PED-XXXX
+    ID_PRODUCTO_CORE: process.env.AIRTABLE_FIELD_COSECHA_ID_PRODUCTO_CORE!, // Long text con SIRIUS-PRODUCT-XXXX
   }
 } as const;
 
@@ -119,6 +126,7 @@ export const SIRIUS_PEDIDOS_CORE_CONFIG = {
     PRECIO_UNITARIO: process.env.AIRTABLE_FIELD_DETALLE_PED_PRECIO_UNITARIO!, // Currency
     SUBTOTAL: process.env.AIRTABLE_FIELD_DETALLE_PED_SUBTOTAL!,       // Currency
     NOTAS: process.env.AIRTABLE_FIELD_DETALLE_PED_NOTAS!,             // Long text
+    PRODUCTO_LISTO: process.env.AIRTABLE_FIELD_DETALLE_PED_PRODUCTO_LISTO!, // Checkbox
   },
   
   // Valores permitidos para Origen del Pedido

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
+  AIRTABLE_CONFIG,
   SIRIUS_INVENTARIO_CONFIG, 
+  SIRIUS_PEDIDOS_CORE_CONFIG,
   buildSiriusInventarioUrl, 
-  getSiriusInventarioHeaders 
+  buildSiriusPedidosCoreUrl,
+  getSiriusInventarioHeaders,
+  getSiriusPedidosCoreHeaders
 } from '@/lib/constants/airtable';
 import { ClienteMigrationService } from '@/lib/services/ClienteMigrationService';
 
@@ -101,17 +105,26 @@ export async function POST(request: NextRequest) {
     if (bolsasLotesTexto) fields[process.env.AIRTABLE_FIELD_COSECHA_BOLSAS_LOTES!] = bolsasLotesTexto;
     if (totalBolsas > 0) fields[process.env.AIRTABLE_FIELD_COSECHA_TOTAL_BOLSAS!] = totalBolsas;
     
-    // Campo responsable
+    // Campo ID Responsable Core (texto con código SIRIUS-PER-XXXX)
     if (body.responsableEntregaId) {
-      console.log('🔍 Intentando guardar responsable:', {
-        fieldId: process.env.AIRTABLE_FIELD_COSECHA_RESPONSABLE,
-        responsableId: body.responsableEntregaId
-      });
-      fields[process.env.AIRTABLE_FIELD_COSECHA_RESPONSABLE!] = [body.responsableEntregaId];
+      console.log('🔍 Guardando ID Responsable Core:', body.responsableEntregaId);
+      fields[AIRTABLE_CONFIG.FIELDS_COSECHA.ID_RESPONSABLE_CORE] = body.responsableEntregaId;
     }
 
     // Enlaces y campos de texto
     if (clienteCoreCode) fields[process.env.AIRTABLE_FIELD_COSECHA_CLIENTE_CORE_CODE!] = clienteCoreCode;
+    
+    // ID Pedido Core (campo de texto)
+    if (body.idPedidoCore) {
+      console.log('📦 Guardando ID Pedido Core:', body.idPedidoCore);
+      fields[AIRTABLE_CONFIG.FIELDS_COSECHA.ID_PEDIDO_CORE] = body.idPedidoCore;
+    }
+    
+    // ID Producto Core (campo long text)
+    if (body.idProductoCore) {
+      console.log('🧪 Guardando ID Producto Core:', body.idProductoCore);
+      fields[AIRTABLE_CONFIG.FIELDS_COSECHA.ID_PRODUCTO_CORE] = body.idProductoCore;
+    }
     
     // NUEVO: Guardar nombre de microorganismo como texto (desvincular tabla DataLab)
     if (body.hongo) fields[process.env.AIRTABLE_FIELD_COSECHA_MICROORGANISMO_TEXTO!] = body.hongo;
@@ -483,9 +496,9 @@ export async function POST(request: NextRequest) {
           [SIRIUS_INVENTARIO_CONFIG.FIELDS_MOVIMIENTOS.OBSERVACIONES]: observacionesInventario,
           // 🎯 TRAZABILIDAD CON CÓDIGOS LEGIBLES:
           // ubicacion_origen_id = LAB-COSE-XXXX (código de cosecha)
-          // ubicacion_destino_id = CL-XXXX (código de cliente)
+          // ubicacion_destino_id = SIRIUS-PED-XXXX (código de pedido)
           [SIRIUS_INVENTARIO_CONFIG.FIELDS_MOVIMIENTOS.UBICACION_ORIGEN_ID]: cosechaCode, // Código LAB-COSE-XXXX obtenido previamente
-          [SIRIUS_INVENTARIO_CONFIG.FIELDS_MOVIMIENTOS.UBICACION_DESTINO_ID]: clienteCoreCode || 'CL-NO-IDENTIFICADO' // Código CL-XXXX
+          [SIRIUS_INVENTARIO_CONFIG.FIELDS_MOVIMIENTOS.UBICACION_DESTINO_ID]: body.idPedidoCore || 'PED-NO-IDENTIFICADO' // ID del pedido
         }
       };
 
@@ -504,6 +517,38 @@ export async function POST(request: NextRequest) {
         const inventarioResult = await inventarioResponse.json();
         console.log('✅ Movimiento de inventario registrado:', inventarioResult.id);
         
+        // ============================================================
+        // MARCAR PRODUCTO COMO LISTO EN DETALLES DEL PEDIDO
+        // ============================================================
+        let productoListoActualizado = false;
+        if (body.idDetallePedido) {
+          try {
+            console.log('📦 Marcando producto como listo en detalle del pedido:', body.idDetallePedido);
+            
+            const detalleUrl = buildSiriusPedidosCoreUrl(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.DETALLES_PEDIDO, body.idDetallePedido);
+            
+            const detalleResponse = await fetch(detalleUrl, {
+              method: 'PATCH',
+              headers: getSiriusPedidosCoreHeaders(),
+              body: JSON.stringify({
+                fields: {
+                  [SIRIUS_PEDIDOS_CORE_CONFIG.FIELDS_DETALLES.PRODUCTO_LISTO]: true // Campo "Producto Listo" = checkbox marcado
+                }
+              }),
+            });
+
+            if (detalleResponse.ok) {
+              productoListoActualizado = true;
+              console.log('✅ Producto marcado como listo en detalle del pedido');
+            } else {
+              const errorDetalle = await detalleResponse.text();
+              console.error('⚠️ Error al marcar producto como listo:', errorDetalle);
+            }
+          } catch (detalleError) {
+            console.error('⚠️ Error al actualizar detalle del pedido:', detalleError);
+          }
+        }
+        
         return NextResponse.json({
           success: true,
           message: 'Cosecha registrada exitosamente con movimiento de inventario',
@@ -511,12 +556,27 @@ export async function POST(request: NextRequest) {
           salidaInoculacionIds,
           salidaCepasIds,
           movimientoInventarioId: inventarioResult.id,
+          productoListoActualizado,
           data: result.fields
         });
       } else {
         const errorData = await inventarioResponse.json();
         console.error('⚠️ Error al registrar movimiento de inventario:', errorData);
         // No fallar el proceso principal, la cosecha ya se creó correctamente
+        
+        // Aún así intentar marcar producto como listo
+        let productoListoActualizado = false;
+        if (body.idDetallePedido) {
+          try {
+            const detalleUrl = buildSiriusPedidosCoreUrl(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.DETALLES_PEDIDO, body.idDetallePedido);
+            const detalleResponse = await fetch(detalleUrl, {
+              method: 'PATCH',
+              headers: getSiriusPedidosCoreHeaders(),
+              body: JSON.stringify({ fields: { [SIRIUS_PEDIDOS_CORE_CONFIG.FIELDS_DETALLES.PRODUCTO_LISTO]: true } }),
+            });
+            productoListoActualizado = detalleResponse.ok;
+          } catch (e) { console.error('⚠️ Error marcando producto listo:', e); }
+        }
         
         return NextResponse.json({
           success: true,
@@ -525,6 +585,7 @@ export async function POST(request: NextRequest) {
           salidaInoculacionIds,
           salidaCepasIds,
           inventarioWarning: 'Error al registrar movimiento de inventario',
+          productoListoActualizado,
           data: result.fields
         });
       }
@@ -533,6 +594,20 @@ export async function POST(request: NextRequest) {
       console.error('❌ Error al procesar movimiento de inventario:', inventarioError);
       // No fallar el proceso principal
       
+      // Aún así intentar marcar producto como listo
+      let productoListoActualizado = false;
+      if (body.idDetallePedido) {
+        try {
+          const detalleUrl = buildSiriusPedidosCoreUrl(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.DETALLES_PEDIDO, body.idDetallePedido);
+          const detalleResponse = await fetch(detalleUrl, {
+            method: 'PATCH',
+            headers: getSiriusPedidosCoreHeaders(),
+            body: JSON.stringify({ fields: { [SIRIUS_PEDIDOS_CORE_CONFIG.FIELDS_DETALLES.PRODUCTO_LISTO]: true } }),
+          });
+          productoListoActualizado = detalleResponse.ok;
+        } catch (e) { console.error('⚠️ Error marcando producto listo:', e); }
+      }
+      
       return NextResponse.json({
         success: true,
         message: 'Cosecha registrada exitosamente (error en movimiento de inventario)',
@@ -540,6 +615,7 @@ export async function POST(request: NextRequest) {
         salidaInoculacionIds,
         salidaCepasIds,
         inventarioWarning: 'Error al procesar movimiento de inventario',
+        productoListoActualizado,
         data: result.fields
       });
     }

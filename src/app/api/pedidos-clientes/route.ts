@@ -21,9 +21,10 @@ interface DetallePedidoAirtable {
     'Detalle del Pedido'?: number;
     'Pedido'?: string[];
     'ID Producto Core'?: string; // Código del producto: "SIRIUS-PRODUCT-0004"
-    'Cantidad'?: number;
+    'Cantidad Pedido'?: number;
     'Precio unitario en el momento del pedido'?: number;
     'Notas del detalle'?: string;
+    'Producto Listo'?: boolean; // Checkbox para marcar producto como completado
   };
 }
 
@@ -80,6 +81,7 @@ interface DetallePedidoFormateado {
   cantidad: number;
   precioUnitario: number;
   notas: string;
+  productoListo: boolean; // Indica si el producto ya fue cosechado
 }
 
 // ============================================================================
@@ -193,9 +195,10 @@ export async function GET(request: NextRequest) {
                 detalleNumero: detalle.fields['Detalle del Pedido'] || 0,
                 pedidoId: pedidoId,
                 idProductoCore: idProductoCore, // Usar el código del producto directamente
-                cantidad: detalle.fields['Cantidad'] || 0,
+                cantidad: detalle.fields['Cantidad Pedido'] || 0,
                 precioUnitario: detalle.fields['Precio unitario en el momento del pedido'] || 0,
                 notas: detalle.fields['Notas del detalle'] || '',
+                productoListo: detalle.fields['Producto Listo'] === true, // Campo checkbox
               });
             });
           });
@@ -409,13 +412,13 @@ export async function POST(request: NextRequest) {
         // Campos de la tabla Detalles del Pedido:
         // - 'Pedido': Link to Pedidos
         // - 'ID Producto Core': Código del producto (SIRIUS-PRODUCT-XXXX)
-        // - 'Cantidad': Número
+        // - 'Cantidad Pedido': Número
         // - 'Precio unitario en el momento del pedido': Currency
         const detalleData = {
           fields: {
             'Pedido': [pedidoCreado.id],
             'ID Producto Core': codigoProducto,
-            'Cantidad': cantidad,
+            'Cantidad Pedido': cantidad,
             'Precio unitario en el momento del pedido': precioUnitario
           }
         };
@@ -470,7 +473,7 @@ export async function POST(request: NextRequest) {
         id: d.id,
         detalleNumero: d.fields['Detalle del Pedido'],
         idProductoCore: d.fields['ID Producto Core'],
-        cantidad: d.fields['Cantidad'],
+        cantidad: d.fields['Cantidad Pedido'],
       })),
       errores: erroresDetalles.length > 0 ? erroresDetalles : undefined,
       mensaje: todosDetallesCreados 

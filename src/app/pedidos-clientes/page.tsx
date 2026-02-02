@@ -30,14 +30,19 @@ interface Cliente {
 
 interface Pedido {
   id: string;
+  idPedidoCore: string;
+  idNumerico: number;
   clienteId: string;
   clienteNombre: string;
   fechaPedido: string;
   fechaEntrega?: string;
-  estado: 'pendiente' | 'en_proceso' | 'completado' | 'cancelado';
+  estado: string;
+  origen: string;
+  notas: string;
   productos: PedidoProducto[];
+  detallesIds: string[];
   total: number;
-  observaciones?: string;
+  createdTime: string;
 }
 
 interface PedidoProducto {
@@ -67,8 +72,8 @@ export default function PedidosClientesPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchClientes();
-      fetchPedidos();
+      // Cargar clientes primero, luego pedidos
+      fetchClientes().then(() => fetchPedidos());
     }
   }, [isAuthenticated]);
 
@@ -89,14 +94,49 @@ export default function PedidosClientesPage() {
   const fetchPedidos = async () => {
     try {
       setLoading(true);
-      // TODO: Crear API para pedidos
-      const response = await fetch('/api/pedidos-clientes');
+      // Obtener pedidos con detalles incluidos
+      const response = await fetch('/api/pedidos-clientes?incluirDetalles=true');
       const data = await response.json();
-      if (response.ok) {
-        setPedidos(data.pedidos || []);
+      if (response.ok && data.success) {
+        // Mapear pedidos con información adicional
+        const pedidosMapeados = (data.pedidos || []).map((pedido: any) => {
+          // Buscar nombre del cliente
+          const cliente = clientes.find(c => c.id === pedido.clienteId || c.codigo === pedido.clienteId);
+          
+          // Obtener detalles del pedido
+          const detallesPedido = data.detalles?.[pedido.id] || [];
+          
+          // Calcular total sumando cantidades * precios
+          const total = detallesPedido.reduce((sum: number, det: any) => {
+            return sum + ((det.cantidad || 0) * (det.precioUnitario || 0));
+          }, 0);
+          
+          // Mapear productos con nombres
+          const productos = detallesPedido.map((det: any) => {
+            const productoInfo = data.productos?.[det.idProductoCore] || {};
+            return {
+              productoId: det.id,
+              nombreProducto: productoInfo.nombre || det.idProductoCore,
+              cantidad: det.cantidad || 0,
+              unidad: 'litros',
+              precioUnitario: det.precioUnitario || 0,
+              subtotal: (det.cantidad || 0) * (det.precioUnitario || 0)
+            };
+          });
+          
+          return {
+            ...pedido,
+            clienteNombre: cliente?.nombre || pedido.clienteId || 'Cliente desconocido',
+            productos,
+            total
+          };
+        });
+        
+        setPedidos(pedidosMapeados);
+        console.log('📦 Pedidos cargados:', pedidosMapeados.length);
       } else {
         console.error('Error loading pedidos:', data.error);
-        setPedidos([]); // Datos de ejemplo por ahora
+        setPedidos([]);
       }
     } catch (error) {
       console.error('Error fetching pedidos:', error);
@@ -145,10 +185,13 @@ export default function PedidosClientesPage() {
 
   const getEstadoColor = (estado: string) => {
     switch (estado.toLowerCase()) {
-      case 'pendiente': return 'bg-yellow-100 text-yellow-800';
+      case 'recibido': return 'bg-yellow-100 text-yellow-800';
+      case 'procesando': return 'bg-blue-100 text-blue-800';
       case 'en_proceso': return 'bg-blue-100 text-blue-800';
       case 'completado': return 'bg-green-100 text-green-800';
+      case 'entregado': return 'bg-green-100 text-green-800';
       case 'cancelado': return 'bg-red-100 text-red-800';
+      case 'pendiente': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -162,6 +205,9 @@ export default function PedidosClientesPage() {
   };
 
   const formatearPrecio = (precio: number) => {
+    if (isNaN(precio) || precio === undefined || precio === null) {
+      return '$ 0';
+    }
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -171,11 +217,22 @@ export default function PedidosClientesPage() {
 
   // Filtrar pedidos
   const pedidosFiltrados = pedidos.filter(pedido => {
-    const matchCliente = !filtroCliente || pedido.clienteNombre.toLowerCase().includes(filtroCliente.toLowerCase());
-    const matchEstado = !filtroEstado || pedido.estado === filtroEstado;
+    const matchCliente = !filtroCliente || 
+      pedido.clienteNombre.toLowerCase().includes(filtroCliente.toLowerCase()) ||
+      pedido.idPedidoCore?.toLowerCase().includes(filtroCliente.toLowerCase()) ||
+      pedido.notas?.toLowerCase().includes(filtroCliente.toLowerCase());
+    const matchEstado = !filtroEstado || pedido.estado.toLowerCase() === filtroEstado.toLowerCase();
     const matchFecha = !filtroFecha || pedido.fechaPedido.includes(filtroFecha);
     return matchCliente && matchEstado && matchFecha;
   });
+
+  // Estadísticas con estados de Airtable
+  const estadisticas = {
+    total: pedidos.length,
+    recibidos: pedidos.filter(p => p.estado.toLowerCase() === 'recibido').length,
+    procesando: pedidos.filter(p => p.estado.toLowerCase() === 'procesando').length,
+    entregados: pedidos.filter(p => p.estado.toLowerCase() === 'entregado' || p.estado.toLowerCase() === 'completado').length,
+  };
 
   if (!isAuthenticated) {
     return (
@@ -247,10 +304,10 @@ export default function PedidosClientesPage() {
                     className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Todos los estados</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="en_proceso">En Proceso</option>
-                    <option value="completado">Completado</option>
-                    <option value="cancelado">Cancelado</option>
+                    <option value="Recibido">Recibido</option>
+                    <option value="Procesando">Procesando</option>
+                    <option value="Entregado">Entregado</option>
+                    <option value="Cancelado">Cancelado</option>
                   </select>
                   <input
                     type="date"
@@ -267,27 +324,27 @@ export default function PedidosClientesPage() {
               <div className="bg-white rounded-lg shadow-lg p-6 text-center">
                 <div className="text-3xl mb-2">📋</div>
                 <p className="text-sm font-medium text-gray-500">Total Pedidos</p>
-                <p className="text-2xl font-bold text-gray-900">{pedidos.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{estadisticas.total}</p>
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-                <div className="text-3xl mb-2">⏳</div>
-                <p className="text-sm font-medium text-gray-500">Pendientes</p>
+                <div className="text-3xl mb-2">📩</div>
+                <p className="text-sm font-medium text-gray-500">Recibidos</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {pedidos.filter(p => p.estado === 'pendiente').length}
+                  {estadisticas.recibidos}
                 </p>
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6 text-center">
                 <div className="text-3xl mb-2">🔄</div>
-                <p className="text-sm font-medium text-gray-500">En Proceso</p>
+                <p className="text-sm font-medium text-gray-500">Procesando</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {pedidos.filter(p => p.estado === 'en_proceso').length}
+                  {estadisticas.procesando}
                 </p>
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6 text-center">
                 <div className="text-3xl mb-2">✅</div>
-                <p className="text-sm font-medium text-gray-500">Completados</p>
+                <p className="text-sm font-medium text-gray-500">Entregados</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {pedidos.filter(p => p.estado === 'completado').length}
+                  {estadisticas.entregados}
                 </p>
               </div>
             </div>
@@ -351,7 +408,9 @@ export default function PedidosClientesPage() {
                   {pedidosFiltrados.map((pedido) => (
                     <tr key={pedido.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">#{pedido.id}</div>
+                        <div className="text-sm font-medium text-blue-600">
+                          {pedido.idPedidoCore || `PED-${pedido.idNumerico || '?'}`}
+                        </div>
                         <div className="text-xs text-gray-500">
                           {pedido.productos?.length || 0} producto(s)
                         </div>
@@ -359,6 +418,9 @@ export default function PedidosClientesPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
                           {pedido.clienteNombre}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {pedido.clienteId}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
