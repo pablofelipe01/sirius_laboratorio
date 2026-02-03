@@ -683,10 +683,14 @@ export default function CosechaPage() {
         }, 3000);
       } else {
         setSubmitStatus('error');
-        setErrorMessage(result.error || 'Error al registrar la cosecha');
+        // Mostrar más detalles del error
+        const errorDetail = result.details ? ` (${result.details})` : '';
+        setErrorMessage(result.error || 'Error al registrar la cosecha' + errorDetail);
+        console.error('❌ Error en cosecha:', result);
       }
     } catch (error) {
       setSubmitStatus('error');
+      console.error('❌ Error de conexión en cosecha:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Error de conexión. Por favor, intente nuevamente.');
     } finally {
       setIsSubmitting(false);

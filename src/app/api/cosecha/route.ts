@@ -14,12 +14,20 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    console.log('🌾 Creando nuevo registro de cosecha:', {
+    console.log('🌾 ===== INICIO PROCESO DE COSECHA =====');
+    console.log('🌾 Datos recibidos:', JSON.stringify({
       cliente: body.cliente,
       hongo: body.hongo,
       litros: body.litros,
+      bidones: body.bidones,
+      idPedidoCore: body.idPedidoCore,
+      idProductoCore: body.idProductoCore,
+      idDetallePedido: body.idDetallePedido,
+      responsableEntregaId: body.responsableEntregaId,
+      lotesSeleccionados: body.lotesSeleccionados?.length || 0,
+      cepasSeleccionadas: body.cepasSeleccionadas?.length || 0,
       timestamp: new Date().toISOString()
-    });
+    }, null, 2));
 
     // Buscar cliente en Sirius Client Core
     let clienteCoreId = null;
@@ -92,50 +100,108 @@ export async function POST(request: NextRequest) {
     const bolsasLotesTexto = body.lotes?.map((lote: { lote: string; bolsas: string }) => lote.bolsas).join(',') || '';
     const totalBolsas = body.lotes?.reduce((total: number, lote: { lote: string; bolsas: string }) => total + (parseInt(lote.bolsas) || 0), 0) || 0;
 
+    console.log('📋 Lotes procesados:', { lotesTexto, bolsasLotesTexto, totalBolsas });
+
+    // Verificar variables de entorno críticas para cosecha
+    const envCheck = {
+      AIRTABLE_BASE_ID: !!process.env.AIRTABLE_BASE_ID,
+      AIRTABLE_API_KEY: !!process.env.AIRTABLE_API_KEY,
+      AIRTABLE_TABLE_COSECHA_LABORATORIO: !!process.env.AIRTABLE_TABLE_COSECHA_LABORATORIO,
+      AIRTABLE_FIELD_COSECHA_HORA_INICIO: !!process.env.AIRTABLE_FIELD_COSECHA_HORA_INICIO,
+      AIRTABLE_FIELD_COSECHA_HORA_FIN: !!process.env.AIRTABLE_FIELD_COSECHA_HORA_FIN,
+      AIRTABLE_FIELD_COSECHA_LITROS: !!process.env.AIRTABLE_FIELD_COSECHA_LITROS,
+      AIRTABLE_FIELD_COSECHA_BIDONES: !!process.env.AIRTABLE_FIELD_COSECHA_BIDONES,
+      AIRTABLE_FIELD_COSECHA_LOTES: !!process.env.AIRTABLE_FIELD_COSECHA_LOTES,
+      AIRTABLE_FIELD_COSECHA_BOLSAS_LOTES: !!process.env.AIRTABLE_FIELD_COSECHA_BOLSAS_LOTES,
+      AIRTABLE_FIELD_COSECHA_TOTAL_BOLSAS: !!process.env.AIRTABLE_FIELD_COSECHA_TOTAL_BOLSAS,
+      AIRTABLE_FIELD_COSECHA_REALIZA_REGISTRO: !!process.env.AIRTABLE_FIELD_COSECHA_REALIZA_REGISTRO,
+      AIRTABLE_FIELD_COSECHA_CLIENTE_CORE_CODE: !!process.env.AIRTABLE_FIELD_COSECHA_CLIENTE_CORE_CODE,
+      AIRTABLE_FIELD_COSECHA_MICROORGANISMO_TEXTO: !!process.env.AIRTABLE_FIELD_COSECHA_MICROORGANISMO_TEXTO,
+      FIELDS_COSECHA_ID_RESPONSABLE_CORE: !!AIRTABLE_CONFIG.FIELDS_COSECHA?.ID_RESPONSABLE_CORE,
+      FIELDS_COSECHA_ID_PEDIDO_CORE: !!AIRTABLE_CONFIG.FIELDS_COSECHA?.ID_PEDIDO_CORE,
+      FIELDS_COSECHA_ID_PRODUCTO_CORE: !!AIRTABLE_CONFIG.FIELDS_COSECHA?.ID_PRODUCTO_CORE,
+    };
+    
+    const missingEnvVars = Object.entries(envCheck).filter(([, value]) => !value).map(([key]) => key);
+    if (missingEnvVars.length > 0) {
+      console.error('❌ Variables de entorno FALTANTES:', missingEnvVars);
+    } else {
+      console.log('✅ Todas las variables de entorno de cosecha están configuradas');
+    }
+
     // Preparar los datos con Field IDs específicos
     const fields: Record<string, unknown> = {};
 
     // Campos obligatorios con Field IDs
-    if (horaInicioISO) fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_INICIO!] = horaInicioISO;
-    if (horaFinISO) fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_FIN!] = horaFinISO;
-    if (body.registradoPor) fields[process.env.AIRTABLE_FIELD_COSECHA_REALIZA_REGISTRO!] = body.registradoPor;
-    if (body.litros) fields[process.env.AIRTABLE_FIELD_COSECHA_LITROS!] = parseFloat(body.litros);
-    if (body.bidones) fields[process.env.AIRTABLE_FIELD_COSECHA_BIDONES!] = parseFloat(body.bidones);
-    if (lotesTexto) fields[process.env.AIRTABLE_FIELD_COSECHA_LOTES!] = lotesTexto;
-    if (bolsasLotesTexto) fields[process.env.AIRTABLE_FIELD_COSECHA_BOLSAS_LOTES!] = bolsasLotesTexto;
-    if (totalBolsas > 0) fields[process.env.AIRTABLE_FIELD_COSECHA_TOTAL_BOLSAS!] = totalBolsas;
+    if (horaInicioISO && process.env.AIRTABLE_FIELD_COSECHA_HORA_INICIO) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_INICIO] = horaInicioISO;
+    }
+    if (horaFinISO && process.env.AIRTABLE_FIELD_COSECHA_HORA_FIN) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_HORA_FIN] = horaFinISO;
+    }
+    if (body.registradoPor && process.env.AIRTABLE_FIELD_COSECHA_REALIZA_REGISTRO) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_REALIZA_REGISTRO] = body.registradoPor;
+    }
+    if (body.litros && process.env.AIRTABLE_FIELD_COSECHA_LITROS) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_LITROS] = parseFloat(body.litros);
+    }
+    if (body.bidones && process.env.AIRTABLE_FIELD_COSECHA_BIDONES) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_BIDONES] = parseFloat(body.bidones);
+    }
+    if (lotesTexto && process.env.AIRTABLE_FIELD_COSECHA_LOTES) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_LOTES] = lotesTexto;
+    }
+    if (bolsasLotesTexto && process.env.AIRTABLE_FIELD_COSECHA_BOLSAS_LOTES) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_BOLSAS_LOTES] = bolsasLotesTexto;
+    }
+    if (totalBolsas > 0 && process.env.AIRTABLE_FIELD_COSECHA_TOTAL_BOLSAS) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_TOTAL_BOLSAS] = totalBolsas;
+    }
     
     // Campo ID Responsable Core (texto con código SIRIUS-PER-XXXX)
-    if (body.responsableEntregaId) {
+    if (body.responsableEntregaId && AIRTABLE_CONFIG.FIELDS_COSECHA?.ID_RESPONSABLE_CORE) {
       console.log('🔍 Guardando ID Responsable Core:', body.responsableEntregaId);
       fields[AIRTABLE_CONFIG.FIELDS_COSECHA.ID_RESPONSABLE_CORE] = body.responsableEntregaId;
+    } else if (body.responsableEntregaId) {
+      console.log('⚠️ No se puede guardar ID Responsable Core: variable de entorno no configurada');
     }
 
     // Enlaces y campos de texto
-    if (clienteCoreCode) fields[process.env.AIRTABLE_FIELD_COSECHA_CLIENTE_CORE_CODE!] = clienteCoreCode;
+    if (clienteCoreCode && process.env.AIRTABLE_FIELD_COSECHA_CLIENTE_CORE_CODE) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_CLIENTE_CORE_CODE] = clienteCoreCode;
+    }
     
     // ID Pedido Core (campo de texto)
-    if (body.idPedidoCore) {
+    if (body.idPedidoCore && AIRTABLE_CONFIG.FIELDS_COSECHA?.ID_PEDIDO_CORE) {
       console.log('📦 Guardando ID Pedido Core:', body.idPedidoCore);
       fields[AIRTABLE_CONFIG.FIELDS_COSECHA.ID_PEDIDO_CORE] = body.idPedidoCore;
+    } else if (body.idPedidoCore) {
+      console.log('⚠️ No se puede guardar ID Pedido Core: variable de entorno no configurada');
     }
     
     // ID Producto Core (campo long text)
-    if (body.idProductoCore) {
+    if (body.idProductoCore && AIRTABLE_CONFIG.FIELDS_COSECHA?.ID_PRODUCTO_CORE) {
       console.log('🧪 Guardando ID Producto Core:', body.idProductoCore);
       fields[AIRTABLE_CONFIG.FIELDS_COSECHA.ID_PRODUCTO_CORE] = body.idProductoCore;
+    } else if (body.idProductoCore) {
+      console.log('⚠️ No se puede guardar ID Producto Core: variable de entorno no configurada');
     }
     
     // NUEVO: Guardar nombre de microorganismo como texto (desvincular tabla DataLab)
-    if (body.hongo) fields[process.env.AIRTABLE_FIELD_COSECHA_MICROORGANISMO_TEXTO!] = body.hongo;
+    if (body.hongo && process.env.AIRTABLE_FIELD_COSECHA_MICROORGANISMO_TEXTO) {
+      fields[process.env.AIRTABLE_FIELD_COSECHA_MICROORGANISMO_TEXTO] = body.hongo;
+    }
     
     // NOTA: Ya no vincular con tabla Microorganismos de DataLab
     // if (microorganismoId) fields[process.env.AIRTABLE_FIELD_COSECHA_MICROORGANISMOS!] = [microorganismoId];
 
-    console.log('📝 Datos preparados para Airtable:', fields);
+    console.log('📝 Datos preparados para Airtable:', JSON.stringify(fields, null, 2));
+    console.log('📝 Field IDs utilizados:', Object.keys(fields));
 
     // Variable para almacenar el código de cosecha (se actualizará después de crear el registro)
     let cosechaCode = '';
+
+    console.log('🔗 URL Airtable:', `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_COSECHA_LABORATORIO}`);
 
     // Crear el registro en Airtable
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_COSECHA_LABORATORIO}`, {
@@ -151,11 +217,14 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('❌ Error de Airtable:', errorData);
+      console.error('❌ Error de Airtable al crear cosecha:');
+      console.error('❌ Status:', response.status);
+      console.error('❌ Respuesta:', JSON.stringify(errorData, null, 2));
       throw new Error(`Airtable API error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
     const result = await response.json();
+    console.log('✅ Cosecha creada en Airtable:', result.id);
 
     // Los campos calculados/fórmula NO se devuelven en respuesta POST, hacer GET
     console.log('🔄 Consultando registro para obtener campo ID (fórmula)...');
@@ -621,12 +690,39 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('❌ Error al crear cosecha:', error);
+    console.error('❌ ===== ERROR EN PROCESO DE COSECHA =====');
+    console.error('❌ Error:', error);
+    console.error('❌ Stack:', error instanceof Error ? error.stack : 'No stack disponible');
+    
+    // Extraer mensaje de error más específico
+    let errorMessage = 'Error al registrar la cosecha';
+    let errorDetails = 'Error desconocido';
+    
+    if (error instanceof Error) {
+      errorDetails = error.message;
+      
+      // Detectar errores comunes de Airtable
+      if (error.message.includes('UNKNOWN_FIELD_NAME')) {
+        errorMessage = 'Error de configuración: campo de Airtable no encontrado';
+      } else if (error.message.includes('INVALID_REQUEST_UNKNOWN_FIELD')) {
+        errorMessage = 'Error de configuración: campo inválido en la solicitud';
+      } else if (error.message.includes('INVALID_PERMISSIONS')) {
+        errorMessage = 'Error de permisos: sin acceso a la base de datos';
+      } else if (error.message.includes('INVALID_API_KEY')) {
+        errorMessage = 'Error de autenticación: API key inválida';
+      } else if (error.message.includes('TABLE_NOT_FOUND')) {
+        errorMessage = 'Error de configuración: tabla no encontrada';
+      } else if (error.message.includes('NOT_FOUND')) {
+        errorMessage = 'Error: registro o recurso no encontrado';
+      }
+    }
+    
     return NextResponse.json(
       { 
         success: false,
-        error: 'Error al registrar la cosecha',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        error: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     );

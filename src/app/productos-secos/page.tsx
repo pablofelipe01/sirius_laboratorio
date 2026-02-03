@@ -1,136 +1,274 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Package, Plus, Search, Calendar, User, Scale, Trash2, Edit, Save, X } from 'lucide-react';
+import { Package, Plus, Search, Calendar, Scale, Save, X, ChevronDown, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 
-interface ProductoSeco {
+// ============================================================================
+// Interfaces
+// ============================================================================
+
+interface ProductoCatalogo {
   id: string;
+  airtableId: string;
+  codigo: string;
   nombre: string;
+  categoria: string[];
+  tipo: string;
+  unidadBase: string;
+  activo: boolean;
+  observaciones?: string;
+  idNumerico: number;
+  area?: string;
+  precioVentaUnitario: number;
+}
+
+interface MovimientoHistorial {
+  id: string;
+  idMovimiento: string;
+  productoId: string;
+  tipo: string;
   cantidad: number;
-  unidad: string;
-  fechaIngreso: string;
-  proveedor: string;
-  lote: string;
-  fechaVencimiento: string;
+  unidadMedida: string;
+  motivo: string;
+  documentoReferencia: string;
   responsable: string;
-  notas: string;
+  fechaMovimiento: string;
+  observaciones: string;
+  createdTime: string;
 }
 
-interface NuevoProducto {
-  nombre: string;
+interface NuevoIngreso {
+  productoId: string;
   cantidad: string;
-  unidad: string;
   proveedor: string;
   lote: string;
   fechaVencimiento: string;
+  numeroFactura: string;
   notas: string;
 }
 
+// ============================================================================
+// Estilos para placeholders negros
+// ============================================================================
+const inputStyles = `
+  w-full px-4 py-3 border border-gray-300 rounded-lg 
+  focus:ring-2 focus:ring-blue-500 focus:border-transparent
+  placeholder:text-gray-800 placeholder:opacity-70
+  text-gray-900
+`;
+
+const selectStyles = `
+  w-full px-4 py-3 border border-gray-300 rounded-lg 
+  focus:ring-2 focus:ring-blue-500 focus:border-transparent
+  text-gray-900 bg-white
+  appearance-none cursor-pointer
+`;
+
+// ============================================================================
+// Componente Principal
+// ============================================================================
 export default function ProductosSecosPage() {
   const { user, isAuthenticated } = useAuth();
-  const [productos, setProductos] = useState<ProductoSeco[]>([]);
+  
+  // Estados principales
+  const [productosCatalogo, setProductosCatalogo] = useState<ProductoCatalogo[]>([]);
+  const [historial, setHistorial] = useState<MovimientoHistorial[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [filtro, setFiltro] = useState('');
-  const [nuevoProducto, setNuevoProducto] = useState<NuevoProducto>({
-    nombre: '',
+  
+  // Estado del formulario
+  const [nuevoIngreso, setNuevoIngreso] = useState<NuevoIngreso>({
+    productoId: '',
     cantidad: '',
-    unidad: 'kg',
     proveedor: '',
     lote: '',
     fechaVencimiento: '',
+    numeroFactura: '',
     notas: ''
   });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchProductos();
-    }
-  }, [isAuthenticated]);
-
-  const fetchProductos = async () => {
+  // ============================================================================
+  // Cargar datos iniciales
+  // ============================================================================
+  const fetchProductosCatalogo = useCallback(async () => {
     try {
       setLoading(true);
-      // TODO: Implementar API para productos secos
-      // Por ahora, datos de ejemplo
-      const datosEjemplo: ProductoSeco[] = [];
-      setProductos(datosEjemplo);
+      const response = await fetch('/api/productos-secos');
+      const data = await response.json();
+      
+      if (data.success) {
+        setProductosCatalogo(data.productos || []);
+        console.log(`✅ ${data.productos?.length || 0} productos secos cargados del catálogo`);
+      } else {
+        console.error('❌ Error cargando productos:', data.error);
+      }
     } catch (error) {
-      console.error('Error fetching productos:', error);
+      console.error('❌ Error en fetch productos:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
+  const fetchHistorial = useCallback(async () => {
+    try {
+      setLoadingHistorial(true);
+      const response = await fetch('/api/productos-secos?incluirHistorial=true');
+      const data = await response.json();
+      
+      if (data.success && data.historial) {
+        setHistorial(data.historial || []);
+        console.log(`✅ ${data.historial?.length || 0} movimientos cargados`);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando historial:', error);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchProductosCatalogo();
+      fetchHistorial();
+    }
+  }, [isAuthenticated, fetchProductosCatalogo, fetchHistorial]);
+
+  // ============================================================================
+  // Manejar envío del formulario
+  // ============================================================================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitStatus('idle');
+    setErrorMessage('');
+    setSuccessMessage('');
 
     try {
-      // TODO: Implementar guardado en API
-      console.log('Guardando producto seco:', nuevoProducto);
+      // Validaciones
+      if (!nuevoIngreso.productoId) {
+        throw new Error('Debes seleccionar un producto');
+      }
       
-      // Simular guardado exitoso
-      const productoNuevo: ProductoSeco = {
-        id: `PS-${Date.now()}`,
-        nombre: nuevoProducto.nombre,
-        cantidad: parseFloat(nuevoProducto.cantidad) || 0,
-        unidad: nuevoProducto.unidad,
-        fechaIngreso: new Date().toISOString(),
-        proveedor: nuevoProducto.proveedor,
-        lote: nuevoProducto.lote,
-        fechaVencimiento: nuevoProducto.fechaVencimiento,
-        responsable: user?.nombre || 'Usuario',
-        notas: nuevoProducto.notas
-      };
+      const cantidad = parseFloat(nuevoIngreso.cantidad);
+      if (isNaN(cantidad) || cantidad <= 0) {
+        throw new Error('La cantidad debe ser mayor a 0');
+      }
 
-      setProductos(prev => [productoNuevo, ...prev]);
-      setSubmitStatus('success');
-      setShowForm(false);
-      resetForm();
-      
-      setTimeout(() => setSubmitStatus('idle'), 3000);
+      // Enviar al API
+      const response = await fetch('/api/productos-secos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productoId: nuevoIngreso.productoId,
+          cantidad: cantidad,
+          proveedor: nuevoIngreso.proveedor,
+          lote: nuevoIngreso.lote,
+          fechaVencimiento: nuevoIngreso.fechaVencimiento,
+          numeroFactura: nuevoIngreso.numeroFactura,
+          notas: nuevoIngreso.notas,
+          responsable: user?.nombre || 'Usuario',
+          fechaMovimiento: new Date().toISOString()
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSubmitStatus('success');
+        setSuccessMessage(data.mensaje || 'Ingreso registrado exitosamente');
+        setShowForm(false);
+        resetForm();
+        
+        // Recargar historial
+        fetchHistorial();
+        
+        setTimeout(() => {
+          setSubmitStatus('idle');
+          setSuccessMessage('');
+        }, 5000);
+      } else {
+        throw new Error(data.error || 'Error al registrar el ingreso');
+      }
     } catch (error) {
-      console.error('Error guardando producto:', error);
+      console.error('❌ Error guardando ingreso:', error);
       setSubmitStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Error desconocido');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const resetForm = () => {
-    setNuevoProducto({
-      nombre: '',
+    setNuevoIngreso({
+      productoId: '',
       cantidad: '',
-      unidad: 'kg',
       proveedor: '',
       lote: '',
       fechaVencimiento: '',
+      numeroFactura: '',
       notas: ''
     });
   };
 
+  // ============================================================================
+  // Formatear fecha
+  // ============================================================================
   const formatearFecha = (fecha: string) => {
     if (!fecha) return '-';
     return new Date(fecha).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
-  const productosFiltrados = productos.filter(p => 
-    p.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
-    p.proveedor.toLowerCase().includes(filtro.toLowerCase()) ||
-    p.lote.toLowerCase().includes(filtro.toLowerCase())
-  );
+  // ============================================================================
+  // Obtener nombre del producto por código
+  // ============================================================================
+  const getNombreProducto = (productoId: string) => {
+    const producto = productosCatalogo.find(p => p.codigo === productoId || p.id === productoId);
+    return producto?.nombre || productoId;
+  };
 
+  // ============================================================================
+  // Filtrar historial
+  // ============================================================================
+  const historialFiltrado = historial.filter(mov => {
+    const nombreProducto = getNombreProducto(mov.productoId);
+    const busqueda = filtro.toLowerCase();
+    return (
+      nombreProducto.toLowerCase().includes(busqueda) ||
+      mov.productoId.toLowerCase().includes(busqueda) ||
+      mov.responsable.toLowerCase().includes(busqueda) ||
+      mov.observaciones.toLowerCase().includes(busqueda)
+    );
+  });
+
+  // ============================================================================
+  // Calcular estadísticas
+  // ============================================================================
+  const ingresosHoy = historial.filter(mov => {
+    const hoy = new Date().toDateString();
+    return new Date(mov.fechaMovimiento).toDateString() === hoy;
+  });
+
+  const totalKgHoy = ingresosHoy.reduce((sum, mov) => sum + mov.cantidad, 0);
+
+  // ============================================================================
+  // Render: No autenticado
+  // ============================================================================
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -143,6 +281,9 @@ export default function ProductosSecosPage() {
     );
   }
 
+  // ============================================================================
+  // Render Principal
+  // ============================================================================
   return (
     <>
       <Navbar />
@@ -165,7 +306,7 @@ export default function ProductosSecosPage() {
                 INGRESO DE PRODUCTOS SECOS
               </h1>
               <p className="text-gray-600">
-                Registro y control de productos secos del laboratorio
+                Registro de compras e ingreso de productos secos del laboratorio
               </p>
             </div>
 
@@ -177,10 +318,10 @@ export default function ProductosSecosPage() {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                     <input
                       type="text"
-                      placeholder="Buscar por nombre, proveedor o lote..."
+                      placeholder="Buscar por producto, responsable..."
                       value={filtro}
                       onChange={(e) => setFiltro(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={`${inputStyles} pl-10`}
                     />
                   </div>
                 </div>
@@ -193,15 +334,17 @@ export default function ProductosSecosPage() {
                 </button>
               </div>
 
-              {/* Mensaje de éxito/error */}
+              {/* Mensajes de éxito/error */}
               {submitStatus === 'success' && (
-                <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
-                  ✅ Producto registrado exitosamente
+                <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
+                  <CheckCircle size={20} />
+                  {successMessage}
                 </div>
               )}
               {submitStatus === 'error' && (
-                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
-                  ❌ Error al registrar el producto
+                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
+                  <AlertCircle size={20} />
+                  {errorMessage}
                 </div>
               )}
 
@@ -210,141 +353,172 @@ export default function ProductosSecosPage() {
                 <form onSubmit={handleSubmit} className="bg-gray-50 rounded-lg p-6 mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                     <Package size={20} />
-                    Registrar Nuevo Producto Seco
+                    Registrar Ingreso de Producto Seco (Compra)
                   </h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Nombre del producto */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nombre del Producto *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={nuevoProducto.nombre}
-                        onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Ej: Harina de soya"
-                      />
+                  {loading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="animate-spin mx-auto text-blue-600" size={32} />
+                      <p className="mt-2 text-gray-600">Cargando productos del catálogo...</p>
                     </div>
+                  ) : productosCatalogo.length === 0 ? (
+                    <div className="text-center py-8 bg-yellow-50 rounded-lg">
+                      <AlertCircle className="mx-auto text-yellow-600 mb-2" size={32} />
+                      <p className="text-yellow-800 font-medium">No hay productos secos en el catálogo</p>
+                      <p className="text-yellow-700 text-sm">
+                        Contacta al administrador para agregar productos con unidad en kg al área de Laboratorio.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Selector de Producto */}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Producto *
+                        </label>
+                        <div className="relative">
+                          <select
+                            required
+                            value={nuevoIngreso.productoId}
+                            onChange={(e) => setNuevoIngreso({...nuevoIngreso, productoId: e.target.value})}
+                            className={selectStyles}
+                          >
+                            <option value="" className="text-gray-800">Seleccionar producto del catálogo</option>
+                            {productosCatalogo.map((producto) => (
+                              <option key={producto.id} value={producto.id} className="text-gray-900">
+                                {producto.nombre} ({producto.codigo}) - {producto.unidadBase}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                        </div>
+                      </div>
 
-                    {/* Cantidad */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Cantidad *
-                      </label>
-                      <div className="flex gap-2">
+                      {/* Cantidad */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Cantidad (kg) *
+                        </label>
+                        <div className="relative">
+                          <Scale className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                          <input
+                            type="number"
+                            required
+                            step="0.01"
+                            min="0.01"
+                            value={nuevoIngreso.cantidad}
+                            onChange={(e) => setNuevoIngreso({...nuevoIngreso, cantidad: e.target.value})}
+                            className={`${inputStyles} pl-10`}
+                            placeholder="Cantidad en kilogramos"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Proveedor */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Proveedor
+                        </label>
                         <input
-                          type="number"
-                          required
-                          step="0.01"
-                          min="0"
-                          value={nuevoProducto.cantidad}
-                          onChange={(e) => setNuevoProducto({...nuevoProducto, cantidad: e.target.value})}
-                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="0"
+                          type="text"
+                          value={nuevoIngreso.proveedor}
+                          onChange={(e) => setNuevoIngreso({...nuevoIngreso, proveedor: e.target.value})}
+                          className={inputStyles}
+                          placeholder="Nombre del proveedor"
                         />
-                        <select
-                          value={nuevoProducto.unidad}
-                          onChange={(e) => setNuevoProducto({...nuevoProducto, unidad: e.target.value})}
-                          className="w-24 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="kg">kg</option>
-                          <option value="g">g</option>
-                          <option value="lb">lb</option>
-                          <option value="unidades">unidades</option>
-                          <option value="bultos">bultos</option>
-                          <option value="sacos">sacos</option>
-                        </select>
+                      </div>
+
+                      {/* Número de Lote */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Número de Lote
+                        </label>
+                        <input
+                          type="text"
+                          value={nuevoIngreso.lote}
+                          onChange={(e) => setNuevoIngreso({...nuevoIngreso, lote: e.target.value})}
+                          className={inputStyles}
+                          placeholder="LOT-2026-001"
+                        />
+                      </div>
+
+                      {/* Número de Factura */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          N° Factura / Documento
+                        </label>
+                        <input
+                          type="text"
+                          value={nuevoIngreso.numeroFactura}
+                          onChange={(e) => setNuevoIngreso({...nuevoIngreso, numeroFactura: e.target.value})}
+                          className={inputStyles}
+                          placeholder="FAC-2026-0001"
+                        />
+                      </div>
+
+                      {/* Fecha de vencimiento */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Fecha de Vencimiento
+                        </label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                          <input
+                            type="date"
+                            value={nuevoIngreso.fechaVencimiento}
+                            onChange={(e) => setNuevoIngreso({...nuevoIngreso, fechaVencimiento: e.target.value})}
+                            className={`${inputStyles} pl-10`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Notas */}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Observaciones
+                        </label>
+                        <textarea
+                          value={nuevoIngreso.notas}
+                          onChange={(e) => setNuevoIngreso({...nuevoIngreso, notas: e.target.value})}
+                          className={`${inputStyles} resize-none`}
+                          rows={2}
+                          placeholder="Notas adicionales sobre el ingreso"
+                        />
                       </div>
                     </div>
+                  )}
 
-                    {/* Proveedor */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Proveedor
-                      </label>
-                      <input
-                        type="text"
-                        value={nuevoProducto.proveedor}
-                        onChange={(e) => setNuevoProducto({...nuevoProducto, proveedor: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Nombre del proveedor"
-                      />
+                  {productosCatalogo.length > 0 && (
+                    <div className="flex justify-end gap-3 mt-6">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowForm(false);
+                          resetForm();
+                        }}
+                        className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || !nuevoIngreso.productoId}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="animate-spin" size={18} />
+                            Registrando...
+                          </>
+                        ) : (
+                          <>
+                            <Save size={18} />
+                            Registrar Ingreso
+                          </>
+                        )}
+                      </button>
                     </div>
-
-                    {/* Lote */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Número de Lote
-                      </label>
-                      <input
-                        type="text"
-                        value={nuevoProducto.lote}
-                        onChange={(e) => setNuevoProducto({...nuevoProducto, lote: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Ej: LOT-2026-001"
-                      />
-                    </div>
-
-                    {/* Fecha de vencimiento */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Fecha de Vencimiento
-                      </label>
-                      <input
-                        type="date"
-                        value={nuevoProducto.fechaVencimiento}
-                        onChange={(e) => setNuevoProducto({...nuevoProducto, fechaVencimiento: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    {/* Notas */}
-                    <div className="md:col-span-2 lg:col-span-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Notas / Observaciones
-                      </label>
-                      <input
-                        type="text"
-                        value={nuevoProducto.notas}
-                        onChange={(e) => setNuevoProducto({...nuevoProducto, notas: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Observaciones adicionales"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3 mt-6">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowForm(false);
-                        resetForm();
-                      }}
-                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Guardando...
-                        </>
-                      ) : (
-                        <>
-                          <Save size={18} />
-                          Guardar Ingreso
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  )}
                 </form>
               )}
             </div>
@@ -353,54 +527,42 @@ export default function ProductosSecosPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="bg-white rounded-lg shadow-lg p-6 text-center">
                 <div className="text-3xl mb-2">📦</div>
-                <p className="text-sm font-medium text-gray-500">Total Productos</p>
-                <p className="text-2xl font-bold text-gray-900">{productos.length}</p>
+                <p className="text-sm font-medium text-gray-500">Productos en Catálogo</p>
+                <p className="text-2xl font-bold text-gray-900">{productosCatalogo.length}</p>
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6 text-center">
                 <div className="text-3xl mb-2">📅</div>
                 <p className="text-sm font-medium text-gray-500">Ingresos Hoy</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {productos.filter(p => 
-                    new Date(p.fechaIngreso).toDateString() === new Date().toDateString()
-                  ).length}
-                </p>
+                <p className="text-2xl font-bold text-blue-600">{ingresosHoy.length}</p>
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-                <div className="text-3xl mb-2">⚠️</div>
-                <p className="text-sm font-medium text-gray-500">Por Vencer (30 días)</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {productos.filter(p => {
-                    if (!p.fechaVencimiento) return false;
-                    const vencimiento = new Date(p.fechaVencimiento);
-                    const hoy = new Date();
-                    const diff = (vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24);
-                    return diff >= 0 && diff <= 30;
-                  }).length}
-                </p>
+                <div className="text-3xl mb-2">⚖️</div>
+                <p className="text-sm font-medium text-gray-500">kg Ingresados Hoy</p>
+                <p className="text-2xl font-bold text-green-600">{totalKgHoy.toFixed(2)}</p>
               </div>
             </div>
 
-            {/* Lista de productos */}
+            {/* Historial de Ingresos */}
             <div className="bg-white rounded-lg shadow-lg">
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-xl font-semibold text-gray-800">
-                  Historial de Ingresos ({productosFiltrados.length})
+                  Historial de Ingresos ({historialFiltrado.length})
                 </h3>
               </div>
 
-              {loading ? (
+              {loadingHistorial ? (
                 <div className="p-8 text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <p className="mt-2 text-gray-600">Cargando productos...</p>
+                  <Loader2 className="animate-spin mx-auto text-blue-600" size={32} />
+                  <p className="mt-2 text-gray-600">Cargando historial...</p>
                 </div>
-              ) : productosFiltrados.length === 0 ? (
+              ) : historialFiltrado.length === 0 ? (
                 <div className="p-8 text-center">
                   <div className="text-6xl mb-4">📦</div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No hay productos registrados</h3>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No hay ingresos registrados</h3>
                   <p className="text-gray-600 mb-4">
-                    {productos.length === 0 
+                    {historial.length === 0 
                       ? "Aún no se han registrado ingresos de productos secos."
-                      : "No se encontraron productos con el filtro aplicado."
+                      : "No se encontraron ingresos con el filtro aplicado."
                     }
                   </p>
                   <button
@@ -422,49 +584,40 @@ export default function ProductosSecosPage() {
                           Cantidad
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Proveedor / Lote
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Fecha Ingreso
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Vencimiento
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Responsable
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Observaciones
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {productosFiltrados.map((producto) => (
-                        <tr key={producto.id} className="hover:bg-gray-50">
+                      {historialFiltrado.map((movimiento) => (
+                        <tr key={movimiento.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{producto.nombre}</div>
-                            <div className="text-xs text-gray-500">{producto.id}</div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {getNombreProducto(movimiento.productoId)}
+                            </div>
+                            <div className="text-xs text-gray-500">{movimiento.productoId}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-blue-600">
-                              {producto.cantidad} {producto.unidad}
+                            <div className="text-sm font-bold text-green-600">
+                              +{movimiento.cantidad} {movimiento.unidadMedida}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{producto.proveedor || '-'}</div>
-                            <div className="text-xs text-gray-500">{producto.lote || '-'}</div>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatearFecha(movimiento.fechaMovimiento)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatearFecha(producto.fechaIngreso)}
+                            {movimiento.responsable || '-'}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`text-sm ${
-                              producto.fechaVencimiento && new Date(producto.fechaVencimiento) < new Date()
-                                ? 'text-red-600 font-semibold'
-                                : 'text-gray-500'
-                            }`}>
-                              {formatearFecha(producto.fechaVencimiento)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {producto.responsable}
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-500 max-w-xs truncate" title={movimiento.observaciones}>
+                              {movimiento.observaciones || '-'}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -478,6 +631,19 @@ export default function ProductosSecosPage() {
         </div>
       </div>
       <Footer />
+
+      {/* Estilos globales para placeholders */}
+      <style jsx global>{`
+        input::placeholder,
+        textarea::placeholder {
+          color: #1f2937 !important;
+          opacity: 0.7 !important;
+        }
+        
+        select option:first-child {
+          color: #1f2937;
+        }
+      `}</style>
     </>
   );
 }

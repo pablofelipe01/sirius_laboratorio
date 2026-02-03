@@ -620,6 +620,11 @@ export default function CalendarioProduccionPage() {
   const [loadingPedidos, setLoadingPedidos] = useState(false);
   const [selectedPedidoDetalle, setSelectedPedidoDetalle] = useState<any | null>(null);
   const [showPedidoDetalleModal, setShowPedidoDetalleModal] = useState(false);
+  
+  // Estados para verificación de stock y despacho
+  const [showVerificarStockModal, setShowVerificarStockModal] = useState(false);
+  const [verificacionStock, setVerificacionStock] = useState<any>(null);
+  const [loadingVerificacion, setLoadingVerificacion] = useState(false);
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -1159,6 +1164,78 @@ export default function CalendarioProduccionPage() {
     } catch (error) {
       console.error('❌ Error guardando pedido:', error);
       alert('Error guardando pedido');
+    }
+  };
+
+  // Verificar stock del pedido antes de despachar
+  const handleVerificarStock = async (pedidoId: string) => {
+    try {
+      setLoadingVerificacion(true);
+      console.log('🔍 Verificando stock para pedido:', pedidoId);
+
+      const response = await fetch('/api/pedidos/verificar-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedidoId }),
+      });
+
+      const data = await response.json();
+
+      console.log('📦 Respuesta completa de verificar-stock:', data);
+
+      if (data.success) {
+        console.log('✅ Verificación de stock completada:', data);
+        console.log('📋 Productos individuales:', data.productos);
+        
+        // Log detallado de cada producto
+        data.productos.forEach((prod: any, idx: number) => {
+          console.log(`📦 Producto ${idx + 1}:`, {
+            nombreProducto: prod.nombreProducto,
+            idProductoCore: prod.idProductoCore,
+            cantidadPedida: prod.cantidadPedida,
+            stockActual: prod.stockActual,
+            stockSuficiente: prod.stockSuficiente,
+            faltante: prod.faltante,
+            unidad: prod.unidad
+          });
+        });
+        
+        console.log('📊 Resumen:', data.resumen);
+        setVerificacionStock(data);
+        setShowVerificarStockModal(true);
+      } else {
+        console.error('❌ Error verificando stock:', data.error);
+        if (data.debug) {
+          console.log('🔍 Debug info:', data.debug);
+        }
+        alert('Error verificando stock: ' + data.error);
+      }
+    } catch (error) {
+      console.error('❌ Error verificando stock:', error);
+      alert('Error verificando stock del pedido');
+    } finally {
+      setLoadingVerificacion(false);
+    }
+  };
+
+  // Generar remisión (solo si el pedido está completo)
+  const handleGenerarRemision = async () => {
+    if (!verificacionStock?.pedidoCompleto) {
+      alert('No se puede generar la remisión porque faltan productos');
+      return;
+    }
+
+    try {
+      console.log('📄 Generando remisión para pedido:', selectedPedidoDetalle?.id);
+      // TODO: Implementar la generación de remisión
+      alert('Funcionalidad de generación de remisión en desarrollo');
+      
+      // Cerrar modales
+      setShowVerificarStockModal(false);
+      setShowPedidoDetalleModal(false);
+    } catch (error) {
+      console.error('❌ Error generando remisión:', error);
+      alert('Error generando remisión');
     }
   };
 
@@ -4333,7 +4410,26 @@ export default function CalendarioProduccionPage() {
             </div>
             
             {/* Footer */}
-            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-end gap-3">
+            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-between gap-3">
+              <button
+                onClick={() => handleVerificarStock(selectedPedidoDetalle.id)}
+                disabled={loadingVerificacion}
+                className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loadingVerificacion ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Verificando...
+                  </>
+                ) : (
+                  <>
+                    📦 Despachar Pedido
+                  </>
+                )}
+              </button>
               <button
                 onClick={() => {
                   setShowPedidoDetalleModal(false);
@@ -4343,6 +4439,179 @@ export default function CalendarioProduccionPage() {
               >
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de Verificación de Stock */}
+      {showVerificarStockModal && verificacionStock && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className={`px-6 py-4 rounded-t-2xl ${
+              verificacionStock.pedidoCompleto 
+                ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
+                : 'bg-gradient-to-r from-orange-600 to-red-600'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    {verificacionStock.pedidoCompleto ? (
+                      <>✅ Pedido Completo - Listo para Despachar</>
+                    ) : (
+                      <>⚠️ Pedido Incompleto - Faltan Productos</>
+                    )}
+                  </h2>
+                  <p className="text-white/90 text-sm mt-1">
+                    {verificacionStock.resumen.productosCompletos} de {verificacionStock.resumen.totalProductos} productos disponibles
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowVerificarStockModal(false);
+                    setVerificacionStock(null);
+                  }}
+                  className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-all"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-6">
+              {/* Resumen */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-blue-50 rounded-xl p-4 text-center">
+                  <p className="text-blue-600 font-medium text-sm mb-1">Total Productos</p>
+                  <p className="text-3xl font-bold text-gray-900">{verificacionStock.resumen.totalProductos}</p>
+                </div>
+                <div className="bg-green-50 rounded-xl p-4 text-center">
+                  <p className="text-green-600 font-medium text-sm mb-1">Completos</p>
+                  <p className="text-3xl font-bold text-green-700">{verificacionStock.resumen.productosCompletos}</p>
+                </div>
+                <div className="bg-red-50 rounded-xl p-4 text-center">
+                  <p className="text-red-600 font-medium text-sm mb-1">Faltantes</p>
+                  <p className="text-3xl font-bold text-red-700">{verificacionStock.resumen.productosFaltantes}</p>
+                </div>
+              </div>
+
+              {/* Lista de productos */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  📋 Detalle de Productos
+                </h3>
+                <div className="space-y-3">
+                  {verificacionStock.productos.map((producto: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className={`rounded-xl p-4 border-2 ${
+                        producto.stockSuficiente
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl">
+                              {producto.stockSuficiente ? '✅' : '❌'}
+                            </span>
+                            <div>
+                              <h4 className="font-semibold text-gray-900">
+                                {producto.nombreProducto}
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                {producto.idProductoCore}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-4">
+                            <div>
+                              <p className="text-xs text-gray-500">Pedido</p>
+                              <p className="text-lg font-bold text-gray-900">
+                                {producto.cantidadPedida} {producto.unidad}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Stock</p>
+                              <p className={`text-lg font-bold ${
+                                producto.stockSuficiente ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {producto.stockActual} {producto.unidad}
+                              </p>
+                            </div>
+                            {!producto.stockSuficiente && (
+                              <div>
+                                <p className="text-xs text-red-600 font-medium">Falta</p>
+                                <p className="text-lg font-bold text-red-700">
+                                  {producto.faltante} {producto.unidad}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mensaje de productos faltantes */}
+              {!verificacionStock.pedidoCompleto && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-xl">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-6 w-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-yellow-800">
+                        Acción Requerida
+                      </h3>
+                      <div className="mt-2 text-sm text-yellow-700">
+                        <p>
+                          Para completar este pedido, es necesario producir o registrar los siguientes productos faltantes:
+                        </p>
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          {verificacionStock.productosFaltantes.map((prod: any, idx: number) => (
+                            <li key={idx}>
+                              <strong>{prod.nombreProducto}</strong>: {prod.faltante} {prod.unidad}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-between gap-3">
+              <button
+                onClick={() => {
+                  setShowVerificarStockModal(false);
+                  setVerificacionStock(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cerrar
+              </button>
+              {verificacionStock.pedidoCompleto && (
+                <button
+                  onClick={handleGenerarRemision}
+                  className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                >
+                  📄 Generar Remisión
+                </button>
+              )}
             </div>
           </div>
         </div>

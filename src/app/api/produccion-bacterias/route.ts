@@ -865,7 +865,6 @@ export async function POST(request: Request) {
           
           // Para microorganismos individuales, crear registro directo en Escalado 50ml
           const AIRTABLE_TABLE_FERMENTACION = process.env.AIRTABLE_TABLE_FERMENTACION;
-          const AIRTABLE_TABLE_USUARIOS = process.env.AIRTABLE_TABLE_EQUIPO_LABORATORIO;
           
           if (!AIRTABLE_TABLE_FERMENTACION) {
             console.error('❌ AIRTABLE_TABLE_FERMENTACION no configurado');
@@ -877,32 +876,50 @@ export async function POST(request: Request) {
 
           // Buscar record IDs de los responsables por nombre
           const responsablesIds: string[] = [];
-          if (responsablesEquipo && responsablesEquipo.length > 0 && AIRTABLE_TABLE_USUARIOS) {
+          if (responsablesEquipo && responsablesEquipo.length > 0) {
             console.log(`🔍 [${nombreMicroorganismo}] Buscando responsables:`, responsablesEquipo);
             
             try {
-              for (const nombreResponsable of responsablesEquipo) {
-                const usuarioResponse = await fetch(
-                  `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_USUARIOS}?filterByFormula=SEARCH("${nombreResponsable}",{Nombre})`,
-                  {
-                    headers: {
-                      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+              // Usar el API interno de equipo-laboratorio para obtener la lista de personal
+              const equipoResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/equipo-laboratorio`);
+              
+              if (equipoResponse.ok) {
+                const equipoData = await equipoResponse.json();
+                console.log(`📊 [${nombreMicroorganismo}] Personal de laboratorio obtenido:`, equipoData.responsables?.length || 0, 'registros');
+                
+                if (equipoData.success && equipoData.responsables) {
+                  // Buscar cada responsable por nombre
+                  for (const nombreResponsable of responsablesEquipo) {
+                    console.log(`🔍 [${nombreMicroorganismo}] Buscando usuario: "${nombreResponsable}"`);
+                    
+                    // Buscar el responsable en la lista obtenida
+                    const responsableEncontrado = equipoData.responsables.find((r: any) => 
+                      r.nombre && r.nombre.toLowerCase().includes(nombreResponsable.toLowerCase())
+                    );
+                    
+                    if (responsableEncontrado && responsableEncontrado.id) {
+                      const usuarioId = responsableEncontrado.id;
+                      console.log(`✅ [${nombreMicroorganismo}] Usuario encontrado: "${nombreResponsable}" -> ID: ${usuarioId}`);
+                      
+                      // Verificar que el ID sea válido antes de agregarlo
+                      if (usuarioId && usuarioId.startsWith('rec') && usuarioId.length >= 17) {
+                        responsablesIds.push(usuarioId);
+                      } else {
+                        console.warn(`⚠️ [${nombreMicroorganismo}] ID de usuario inválido: ${usuarioId}`);
+                      }
+                    } else {
+                      console.warn(`⚠️ [${nombreMicroorganismo}] Usuario no encontrado en el personal de laboratorio: "${nombreResponsable}"`);
                     }
                   }
-                );
-                
-                if (usuarioResponse.ok) {
-                  const usuarioData = await usuarioResponse.json();
-                  if (usuarioData.records && usuarioData.records.length > 0) {
-                    responsablesIds.push(usuarioData.records[0].id);
-                    console.log(`✅ [${nombreMicroorganismo}] Usuario encontrado: ${nombreResponsable} -> ${usuarioData.records[0].id}`);
-                  } else {
-                    console.warn(`⚠️ [${nombreMicroorganismo}] Usuario no encontrado: ${nombreResponsable}`);
-                  }
+                } else {
+                  console.error(`❌ [${nombreMicroorganismo}] Error en respuesta de equipo-laboratorio:`, equipoData);
                 }
+              } else {
+                console.error(`❌ [${nombreMicroorganismo}] Error al obtener personal de laboratorio:`, equipoResponse.status, equipoResponse.statusText);
               }
             } catch (error) {
               console.error(`❌ [${nombreMicroorganismo}] Error buscando responsables:`, error);
+              // No agregar IDs inválidos en caso de error
             }
           }
           
@@ -968,8 +985,24 @@ export async function POST(request: Request) {
               'Microorganismos': [microorganismoId],
               'Responsables': responsablesIds.length > 0 ? responsablesIds : []
             }
-          };          console.log(`📦 [${nombreMicroorganismo}] Datos para Airtable:`, JSON.stringify(recordData, null, 2));
+          };          
+          
+          console.log(`📦 [${nombreMicroorganismo}] Datos para Airtable:`, JSON.stringify(recordData, null, 2));
           console.log(`👥 [${nombreMicroorganismo}] Responsables IDs encontrados:`, responsablesIds);
+          
+          // Validar que todos los IDs de responsables sean válidos
+          const responsablesValidos = responsablesIds.filter(id => 
+            id && typeof id === 'string' && id.startsWith('rec') && id.length >= 17
+          );
+          
+          if (responsablesIds.length > responsablesValidos.length) {
+            console.warn(`⚠️ [${nombreMicroorganismo}] Se encontraron IDs de responsables inválidos. Originales: ${responsablesIds.length}, Válidos: ${responsablesValidos.length}`);
+            console.warn(`⚠️ [${nombreMicroorganismo}] IDs originales:`, responsablesIds);
+            console.warn(`⚠️ [${nombreMicroorganismo}] IDs válidos:`, responsablesValidos);
+          }
+          
+          // Actualizar los datos con IDs válidos
+          recordData.fields.Responsables = responsablesValidos;
           
           // Crear registro en Airtable
           const airtableResponse = await fetch(
