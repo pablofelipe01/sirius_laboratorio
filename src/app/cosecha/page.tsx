@@ -357,16 +357,26 @@ export default function CosechaPage() {
   const fetchResponsables = async () => {
     setLoadingResponsables(true);
     try {
+      console.log('🔄 [COSECHA] Iniciando fetch de responsables...');
       const response = await fetch('/api/equipo-laboratorio');
       const data = await response.json();
       
-      if (data.success) {
+      console.log('📋 [COSECHA] Respuesta de equipo-laboratorio:', {
+        success: data.success,
+        responsablesCount: data.responsables?.length || 0,
+        responsables: data.responsables
+      });
+      
+      if (data.success && data.responsables && data.responsables.length > 0) {
         setResponsables(data.responsables);
+        console.log('✅ [COSECHA] Responsables cargados:', data.responsables.length);
       } else {
-        console.error('Error loading responsables:', data.error);
+        console.error('❌ [COSECHA] Error loading responsables:', data.error || 'Sin responsables');
+        setResponsables([]);
       }
     } catch (error) {
-      console.error('Error fetching responsables:', error);
+      console.error('❌ [COSECHA] Error fetching responsables:', error);
+      setResponsables([]);
     } finally {
       setLoadingResponsables(false);
     }
@@ -1233,7 +1243,7 @@ export default function CosechaPage() {
                       disabled={loadingResponsables}
                     >
                       <option value="">
-                        {loadingResponsables ? 'Cargando responsables...' : 'Seleccione una persona'}
+                        {loadingResponsables ? 'Cargando responsables...' : `Seleccione una persona (${responsables.length} disponibles)`}
                       </option>
                       {responsables.map((responsable) => (
                         <option key={responsable.id} value={responsable.nombre} data-idcore={responsable.idCore || ''}>
