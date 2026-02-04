@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
 
         const stockSuficiente = stockActual >= detalle.cantidadPedida;
         const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockActual;
-
+ 
         return {
           productoNombre: nombresProductos.get(detalle.idProductoCore) || detalle.idProductoCore,
           productoId: detalle.idProductoCore,
