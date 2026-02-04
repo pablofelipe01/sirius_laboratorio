@@ -834,7 +834,6 @@ const StockInsumosPage = () => {
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Insumo</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Categoría</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Unidad Presentación</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Cantidad Presentación</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Unidades</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Granel</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Estado</th>
@@ -890,13 +889,6 @@ const StockInsumosPage = () => {
                               <td className="py-3 px-4 text-gray-700">
                                 <span className="text-sm">
                                   {insumo.fields['Unidad Ingresa Insumo'] || insumo.fields.unidad_medida || 'Sin unidad'}
-                                </span>
-                              </td>
-                              
-                              {/* Cantidad Presentación */}
-                              <td className="py-3 px-4 text-center">
-                                <span className="font-medium text-gray-800">
-                                  {Number(cantidadPresentacion).toFixed(2)}
                                 </span>
                               </td>
                               

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -625,6 +625,9 @@ export default function CalendarioProduccionPage() {
   const [showVerificarStockModal, setShowVerificarStockModal] = useState(false);
   const [verificacionStock, setVerificacionStock] = useState<any>(null);
   const [loadingVerificacion, setLoadingVerificacion] = useState(false);
+  
+  // Estado para progreso de stock (batch optimizado)
+  const [progresosPedidos, setProgresosPedidos] = useState<Record<string, any>>({});
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -1109,6 +1112,21 @@ export default function CalendarioProduccionPage() {
         
         console.log('📦 Pedidos pendientes cargados:', pendientes.length, 'de', data.pedidos.length, 'totales');
         console.log('📅 Fechas de pedidos:', pendientes.map((p: any) => ({ id: p.idPedidoCore, fecha: p.fechaPedido })));
+        
+        // OPTIMIZACIÓN: Cargar progreso de todos los pedidos en batch
+        if (pendientes.length > 0) {
+          const pedidoIds = pendientes.map((p: any) => p.id).filter(Boolean);
+          if (pedidoIds.length > 0) {
+            // Cargar en chunks de 10 para no sobrecargar
+            const chunks = [];
+            for (let i = 0; i < pedidoIds.length; i += 10) {
+              chunks.push(pedidoIds.slice(i, i + 10));
+            }
+            
+            // Cargar chunks en paralelo
+            await Promise.all(chunks.map(chunk => calcularProgresoStockBatch(chunk)));
+          }
+        }
       } else {
         console.log('⚠️ No se obtuvieron pedidos:', data);
         setPedidosPendientes([]);
@@ -1236,6 +1254,66 @@ export default function CalendarioProduccionPage() {
     } catch (error) {
       console.error('❌ Error generando remisión:', error);
       alert('Error generando remisión');
+    }
+  };
+
+  // Calcular progreso de stock para un pedido
+  const calcularProgresoStock = async (pedidoId: string) => {
+    try {
+      const response = await fetch('/api/pedidos/verificar-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedidoId }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.productos) {
+        const totalPedido = data.productos.reduce((sum: number, p: any) => sum + p.cantidadPedida, 0);
+        const totalStock = data.productos.reduce((sum: number, p: any) => sum + p.stockActual, 0);
+        const porcentaje = totalPedido > 0 ? Math.round((totalStock / totalPedido) * 100) : 0;
+        
+        return {
+          porcentaje: Math.min(porcentaje, 100),
+          totalPedido,
+          totalStock,
+          completo: data.pedidoCompleto
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error calculando progreso:', error);
+      return null;
+    }
+  };
+
+  // OPTIMIZADO: Calcular progreso de múltiples pedidos en batch
+  const calcularProgresoStockBatch = async (pedidoIds: string[]) => {
+    try {
+      const response = await fetch('/api/pedidos/verificar-stock-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedidoIds }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.resultados) {
+        const progresosMap: Record<string, any> = {};
+        data.resultados.forEach((resultado: any) => {
+          if (resultado.success) {
+            progresosMap[resultado.pedidoId] = {
+              porcentaje: resultado.porcentaje,
+              totalPedido: resultado.totalPedido,
+              totalStock: resultado.totalStock,
+              completo: resultado.completo
+            };
+          }
+        });
+        setProgresosPedidos(progresosMap);
+      }
+    } catch (error) {
+      console.error('Error calculando progreso batch:', error);
     }
   };
 
@@ -2249,6 +2327,7 @@ export default function CalendarioProduccionPage() {
                 {pedidosPendientes.map((pedido: any) => {
                   const productos = getProductosPedido(pedido.id);
                   const nombreCliente = getNombreCliente(pedido.clienteId);
+                  const progreso = progresosPedidos[pedido.id] || null;
                   
                   return (
                     <div
@@ -2282,6 +2361,43 @@ export default function CalendarioProduccionPage() {
                         🏢 {nombreCliente}
                       </h4>
                       
+                      {/* Barra de progreso de stock */}
+                      {progreso ? (
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium text-gray-600">Progreso de Producción</span>
+                            <span className={`text-xs font-bold ${
+                              progreso.completo ? 'text-green-600' : 
+                              progreso.porcentaje >= 50 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {progreso.porcentaje}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                            <div
+                              className={`h-2.5 rounded-full transition-all duration-500 ${
+                                progreso.completo ? 'bg-green-500' : 
+                                progreso.porcentaje >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${progreso.porcentaje}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-xs text-gray-500">{progreso.totalStock}L / {progreso.totalPedido}L</span>
+                            {progreso.completo && (
+                              <span className="text-xs text-green-600 font-semibold">✓ Listo para despachar</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mb-3">
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden animate-pulse">
+                            <div className="h-2.5 bg-gray-300 rounded-full" style={{ width: '50%' }} />
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">Calculando...</div>
+                        </div>
+                      )}
+                      
                       <div className="text-sm text-gray-600 space-y-1">
                         {pedido.fechaPedido && (
                           <p className="flex items-center gap-1">
@@ -2295,7 +2411,7 @@ export default function CalendarioProduccionPage() {
                           <div className="mt-2 pt-2 border-t border-indigo-200">
                             <p className="font-medium text-gray-700 mb-1">🧪 Productos:</p>
                             <ul className="space-y-0.5 text-xs">
-                              {productos.map((prod, idx) => (
+                              {productos.map((prod: any, idx: number) => (
                                 <li key={idx} className="flex justify-between">
                                   <span className="truncate flex-1">{prod.nombre}</span>
                                   <span className="font-semibold text-indigo-600 ml-2">x{prod.cantidad}</span>
@@ -4509,7 +4625,7 @@ export default function CalendarioProduccionPage() {
                     <div
                       key={idx}
                       className={`rounded-xl p-4 border-2 ${
-                        producto.stockSuficiente
+                        producto.completo
                           ? 'bg-green-50 border-green-200'
                           : 'bg-red-50 border-red-200'
                       }`}
@@ -4518,14 +4634,14 @@ export default function CalendarioProduccionPage() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-2xl">
-                              {producto.stockSuficiente ? '✅' : '❌'}
+                              {producto.completo ? '✅' : '❌'}
                             </span>
                             <div>
                               <h4 className="font-semibold text-gray-900">
-                                {producto.nombreProducto}
+                                {producto.productoNombre}
                               </h4>
                               <p className="text-sm text-gray-600">
-                                {producto.idProductoCore}
+                                {producto.productoId}
                               </p>
                             </div>
                           </div>
@@ -4541,12 +4657,12 @@ export default function CalendarioProduccionPage() {
                             <div>
                               <p className="text-xs text-gray-500">Stock</p>
                               <p className={`text-lg font-bold ${
-                                producto.stockSuficiente ? 'text-green-600' : 'text-red-600'
+                                producto.completo ? 'text-green-600' : 'text-red-600'
                               }`}>
-                                {producto.stockActual} {producto.unidad}
+                                {producto.stockDisponible} {producto.unidad}
                               </p>
                             </div>
-                            {!producto.stockSuficiente && (
+                            {!producto.completo && (
                               <div>
                                 <p className="text-xs text-red-600 font-medium">Falta</p>
                                 <p className="text-lg font-bold text-red-700">
@@ -4580,9 +4696,9 @@ export default function CalendarioProduccionPage() {
                           Para completar este pedido, es necesario producir o registrar los siguientes productos faltantes:
                         </p>
                         <ul className="list-disc list-inside mt-2 space-y-1">
-                          {verificacionStock.productosFaltantes.map((prod: any, idx: number) => (
+                          {verificacionStock.productos?.filter((p: any) => !p.completo).map((prod: any, idx: number) => (
                             <li key={idx}>
-                              <strong>{prod.nombreProducto}</strong>: {prod.faltante} {prod.unidad}
+                              <strong>{prod.productoNombre}</strong>: {prod.faltante} {prod.unidad}
                             </li>
                           ))}
                         </ul>
@@ -4604,13 +4720,29 @@ export default function CalendarioProduccionPage() {
               >
                 Cerrar
               </button>
-              {verificacionStock.pedidoCompleto && (
-                <button
-                  onClick={handleGenerarRemision}
-                  className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
-                >
-                  📄 Generar Remisión
-                </button>
+              
+              {/* Mostrar botón si hay al menos 1 producto con stock disponible */}
+              {verificacionStock.productos?.some((p: any) => p.stockDisponible > 0) && (
+                <div className="flex-1 flex flex-col items-end gap-2">
+                  {!verificacionStock.pedidoCompleto && (
+                    <p className="text-xs text-amber-600 font-medium">
+                      ⚠️ Despacho parcial: solo productos con stock disponible
+                    </p>
+                  )}
+                  <button
+                    onClick={handleGenerarRemision}
+                    className={`px-6 py-2 font-medium rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 ${
+                      verificacionStock.pedidoCompleto
+                        ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600'
+                    }`}
+                  >
+                    {verificacionStock.pedidoCompleto 
+                      ? '📄 Generar Remisión Completa' 
+                      : '📦 Despachar Productos Disponibles'
+                    }
+                  </button>
+                </div>
               )}
             </div>
           </div>
