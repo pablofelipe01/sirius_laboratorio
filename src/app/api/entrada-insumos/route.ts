@@ -50,9 +50,9 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      if (!record.fields['Cantidad Ingresa Unidades'] || typeof record.fields['Cantidad Ingresa Unidades'] !== 'number' || record.fields['Cantidad Ingresa Unidades'] <= 0) {
+      if (!record.fields['Cantidad Ingresa Insumo'] || typeof record.fields['Cantidad Ingresa Insumo'] !== 'number' || record.fields['Cantidad Ingresa Insumo'] <= 0) {
         return NextResponse.json(
-          { success: false, error: 'Cada registro debe tener una Cantidad Ingresa Unidades válida (número mayor a 0)' },
+          { success: false, error: 'Cada registro debe tener una Cantidad Ingresa Insumo válida (número mayor a 0)' },
           { status: 400 }
         );
       }

@@ -185,6 +185,7 @@ interface InoculationData {
   microorganism: string;
   microorganismId: string;
   microorganismAbreviatura: string; // Abreviatura del producto (ej: "TR", "MT")
+  codigoProducto: string; // ID Product Core (SIRIUS-PRODUCT-XXXX)
   inoculationDate: string;
   responsables: string[];
   responsablesIds: string[];
@@ -197,6 +198,7 @@ interface Microorganism {
   id: string;
   nombre: string;
   abreviatura?: string; // Abreviatura del producto
+  codigo?: string; // ID Product Core (SIRIUS-PRODUCT-XXXX)
 }
 
 interface Responsable {
@@ -219,6 +221,7 @@ const MushroomInoculationForm = () => {
     microorganism: '',
     microorganismId: '',
     microorganismAbreviatura: '', // Abreviatura del producto
+    codigoProducto: '', // ID Product Core (SIRIUS-PRODUCT-XXXX)
     inoculationDate: getTodayDate(), // Inicializar con fecha de hoy
     responsables: [],
     responsablesIds: [],
@@ -256,8 +259,8 @@ const MushroomInoculationForm = () => {
           const insumoEncontrado = data.insumos.find((insumo: any) => insumo.id === insumoId);
           
           if (insumoEncontrado) {
-            // Usar el campo 'Total Insumo Unidades' para comparar stock disponible
-            const stockDisponible = insumoEncontrado.fields['Total Insumo Unidades'] || 0;
+            // Usar el campo 'Total Actual Insumos' para comparar stock disponible
+            const stockDisponible = insumoEncontrado.fields['Total Actual Insumos'] || 0;
             console.log(`✅ Stock encontrado para ${insumoId}: ${stockDisponible}`);
             return stockDisponible;
           } else {
@@ -365,11 +368,14 @@ const MushroomInoculationForm = () => {
       const selectedOption = e.target.options[e.target.selectedIndex];
       const microorganismId = selectedOption.getAttribute('data-id') || '';
       const microorganismAbreviatura = selectedOption.getAttribute('data-abreviatura') || '';
+      const codigoProducto = selectedOption.getAttribute('data-codigo') || '';
       setFormData(prev => ({
         ...prev,
         microorganism: value,
         microorganismId: microorganismId,
         microorganismAbreviatura: microorganismAbreviatura,
+        codigoProducto: codigoProducto,
+        cepasSeleccionadas: [], // Limpiar cepas al cambiar microorganismo
       }));
     } else {
       setFormData(prev => ({
@@ -652,6 +658,7 @@ const MushroomInoculationForm = () => {
           microorganism: '',
           microorganismId: '',
           microorganismAbreviatura: '',
+          codigoProducto: '',
           inoculationDate: getTodayDate(), // Mantener fecha de hoy al resetear
           responsables: [],
           responsablesIds: [],
@@ -857,7 +864,7 @@ const MushroomInoculationForm = () => {
               >
                 <option value="">{loadingMicroorganisms ? 'Cargando...' : 'Seleccionar microorganismo'}</option>
                 {!loadingMicroorganisms && microorganisms && microorganisms.map((organism) => (
-                  <option key={organism.id} value={organism.nombre} data-id={organism.id} data-abreviatura={organism.abreviatura || ''}>{organism.nombre}</option>
+                  <option key={organism.id} value={organism.nombre} data-id={organism.id} data-abreviatura={organism.abreviatura || ''} data-codigo={organism.codigo || ''}>{organism.nombre}</option>
                 ))}
               </select>
             </div>
@@ -876,6 +883,7 @@ const MushroomInoculationForm = () => {
               )}
               <CepaSelector
                 microorganismoSeleccionado={formData.microorganism}
+                idProductCore={formData.codigoProducto}
                 onCepaAgregada={handleCepaAgregada}
                 onCepaRemovida={handleRemoverCepa}
                 cepasAgregadas={formData.cepasSeleccionadas}

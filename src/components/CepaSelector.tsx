@@ -23,6 +23,7 @@ interface CepaSeleccionada {
 
 interface CepaSelectorProps {
   microorganismoSeleccionado: string;
+  idProductCore?: string; // SIRIUS-PRODUCT-XXXX
   abreviaturaSeleccionada?: string;
   onCepaAgregada: (cepa: CepaSeleccionada) => void;
   onCepaRemovida: (index: number) => void;
@@ -31,6 +32,7 @@ interface CepaSelectorProps {
 
 const CepaSelector = ({ 
   microorganismoSeleccionado, 
+  idProductCore,
   abreviaturaSeleccionada,
   onCepaAgregada,
   onCepaRemovida,
@@ -42,27 +44,31 @@ const CepaSelector = ({
   const [cantidadSeleccionada, setCantidadSeleccionada] = useState<number | string>('');
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Cargar cepas cuando cambie el microorganismo
+  // Cargar cepas cuando cambie el microorganismo o idProductCore
   useEffect(() => {
-    if (microorganismoSeleccionado) {
+    if (microorganismoSeleccionado || idProductCore) {
       fetchCepasDisponibles();
     } else {
       setCepasDisponibles([]);
       setCepaSeleccionada('');
     }
-  }, [microorganismoSeleccionado, abreviaturaSeleccionada]);
+  }, [microorganismoSeleccionado, idProductCore, abreviaturaSeleccionada]);
 
   const fetchCepasDisponibles = async () => {
     setLoadingCepas(true);
     try {
       const params = new URLSearchParams();
-      if (microorganismoSeleccionado) {
+      // Preferir idProductCore sobre microorganismo para filtrar
+      if (idProductCore) {
+        params.append('idProductCore', idProductCore);
+      } else if (microorganismoSeleccionado) {
         params.append('microorganismo', microorganismoSeleccionado);
       }
       if (abreviaturaSeleccionada) {
         params.append('abreviatura', abreviaturaSeleccionada);
       }
 
+      console.log('🔍 Buscando cepas con params:', params.toString());
       const response = await fetch(`/api/cepas-disponibles?${params}`);
       const data = await response.json();
       

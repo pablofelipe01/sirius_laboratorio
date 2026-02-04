@@ -16,10 +16,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const microorganismo = searchParams.get('microorganismo');
     const abreviatura = searchParams.get('abreviatura');
+    const idProductCore = searchParams.get('idProductCore'); // SIRIUS-PRODUCT-XXXX
     
     console.log('🔍 Solicitud cepas-disponibles:', {
       microorganismo,
       abreviatura,
+      idProductCore,
       timestamp: new Date().toISOString()
     });
     
@@ -33,29 +35,30 @@ export async function GET(request: NextRequest) {
 
     let filterFormula = '{Total Cantidad Bolsas} > 0';
     
-    // Si no hay filtros específicos, solo filtrar por cantidad > 0
-    if (!microorganismo && !abreviatura) {
-      console.log('📌 Sin filtros específicos, mostrando todas las cepas con cantidad > 0');
+    // Prioridad: idProductCore > microorganismo > abreviatura
+    if (idProductCore) {
+      // Filtrar por ID Product Core (más preciso)
+      const safeProductCore = idProductCore.replace(/['"]/g, '');
+      filterFormula = `AND({Total Cantidad Bolsas} > 0, {ID Product Core} = "${safeProductCore}")`;
+      console.log('🏷️ Filtrado por ID Product Core:', safeProductCore);
     } else if (microorganismo) {
       // Limpiar el nombre del microorganismo:
-      // - Remover sufijos de unidad como "(L)", "(Kg)", "(Bolsa)", etc.
-      // - Remover comillas
       const safeOrganism = microorganismo
         .replace(/['"]/g, '')
-        .replace(/\s*\(L\)\s*$/i, '')      // Remover (L) al final
-        .replace(/\s*\(Kg\)\s*$/i, '')     // Remover (Kg) al final  
-        .replace(/\s*\(Bolsa\)\s*$/i, '')  // Remover (Bolsa) al final
-        .replace(/\s*\(Unidad\)\s*$/i, '') // Remover (Unidad) al final
+        .replace(/\s*\(L\)\s*$/i, '')
+        .replace(/\s*\(Kg\)\s*$/i, '')
+        .replace(/\s*\(Bolsa\)\s*$/i, '')
+        .replace(/\s*\(Unidad\)\s*$/i, '')
         .trim();
       
       filterFormula = `AND({Total Cantidad Bolsas} > 0, SEARCH("${safeOrganism}", ARRAYJOIN({Microorganismo (from Microorganismos)}, " ")))`;
-      console.log('🔬 Filtrado por microorganismo (original):', microorganismo);
-      console.log('🔬 Filtrado por microorganismo (limpio):', safeOrganism);
+      console.log('🔬 Filtrado por microorganismo:', safeOrganism);
     } else if (abreviatura) {
-      // Simplificar la fórmula para abreviatura
       const safeAbbrev = abreviatura.replace(/['"]/g, '');
       filterFormula = `AND({Total Cantidad Bolsas} > 0, SEARCH("${safeAbbrev}", ARRAYJOIN({Abreviatura Hongo}, " ")))`;
       console.log('🏷️ Filtrado por abreviatura:', safeAbbrev);
+    } else {
+      console.log('📌 Sin filtros específicos, mostrando todas las cepas con cantidad > 0');
     }
 
     console.log('📋 Fórmula de filtro:', filterFormula);
@@ -73,7 +76,8 @@ export async function GET(request: NextRequest) {
           'Codigo Cepa',
           'Total Cantidad Bolsas',
           'Fecha Creacion',
-          'Nombre (from Responsables)'
+          'Nombre (from Responsables)',
+          'ID Product Core'
         ]
       })
       .firstPage();
@@ -85,13 +89,16 @@ export async function GET(request: NextRequest) {
       codigoCepa: record.get('Codigo Cepa'),
       totalCantidadBolsas: record.get('Total Cantidad Bolsas'),
       fechaCreacion: record.get('Fecha Creacion'),
-      responsables: record.get('Nombre (from Responsables)')
+      responsables: record.get('Nombre (from Responsables)'),
+      idProductCore: record.get('ID Product Core')
     }));
 
     console.log('✅ Cepas filtradas obtenidas:', {
       microorganismo,
       abreviatura,
+      idProductCore,
       cantidadCepas: formattedRecords.length,
+      cepas: formattedRecords.map(c => ({ codigo: c.codigoCepa, bolsas: c.totalCantidadBolsas })),
       timestamp: new Date().toISOString()
     });
 
@@ -99,7 +106,7 @@ export async function GET(request: NextRequest) {
       success: true,
       cepas: formattedRecords,
       total: formattedRecords.length,
-      filtros: { microorganismo, abreviatura }
+      filtros: { microorganismo, abreviatura, idProductCore }
     });
 
   } catch (error) {

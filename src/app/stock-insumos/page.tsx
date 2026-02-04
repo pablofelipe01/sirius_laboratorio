@@ -19,10 +19,9 @@ interface Insumo {
     'Rango Minimo Stock'?: number;
     estado?: string;
     'Total Cantidad Producto'?: number;
-    'Total Insumo Unidades'?: number;
-    'Total Insumo Granel'?: number;
+    'Total Actual Insumos'?: number;
     'cantidad Entrada Insumos'?: number[];
-    'cantidad Salida Insumos'?: number[];
+    'Cantidad Salida Insumos'?: number[];
     'ID_Entrada Insumos'?: string[];
     'Salida Insumos'?: string[];
   };
@@ -250,7 +249,7 @@ const StockInsumosPage = () => {
                 records: [{
                   fields: {
                     'Insumos Laboratorio': [insumoData.insumo.id],
-                    'Cantidad Ingresa Unidades': Number(insumo.cantidadInicial),
+                    'Cantidad Ingresa Insumo': Number(insumo.cantidadInicial),
                     'Realiza Registro': user?.nombre || 'Usuario no identificado',
                     ...(insumo.fechaVencimiento && { 'fecha_vencimiento': insumo.fechaVencimiento })
                   }
@@ -349,7 +348,7 @@ const StockInsumosPage = () => {
         return;
       }
       
-      const stockDisponible = entradaSeleccionada.fields['Cantidad Ingresa Unidades'] || 0;
+      const stockDisponible = entradaSeleccionada.fields['Total Cantidad Granel Actual'] || 0;
       const cantidadSolicitada = Number(insumo.cantidadSalidaUnidades);
       
       if (cantidadSolicitada > stockDisponible) {
@@ -466,7 +465,7 @@ const StockInsumosPage = () => {
           records: insumosValidos.map(insumo => ({
             fields: {
               'Insumos Laboratorio': [insumo.insumoId],
-              'Cantidad Ingresa Unidades': Number(insumo.cantidadIngresaUnidades),
+              'Cantidad Ingresa Insumo': Number(insumo.cantidadIngresaUnidades),
               'Realiza Registro': user?.nombre || 'Usuario no identificado',
               ...(insumo.fechaVencimiento && { 'fecha_vencimiento': insumo.fechaVencimiento })
             }
@@ -820,16 +819,15 @@ const StockInsumosPage = () => {
                         {insumosFiltrados.map((insumo, index) => {
                           const hasName = insumo.fields.nombre && insumo.fields.nombre.trim();
                           const totalCantidad = insumo.fields['Total Cantidad Producto'] || 0;
-                          const totalUnidades = insumo.fields['Total Insumo Unidades'] || 0;
-                          const totalGranel = insumo.fields['Total Insumo Granel'] || 0;
+                          const totalActual = insumo.fields['Total Actual Insumos'] || 0;
                           const cantidadPresentacion = insumo.fields['Cantidad Presentacion Insumo'] || 0;
                           const estado = insumo.fields.estado || 'Disponible';
                           
-                          // Lógica simplificada de estados basada en Total Insumo Unidades:
-                          // - Agotado: totalUnidades = 0
-                          // - Disponible: totalUnidades > 0
-                          const esAgotado = totalUnidades === 0;
-                          const esDisponible = totalUnidades > 0;
+                          // Lógica simplificada de estados basada en Total Actual Insumos:
+                          // - Agotado: totalActual = 0
+                          // - Disponible: totalActual > 0
+                          const esAgotado = totalActual === 0;
+                          const esDisponible = totalActual > 0;
                           
                           return (
                             <tr 
@@ -869,10 +867,10 @@ const StockInsumosPage = () => {
                                 </span>
                               </td>
                               
-                              {/* Total Granel */}
+                              {/* Total Actual */}
                               <td className="py-3 px-4 text-center">
                                 <span className="font-medium text-gray-700">
-                                  {Number(totalGranel).toFixed(2)}
+                                  {Number(totalActual).toFixed(2)}
                                 </span>
                               </td>
                               
@@ -1403,7 +1401,7 @@ const StockInsumosPage = () => {
                               {filtrarInsumos(searchInsumoDescontar[index] || '').length > 0 ? (
                                 filtrarInsumos(searchInsumoDescontar[index] || '').map(insumoOption => {
                                   const hasName = insumoOption.fields.nombre && insumoOption.fields.nombre.trim();
-                                  const totalUnidades = insumoOption.fields['Total Insumo Unidades'] || 0;
+                                  const totalActual = insumoOption.fields['Total Actual Insumos'] || 0;
                                   const unidad = insumoOption.fields['Unidad Ingresa Insumo'] || insumoOption.fields.unidad_medida || 'unidad';
                                   const displayName = hasName ? insumoOption.fields.nombre : `Sin nombre - ${insumoOption.id.slice(-6)}`;
 
@@ -1425,7 +1423,7 @@ const StockInsumosPage = () => {
                                     >
                                       <div className="font-medium text-gray-900">{displayName}</div>
                                       <div className="text-sm text-gray-500 flex items-center space-x-2">
-                                        <span>📦 Stock: {Number(totalUnidades).toFixed(2)} {unidad}</span>
+                                        <span>📦 Stock: {Number(totalActual).toFixed(2)} {unidad}</span>
                                       </div>
                                       {insumoOption.fields.categoria_insumo && (
                                         <div className="text-xs text-gray-400">{insumoOption.fields.categoria_insumo}</div>
@@ -1467,7 +1465,7 @@ const StockInsumosPage = () => {
                               <span>📊</span>
                               <span>
                                 <strong>Stock Actual:</strong> {
-                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields['Total Insumo Unidades'] || 0
+                                  insumos.find(ins => ins.id === insumo.insumoId)?.fields['Total Actual Insumos'] || 0
                                 } unidades
                               </span>
                             </p>
@@ -1502,7 +1500,7 @@ const StockInsumosPage = () => {
                               {(entradasDisponibles[index] || []).map(entrada => {
                                 const fechaIngreso = entrada.fields.fecha_ingreso ? new Date(entrada.fields.fecha_ingreso).toLocaleDateString() : 'Sin fecha';
                                 const fechaVencimiento = entrada.fields.fecha_vencimiento ? new Date(entrada.fields.fecha_vencimiento).toLocaleDateString() : 'No aplica';
-                                const stockDisponible = entrada.fields['Cantidad Ingresa Unidades'] || 0;
+                                const stockDisponible = entrada.fields['Total Cantidad Granel Actual'] || 0;
                                 const estadoVencimiento = entrada.fields.estado_vencimiento_producto || 'Sin estado';
                                 
                                 return (
@@ -1523,7 +1521,7 @@ const StockInsumosPage = () => {
                                 
                                 const fechaIngreso = entradaSeleccionada.fields.fecha_ingreso ? new Date(entradaSeleccionada.fields.fecha_ingreso).toLocaleDateString() : 'Sin fecha';
                                 const fechaVencimiento = entradaSeleccionada.fields.fecha_vencimiento ? new Date(entradaSeleccionada.fields.fecha_vencimiento).toLocaleDateString() : 'No aplica';
-                                const stockDisponible = entradaSeleccionada.fields['Cantidad Ingresa Unidades'] || 0;
+                                const stockDisponible = entradaSeleccionada.fields['Total Cantidad Granel Actual'] || 0;
                                 const estadoVencimiento = entradaSeleccionada.fields.estado_vencimiento_producto || 'Sin estado';
                                 
                                 const getEstadoColor = (estado: string) => {
@@ -1581,7 +1579,7 @@ const StockInsumosPage = () => {
                           max={(() => {
                             if (!insumo.entradaId || !entradasDisponibles[index]) return undefined;
                             const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
-                            return entradaSeleccionada?.fields['Cantidad Ingresa Unidades'] || undefined;
+                            return entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || undefined;
                           })()}
                           value={insumo.cantidadSalidaUnidades}
                           onChange={(e) => {
@@ -1591,7 +1589,7 @@ const StockInsumosPage = () => {
                             // Validar que no exceda el stock disponible
                             if (insumo.entradaId && entradasDisponibles[index]) {
                               const entradaSeleccionada = entradasDisponibles[index].find(ent => ent.id === insumo.entradaId);
-                              const stockDisponible = entradaSeleccionada?.fields['Cantidad Ingresa Unidades'] || 0;
+                              const stockDisponible = entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || 0;
                               
                               if (valorIngresado > stockDisponible) {
                                 valorFinal = stockDisponible.toString();
@@ -1609,7 +1607,7 @@ const StockInsumosPage = () => {
                             insumo.entradaId && entradasDisponibles[index]
                               ? (() => {
                                   const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
-                                  const stockDisponible = entradaSeleccionada?.fields['Cantidad Ingresa Unidades'] || 0;
+                                  const stockDisponible = entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || 0;
                                   return `Ingrese cantidad en unidades (máximo ${stockDisponible})`;
                                 })()
                               : "Ingrese cantidad en unidades"

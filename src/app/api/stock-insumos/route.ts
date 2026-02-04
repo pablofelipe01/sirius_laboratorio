@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
         
         const entradaFields: any = {
           'Insumos Laboratorio': [createdRecord.id],
-          'Cantidad Ingresa Unidades': Number(insumoData.cantidadInicial),
+          'Cantidad Ingresa Insumo': Number(insumoData.cantidadInicial),
           'Realiza Registro': insumoData.realizaRegistro || 'Sistema - Registro inicial'
         };
 
