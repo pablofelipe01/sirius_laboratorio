@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -110,32 +110,21 @@ const StockInsumosPage = () => {
     "Equipo de Protección Personal"
   ];
 
-  // Unidades de medida exactas de Airtable según documentación
-  const unidadesMedida = [
-    "UNIDAD",
-    "TARRO DE 80GR",
-    "TARRO DE 500GR",
-    "TARRO DE 1KG",
-    "TARRO DE 1000L",
-    "TARRO DE 500ML",
-    "TARRO DE 250ML",
-    "TARRO DE 100ML",
-    "TARRO DE 100GR",
-    "TARRO DE 250GR",
-    "TARRO DE 200ML",
-    "TARRO DE 50ML",
-    "TARRO DE 1000ML",
-    "BOLSA DE 1KG",
-    "BOLSA DE 500GR",
-    "PAQUETE",
-    "CAJA JERINGAS 80UND",
-    "CAJA JERINGAS 40UND",
-    "TARRO DE 20000ML",
-    "TARRO DE 3800ML",
-    "TARRO DE 2000ML",
-    "CAJA 100UND",
-    "CAJA 50UND"
-  ];
+  // Unidades de medida dinámicas extraídas de los insumos existentes en Airtable
+  const unidadesMedida = useMemo(() => {
+    const unidadesSet = new Set<string>();
+    insumos.forEach(insumo => {
+      const unidad = insumo.fields['Unidad Ingresa Insumo'] || insumo.fields.unidad_medida;
+      if (unidad && typeof unidad === 'string' && unidad.trim()) {
+        unidadesSet.add(unidad.trim());
+      }
+    });
+    // Convertir a array y ordenar alfabéticamente
+    return Array.from(unidadesSet).sort();
+  }, [insumos]);
+
+  // Mantener "UNIDAD" como opción por defecto si no hay insumos
+  const unidadesDisponibles = unidadesMedida.length > 0 ? unidadesMedida : ["UNIDAD"];
 
   // Cargar datos al iniciar
   useEffect(() => {
@@ -671,17 +660,6 @@ const StockInsumosPage = () => {
                 {/* Filtros por categoría */}
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => setFiltroCategoria('todos')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                      filtroCategoria === 'todos'
-                        ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    Básicos ({insumos.filter(i => categoriasBasicas.includes(i.fields.categoria_insumo || '')).length})
-                  </button>
-                  
-                  <button
                     onClick={() => setFiltroCategoria('ver-todas')}
                     className={`px-4 py-2 rounded-lg font-medium transition-all ${
                       filtroCategoria === 'ver-todas'
@@ -834,8 +812,7 @@ const StockInsumosPage = () => {
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Insumo</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Categoría</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Unidad Presentación</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Unidades</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Granel</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Total</th>
                           <th className="text-center py-3 px-4 font-semibold text-gray-700">Estado</th>
                         </tr>
                       </thead>
@@ -889,15 +866,6 @@ const StockInsumosPage = () => {
                               <td className="py-3 px-4 text-gray-700">
                                 <span className="text-sm">
                                   {insumo.fields['Unidad Ingresa Insumo'] || insumo.fields.unidad_medida || 'Sin unidad'}
-                                </span>
-                              </td>
-                              
-                              {/* Total Unidades */}
-                              <td className="py-3 px-4 text-center">
-                                <span className={`font-bold text-lg ${
-                                  esAgotado ? 'text-red-600' : 'text-green-600'
-                                }`}>
-                                  {Number(totalUnidades).toFixed(2)}
                                 </span>
                               </td>
                               
@@ -1073,16 +1041,18 @@ const StockInsumosPage = () => {
                           </select>
                         </div>
 
-                        {/* Unidad de medida */}
+                        {/* Unidad de medida - Campo de texto con sugerencias de Airtable */}
                         <div className="group">
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
                             <div className="flex items-center space-x-2">
                               <span className="text-lg">⚖️</span>
-                              <span>Unidad de Medida</span>
+                              <span>Unidad de Presentación</span>
                               <span className="text-red-500">*</span>
                             </div>
                           </label>
-                          <select
+                          <input
+                            type="text"
+                            list={`unidades-list-${index}`}
                             required
                             value={insumo.unidad_medida}
                             onChange={(e) => {
@@ -1090,12 +1060,17 @@ const StockInsumosPage = () => {
                               nuevosInsumos[index] = {...nuevosInsumos[index], unidad_medida: e.target.value};
                               setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
                             }}
-                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white appearance-none cursor-pointer placeholder-gray-500 text-gray-700"
-                          >
-                            {unidadesMedida.map(unidad => (
-                              <option key={unidad} value={unidad} className="text-gray-700">{unidad}</option>
+                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white placeholder-gray-500 text-gray-700"
+                            placeholder="Ej: TARRO DE 500GR, BOLSA DE 1KG, UNIDAD..."
+                          />
+                          <datalist id={`unidades-list-${index}`}>
+                            {unidadesDisponibles.map(unidad => (
+                              <option key={unidad} value={unidad} />
                             ))}
-                          </select>
+                          </datalist>
+                          <p className="text-xs text-gray-500 mt-1">
+                            💡 Escribe una nueva unidad o selecciona una existente de Airtable
+                          </p>
                         </div>
                       </div>
 
