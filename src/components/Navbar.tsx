@@ -131,6 +131,7 @@ const Navbar: React.FC = () => {
             ? 'bg-white/95 backdrop-blur-md shadow-lg'
             : 'bg-transparent'
         }`}
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3">
@@ -305,9 +306,10 @@ const Navbar: React.FC = () => {
         {/* Mobile menu */}
         <div
           ref={mobileMenuRef}
-          className={`xl:hidden fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col ${
+          className={`xl:hidden fixed top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col ${
             isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
+          style={{ height: '100dvh', minHeight: '-webkit-fill-available' }}
         >
           {/* Mobile menu header */}
           <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
@@ -607,7 +609,10 @@ const Navbar: React.FC = () => {
 
           {/* Mobile menu footer - fixed at bottom */}
           {isAuthenticated && (
-            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
+            <div 
+              className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900"
+              style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}
+            >
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
