@@ -48,7 +48,7 @@ const StockInsumosPage = () => {
     insumos: [{
       nombre: '',
       categoria_insumo: 'Materiales y Suministros Generales',
-      unidad_medida: 'UNIDAD',
+      unidad_medida: '',
       descripcion: '',
       cantidadPresentacion: '',
       cantidadInicial: '',
@@ -947,7 +947,7 @@ const StockInsumosPage = () => {
                         insumos: [...newInsumoData.insumos, {
                           nombre: '',
                           categoria_insumo: 'Materiales y Suministros Generales',
-                          unidad_medida: 'UNIDAD',
+                          unidad_medida: '',
                           descripcion: '',
                           cantidadPresentacion: '',
                           cantidadInicial: '',
@@ -1050,9 +1050,7 @@ const StockInsumosPage = () => {
                               <span className="text-red-500">*</span>
                             </div>
                           </label>
-                          <input
-                            type="text"
-                            list={`unidades-list-${index}`}
+                          <select
                             required
                             value={insumo.unidad_medida}
                             onChange={(e) => {
@@ -1060,17 +1058,13 @@ const StockInsumosPage = () => {
                               nuevosInsumos[index] = {...nuevosInsumos[index], unidad_medida: e.target.value};
                               setNewInsumoData({...newInsumoData, insumos: nuevosInsumos});
                             }}
-                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white placeholder-gray-500 text-gray-700"
-                            placeholder="Ej: TARRO DE 500GR, BOLSA DE 1KG, UNIDAD..."
-                          />
-                          <datalist id={`unidades-list-${index}`}>
+                            className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white appearance-none cursor-pointer text-gray-700"
+                          >
+                            <option value="" className="text-gray-500">Seleccionar unidad...</option>
                             {unidadesDisponibles.map(unidad => (
-                              <option key={unidad} value={unidad} />
+                              <option key={unidad} value={unidad} className="text-gray-700">{unidad}</option>
                             ))}
-                          </datalist>
-                          <p className="text-xs text-gray-500 mt-1">
-                            💡 Escribe una nueva unidad o selecciona una existente de Airtable
-                          </p>
+                          </select>
                         </div>
                       </div>
 

@@ -256,9 +256,9 @@ const MushroomInoculationForm = () => {
           const insumoEncontrado = data.insumos.find((insumo: any) => insumo.id === insumoId);
           
           if (insumoEncontrado) {
-            // Usar el campo 'Total Insumo Granel' para comparar con cantidades en gramos
-            const stockDisponible = insumoEncontrado.fields['Total Insumo Granel'] || 0;
-            console.log(`✅ Stock encontrado para ${insumoId}: ${stockDisponible} gramos`);
+            // Usar el campo 'Total Insumo Unidades' para comparar stock disponible
+            const stockDisponible = insumoEncontrado.fields['Total Insumo Unidades'] || 0;
+            console.log(`✅ Stock encontrado para ${insumoId}: ${stockDisponible}`);
             return stockDisponible;
           } else {
             console.log(`⚠️ Insumo ${insumoId} no encontrado en la tabla de stock`);
@@ -486,10 +486,8 @@ const MushroomInoculationForm = () => {
                 
                 const salidaInsumosData = insumosCalculados.map(insumo => ({
                   fecha: formData.inoculationDate,
-                  cantidad: insumo.cantidad,
-                  unidad: insumo.unidad,
+                  cantidadSalida: insumo.cantidad, // Cantidad directa = bolsas × factor
                   insumoId: insumo.id,
-                  equivalenciaGramos: insumo.equivalenciaGramos,
                   inoculacionId: result.recordId,
                   userName: user?.nombre || formData.registradoPor,
                   nombreEvento: `Inoculación ${formData.microorganism} - ${formData.bagQuantity} bolsas`
@@ -687,55 +685,50 @@ const MushroomInoculationForm = () => {
   };
 
   // Función para calcular insumos según la fórmula maestra
+  // Cantidad Salida = Cantidad de Bolsas × Factor/Bolsa
   const calcularInsumos = async (cantidadBolsas: number) => {
     const formInsumos = [
       {
         id: 'recAhttbj6RjnpACX',
         nombre: 'Arroz',
         cantidad: cantidadBolsas * 150,
-        unidad: 'gr',
-        descripcion: 'Arroz por @',
-        equivalenciaGramos: 11339.8 // 1 paquete = 11,339.8gr
+        unidad: 'GRAMOS',
+        descripcion: 'Arroz por @'
       },
       {
         id: 'rec6U8tw8EEoFx52A',
         nombre: 'Clorafenicol',
         cantidad: cantidadBolsas * 0.014,
-        unidad: 'gr',
-        descripcion: 'Antibiótico-cloranfenicol',
-        equivalenciaGramos: 20 // 1 unidad = 20gr
+        unidad: 'GRAMOS',
+        descripcion: 'Antibiótico-cloranfenicol'
       },
       {
         id: 'recXBHudUK2T0OcPI',
         nombre: 'Melaza',
         cantidad: cantidadBolsas * 0.56,
-        unidad: 'gr',
-        descripcion: 'Melaza',
-        equivalenciaGramos: 30000 // 1 unidad = 30,000gr
+        unidad: 'GRAMOS',
+        descripcion: 'Melaza'
       },
       {
         id: 'recHlpm0r9IILswJP',
         nombre: 'Bolsa polipropileno',
         cantidad: cantidadBolsas * 1,
-        unidad: 'unidad',
-        descripcion: 'Bolsas de Polipropileno x 100und',
-        equivalenciaGramos: 100 // 1 paquete = 100 unidades
+        unidad: 'UNIDADES',
+        descripcion: 'Bolsas de Polipropileno x 100und'
       },
       {
         id: 'rec9AVRKuMfYoLozj',
         nombre: 'Tween 80',
         cantidad: cantidadBolsas * 0.028,
-        unidad: 'ml',
-        descripcion: 'Tween 80 x 500ml',
-        equivalenciaGramos: 500 // 1 tarro = 500ml
+        unidad: 'MILILITROS',
+        descripcion: 'Tween 80 x 500ml'
       },
       {
         id: 'recd9ipWHpeMzBX3O',
         nombre: 'Algodón',
         cantidad: cantidadBolsas * 0.42,
-        unidad: 'gr',
-        descripcion: 'Bolsa copos de algodón x 500 gr',
-        equivalenciaGramos: 500 // 1 bolsa = 500gr
+        unidad: 'GRAMOS',
+        descripcion: 'Bolsa copos de algodón x 500 gr'
       }
     ];
 
