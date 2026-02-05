@@ -16,7 +16,8 @@ import {
   Plus,
   Edit,
   Eye,
-  CheckCircle
+  CheckCircle,
+  FileText
 } from 'lucide-react';
 
 interface Cliente {
@@ -75,6 +76,11 @@ export default function PedidosClientesPage() {
   const [verificacionStock, setVerificacionStock] = useState<any>(null);
   const [loadingVerificacion, setLoadingVerificacion] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<Pedido | null>(null);
+  
+  // Estados para remisiones
+  const [remisionesDelPedido, setRemisionesDelPedido] = useState<any[]>([]);
+  const [loadingRemisiones, setLoadingRemisiones] = useState(false);
+  const [generandoRemision, setGenerandoRemision] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -286,56 +292,113 @@ export default function PedidosClientesPage() {
 
     setPedidoSeleccionado(pedido);
     setLoadingVerificacion(true);
+    setLoadingRemisiones(true);
     setShowVerificarStockModal(true);
+    setRemisionesDelPedido([]);
 
     try {
-      console.log('🔍 Verificando stock para pedido:', pedido.idPedidoCore);
-      const response = await fetch(`/api/pedidos/verificar-stock?pedidoId=${pedido.idPedidoCore}`);
+      // Cargar verificación de stock y remisiones en paralelo
+      const [stockResponse, remisionesResponse] = await Promise.all([
+        fetch(`/api/pedidos/verificar-stock?pedidoId=${pedido.idPedidoCore}`),
+        fetch(`/api/remisiones?pedidoId=${pedido.idPedidoCore}`)
+      ]);
       
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', response.headers.get('content-type'));
-      
-      // Verificar si la respuesta tiene contenido
-      const text = await response.text();
-      console.log('📄 Response text:', text);
-      
-      if (!text) {
-        throw new Error('Respuesta vacía del servidor');
+      // Procesar verificación de stock
+      const stockText = await stockResponse.text();
+      if (stockText) {
+        const stockData = JSON.parse(stockText);
+        if (stockData.success) {
+          setVerificacionStock(stockData);
+        } else {
+          setVerificacionStock({ success: false, error: stockData.error });
+        }
+      } else {
+        setVerificacionStock({ success: false, error: 'Respuesta vacía del servidor' });
       }
       
-      const data = JSON.parse(text);
-      
-      if (data.success) {
-        setVerificacionStock(data);
-      } else {
-        console.error('Error verificando stock:', data.error);
-        setVerificacionStock({ success: false, error: data.error });
+      // Procesar remisiones
+      if (remisionesResponse.ok) {
+        const remisionesData = await remisionesResponse.json();
+        if (remisionesData.success) {
+          setRemisionesDelPedido(remisionesData.remisiones || []);
+          console.log('📦 Remisiones del pedido:', remisionesData.remisiones?.length || 0);
+        }
       }
     } catch (error) {
       console.error('Error verificando stock:', error);
       setVerificacionStock({ success: false, error: error instanceof Error ? error.message : 'Error de conexión' });
     } finally {
       setLoadingVerificacion(false);
+      setLoadingRemisiones(false);
     }
   };
 
-  // Función para generar remisión (placeholder)
-  const generarRemision = async () => {
-    if (!pedidoSeleccionado || !verificacionStock?.pedidoCompleto) return;
+  // Función para generar remisión
+  const generarRemision = async (esDespachoCompleto: boolean = true) => {
+    if (!pedidoSeleccionado || !verificacionStock?.productos) return;
+
+    setGenerandoRemision(true);
 
     try {
-      alert('🚧 Función de generación de remisión en desarrollo.\n\n' +
-            'Próximamente se creará la remisión en Sirius Remisiones Core.');
-      
-      // TODO: Implementar creación de remisión
-      // const response = await fetch('/api/remisiones/crear', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ pedidoId: pedidoSeleccionado.idPedidoCore })
-      // });
-      
-      setShowVerificarStockModal(false);
+      // Preparar productos para la remisión
+      const productosParaRemision = verificacionStock.productos
+        .filter((p: any) => esDespachoCompleto ? p.completo : p.stockDisponible > 0)
+        .map((p: any) => ({
+          productoId: p.productoId,
+          cantidad: esDespachoCompleto ? p.cantidadPedida : Math.min(p.stockDisponible, p.cantidadPedida),
+          unidad: p.unidad || 'Litro',
+          notas: p.productoNombre
+        }));
+
+      if (productosParaRemision.length === 0) {
+        alert('No hay productos disponibles para crear la remisión');
+        setGenerandoRemision(false);
+        return;
+      }
+
+      console.log('📦 Generando remisión con', productosParaRemision.length, 'productos');
+
+      const response = await fetch('/api/remisiones', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pedidoId: pedidoSeleccionado.idPedidoCore,
+          productos: productosParaRemision,
+          responsable: user?.nombre || '',
+          areaOrigen: 'Laboratorio',
+          esDespachoCompleto,
+          notas: esDespachoCompleto 
+            ? 'Despacho completo generado desde DataLab' 
+            : 'Despacho parcial - productos con stock disponible'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`✅ ${data.message}\n\nID Remisión: ${data.remision.idRemision}\nProductos: ${data.remision.productosRemitidos}`);
+        
+        // Recargar remisiones del pedido
+        const remisionesResponse = await fetch(`/api/remisiones?pedidoId=${pedidoSeleccionado.idPedidoCore}`);
+        if (remisionesResponse.ok) {
+          const remisionesData = await remisionesResponse.json();
+          if (remisionesData.success) {
+            setRemisionesDelPedido(remisionesData.remisiones || []);
+          }
+        }
+        
+        // Recargar pedidos para actualizar estado
+        fetchPedidos();
+      } else {
+        alert(`❌ Error al crear remisión: ${data.error}`);
+      }
     } catch (error) {
       console.error('Error generando remisión:', error);
+      alert('❌ Error de conexión al generar la remisión');
+    } finally {
+      setGenerandoRemision(false);
     }
   };
 
@@ -808,8 +871,9 @@ export default function PedidosClientesPage() {
                     <button
                       onClick={() => setShowVerificarStockModal(false)}
                       className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                      disabled={generandoRemision}
                     >
-                      Cancelar
+                      Cerrar
                     </button>
                     {verificacionStock.productos?.some((p: any) => p.stockDisponible > 0) && (
                       <div className="flex-1">
@@ -819,19 +883,87 @@ export default function PedidosClientesPage() {
                           </p>
                         )}
                         <button
-                          onClick={generarRemision}
-                          className={`w-full px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg ${
+                          onClick={() => generarRemision(verificacionStock.pedidoCompleto)}
+                          disabled={generandoRemision}
+                          className={`w-full px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
                             verificacionStock.pedidoCompleto
                               ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700'
                               : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600'
                           }`}
                         >
-                          {verificacionStock.pedidoCompleto 
-                            ? '🚀 Generar Remisión Completa' 
-                            : '📦 Despachar Productos Disponibles'
-                          }
+                          {generandoRemision ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                              Generando Remisión...
+                            </span>
+                          ) : (
+                            verificacionStock.pedidoCompleto 
+                              ? '🚀 Generar Remisión Completa' 
+                              : '📦 Despachar Productos Disponibles'
+                          )}
                         </button>
                       </div>
+                    )}
+                  </div>
+                  
+                  {/* Sección de Remisiones Existentes */}
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <h5 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      📄 Remisiones de este Pedido
+                      {loadingRemisiones && (
+                        <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></span>
+                      )}
+                    </h5>
+                    
+                    {!loadingRemisiones && remisionesDelPedido.length === 0 ? (
+                      <div className="text-center py-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-500 text-sm">No hay remisiones generadas para este pedido</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {remisionesDelPedido.map((remision: any, idx: number) => (
+                          <div 
+                            key={remision.id || idx}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">📄</span>
+                              <div>
+                                <p className="font-semibold text-blue-600">{remision.idRemision}</p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(remision.fechaRemision).toLocaleDateString('es-ES', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                remision.estado === 'Entregada' ? 'bg-green-100 text-green-800' :
+                                remision.estado === 'En Tránsito' ? 'bg-blue-100 text-blue-800' :
+                                remision.estado === 'Pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                                remision.estado === 'Cancelada' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {remision.estado}
+                              </span>
+                              <span className="text-sm font-medium text-gray-600">
+                                {remision.totalCantidad?.toLocaleString('es-CO')} L
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {remisionesDelPedido.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Total: {remisionesDelPedido.length} remisión(es) generada(s)
+                      </p>
                     )}
                   </div>
                 </>

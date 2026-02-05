@@ -626,6 +626,11 @@ export default function CalendarioProduccionPage() {
   const [verificacionStock, setVerificacionStock] = useState<any>(null);
   const [loadingVerificacion, setLoadingVerificacion] = useState(false);
   
+  // Estados para el formulario de despacho
+  const [cantidadesDespacho, setCantidadesDespacho] = useState<Record<string, number>>({});
+  const [productosExcluidos, setProductosExcluidos] = useState<Set<string>>(new Set());
+  const [generandoRemision, setGenerandoRemision] = useState(false);
+  
   // Estado para progreso de stock (batch optimizado)
   const [progresosPedidos, setProgresosPedidos] = useState<Record<string, any>>({});
 
@@ -1220,6 +1225,17 @@ export default function CalendarioProduccionPage() {
         
         console.log('📊 Resumen:', data.resumen);
         setVerificacionStock(data);
+        
+        // Inicializar cantidades de despacho con el mínimo entre stock disponible y cantidad pedida
+        const cantidadesIniciales: Record<string, number> = {};
+        data.productos.forEach((prod: any) => {
+          const productoId = prod.productoId || prod.idProductoCore;
+          // Valor inicial: el menor entre stock disponible y cantidad pedida
+          cantidadesIniciales[productoId] = Math.min(prod.stockDisponible || 0, prod.cantidadPedida || 0);
+        });
+        setCantidadesDespacho(cantidadesIniciales);
+        setProductosExcluidos(new Set()); // Limpiar productos excluidos
+        
         setShowVerificarStockModal(true);
       } else {
         console.error('❌ Error verificando stock:', data.error);
@@ -1236,25 +1252,162 @@ export default function CalendarioProduccionPage() {
     }
   };
 
-  // Generar remisión (solo si el pedido está completo)
+  // Generar remisión (completa o parcial)
   const handleGenerarRemision = async () => {
-    if (!verificacionStock?.pedidoCompleto) {
-      alert('No se puede generar la remisión porque faltan productos');
+    if (!verificacionStock?.productos || verificacionStock.productos.length === 0) {
+      alert('No se puede generar la remisión porque no hay datos de productos');
       return;
     }
 
+    // Filtrar productos no excluidos y con cantidad > 0
+    const productosADespachar = verificacionStock.productos.filter((p: any) => {
+      const productoId = p.productoId || p.idProductoCore;
+      const cantidad = cantidadesDespacho[productoId] || 0;
+      return !productosExcluidos.has(productoId) && cantidad > 0;
+    });
+
+    if (productosADespachar.length === 0) {
+      alert('No hay productos seleccionados para despachar. Agrega al menos un producto con cantidad mayor a 0.');
+      return;
+    }
+
+    // Verificar que todas las cantidades sean válidas
+    const cantidadTotal = productosADespachar.reduce((sum: number, p: any) => {
+      const productoId = p.productoId || p.idProductoCore;
+      return sum + (cantidadesDespacho[productoId] || 0);
+    }, 0);
+
+    if (cantidadTotal === 0) {
+      alert('La cantidad total a despachar debe ser mayor a 0');
+      return;
+    }
+
+    setGenerandoRemision(true);
+    
     try {
-      console.log('📄 Generando remisión para pedido:', selectedPedidoDetalle?.id);
-      // TODO: Implementar la generación de remisión
-      alert('Funcionalidad de generación de remisión en desarrollo');
+      console.log('📄 Generando remisión para pedido:', selectedPedidoDetalle?.idPedidoCore || selectedPedidoDetalle?.id);
       
-      // Cerrar modales
-      setShowVerificarStockModal(false);
-      setShowPedidoDetalleModal(false);
+      // Preparar productos para la remisión con las cantidades del formulario
+      const productosParaRemision = productosADespachar.map((p: any) => {
+        const productoId = p.productoId || p.idProductoCore;
+        return {
+          productoId,
+          cantidad: cantidadesDespacho[productoId] || 0,
+          unidad: p.unidad || 'Litro',
+          notas: p.productoNombre || p.nombreProducto
+        };
+      });
+
+      console.log('📦 Productos para remisión:', productosParaRemision);
+
+      // Determinar si es despacho completo (todos los productos con cantidad completa)
+      const esDespachoCompleto = verificacionStock.productos.every((p: any) => {
+        const productoId = p.productoId || p.idProductoCore;
+        const cantidadDespacho = cantidadesDespacho[productoId] || 0;
+        return !productosExcluidos.has(productoId) && cantidadDespacho >= p.cantidadPedida;
+      });
+
+      const response = await fetch('/api/remisiones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedidoId: selectedPedidoDetalle?.idPedidoCore || selectedPedidoDetalle?.id,
+          productos: productosParaRemision,
+          responsable: user?.nombre || '',
+          areaOrigen: 'Laboratorio',
+          esDespachoCompleto,
+          notas: esDespachoCompleto 
+            ? 'Despacho completo generado desde Calendario de Producción' 
+            : `Despacho parcial - ${productosParaRemision.length} producto(s) despachado(s)`
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const resumenProductos = productosParaRemision
+          .map((p: { notas: string; cantidad: number; unidad: string }) => `${p.notas}: ${p.cantidad} ${p.unidad}`)
+          .join('\n');
+        
+        alert(`✅ ${data.message}\n\nID Remisión: ${data.remision.idRemision}\n\nProductos despachados:\n${resumenProductos}`);
+        
+        // Cerrar modales y recargar datos
+        setShowVerificarStockModal(false);
+        setVerificacionStock(null);
+        setCantidadesDespacho({});
+        setProductosExcluidos(new Set());
+        setShowPedidoDetalleModal(false);
+        setSelectedPedidoDetalle(null);
+        
+        // Recargar pedidos pendientes
+        fetchPedidosPendientes();
+      } else {
+        console.error('❌ Error generando remisión:', data.error);
+        alert('Error generando remisión: ' + data.error);
+      }
     } catch (error) {
       console.error('❌ Error generando remisión:', error);
       alert('Error generando remisión');
+    } finally {
+      setGenerandoRemision(false);
     }
+  };
+
+  // Funciones para manejar el formulario de despacho
+  const handleCantidadChange = (productoId: string, cantidad: number, maxCantidad: number) => {
+    // Asegurar que la cantidad esté entre 0 y el máximo permitido
+    const cantidadValida = Math.max(0, Math.min(cantidad, maxCantidad));
+    setCantidadesDespacho(prev => ({
+      ...prev,
+      [productoId]: cantidadValida
+    }));
+  };
+
+  const handleExcluirProducto = (productoId: string) => {
+    setProductosExcluidos(prev => {
+      const newSet = new Set(prev);
+      newSet.add(productoId);
+      return newSet;
+    });
+    // Poner cantidad en 0
+    setCantidadesDespacho(prev => ({
+      ...prev,
+      [productoId]: 0
+    }));
+  };
+
+  const handleIncluirProducto = (productoId: string, stockDisponible: number, cantidadPedida: number) => {
+    setProductosExcluidos(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(productoId);
+      return newSet;
+    });
+    // Restaurar cantidad al mínimo entre stock y pedido
+    setCantidadesDespacho(prev => ({
+      ...prev,
+      [productoId]: Math.min(stockDisponible, cantidadPedida)
+    }));
+  };
+
+  // Calcular totales del despacho actual
+  const calcularTotalesDespacho = () => {
+    if (!verificacionStock?.productos) return { cantidad: 0, productos: 0 };
+    
+    let cantidadTotal = 0;
+    let productosTotal = 0;
+    
+    verificacionStock.productos.forEach((p: any) => {
+      const productoId = p.productoId || p.idProductoCore;
+      if (!productosExcluidos.has(productoId)) {
+        const cantidad = cantidadesDespacho[productoId] || 0;
+        if (cantidad > 0) {
+          cantidadTotal += cantidad;
+          productosTotal++;
+        }
+      }
+    });
+    
+    return { cantidad: cantidadTotal, productos: productosTotal };
   };
 
   // Calcular progreso de stock para un pedido
@@ -4566,14 +4719,18 @@ export default function CalendarioProduccionPage() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className={`px-6 py-4 rounded-t-2xl ${
-              verificacionStock.pedidoCompleto 
-                ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
-                : 'bg-gradient-to-r from-orange-600 to-red-600'
+              verificacionStock.pedidoDespachado 
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600'
+                : verificacionStock.pedidoCompleto 
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
+                  : 'bg-gradient-to-r from-orange-600 to-red-600'
             }`}>
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    {verificacionStock.pedidoCompleto ? (
+                    {verificacionStock.pedidoDespachado ? (
+                      <>📦 Pedido Completamente Despachado</>
+                    ) : verificacionStock.pedidoCompleto ? (
                       <>✅ Pedido Completo - Listo para Despachar</>
                     ) : (
                       <>⚠️ Pedido Incompleto - Faltan Productos</>
@@ -4581,6 +4738,9 @@ export default function CalendarioProduccionPage() {
                   </h2>
                   <p className="text-white/90 text-sm mt-1">
                     {verificacionStock.resumen.productosCompletos} de {verificacionStock.resumen.totalProductos} productos disponibles
+                    {verificacionStock.resumen.totalDespachado > 0 && (
+                      <> • Ya despachado: {verificacionStock.resumen.totalDespachado} L</>
+                    )}
                   </p>
                 </div>
                 <button
@@ -4599,151 +4759,250 @@ export default function CalendarioProduccionPage() {
 
             {/* Body */}
             <div className="p-6 space-y-6">
-              {/* Resumen */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-blue-50 rounded-xl p-4 text-center">
-                  <p className="text-blue-600 font-medium text-sm mb-1">Total Productos</p>
-                  <p className="text-3xl font-bold text-gray-900">{verificacionStock.resumen.totalProductos}</p>
+              {/* Resumen del despacho actual */}
+              <div className="grid grid-cols-5 gap-3">
+                <div className="bg-blue-50 rounded-xl p-3 text-center">
+                  <p className="text-blue-600 font-medium text-xs mb-1">Total Pedido</p>
+                  <p className="text-xl font-bold text-gray-900">{verificacionStock.resumen.totalPedido} L</p>
                 </div>
-                <div className="bg-green-50 rounded-xl p-4 text-center">
-                  <p className="text-green-600 font-medium text-sm mb-1">Completos</p>
-                  <p className="text-3xl font-bold text-green-700">{verificacionStock.resumen.productosCompletos}</p>
+                <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                  <p className="text-emerald-600 font-medium text-xs mb-1">Ya Despachado</p>
+                  <p className="text-xl font-bold text-emerald-700">{verificacionStock.resumen.totalDespachado || 0} L</p>
                 </div>
-                <div className="bg-red-50 rounded-xl p-4 text-center">
-                  <p className="text-red-600 font-medium text-sm mb-1">Faltantes</p>
-                  <p className="text-3xl font-bold text-red-700">{verificacionStock.resumen.productosFaltantes}</p>
+                <div className="bg-amber-50 rounded-xl p-3 text-center">
+                  <p className="text-amber-600 font-medium text-xs mb-1">Pendiente</p>
+                  <p className="text-xl font-bold text-amber-700">{verificacionStock.resumen.totalPendiente || verificacionStock.resumen.totalPedido} L</p>
+                </div>
+                <div className="bg-green-50 rounded-xl p-3 text-center">
+                  <p className="text-green-600 font-medium text-xs mb-1">Stock Disponible</p>
+                  <p className="text-xl font-bold text-green-700">{verificacionStock.resumen.totalDisponible} L</p>
+                </div>
+                <div className="bg-purple-50 rounded-xl p-3 text-center">
+                  <p className="text-purple-600 font-medium text-xs mb-1">A Despachar Ahora</p>
+                  <p className="text-xl font-bold text-purple-700">{calcularTotalesDespacho().cantidad.toLocaleString('es-CO')} L</p>
                 </div>
               </div>
 
-              {/* Lista de productos */}
+              {/* Formulario de productos a despachar */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  📋 Detalle de Productos
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  📦 Configurar Despacho
+                  <span className="text-sm font-normal text-gray-500">
+                    (Ajusta las cantidades a despachar por producto)
+                  </span>
                 </h3>
+                
+                {/* Productos incluidos */}
                 <div className="space-y-3">
-                  {verificacionStock.productos.map((producto: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className={`rounded-xl p-4 border-2 ${
-                        producto.completo
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-red-50 border-red-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-2xl">
-                              {producto.completo ? '✅' : '❌'}
-                            </span>
-                            <div>
-                              <h4 className="font-semibold text-gray-900">
-                                {producto.productoNombre}
-                              </h4>
-                              <p className="text-sm text-gray-600">
-                                {producto.productoId}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
+                  {verificacionStock.productos
+                    .filter((producto: any) => !productosExcluidos.has(producto.productoId || producto.idProductoCore))
+                    .map((producto: any, idx: number) => {
+                      const productoId = producto.productoId || producto.idProductoCore;
+                      const maxCantidad = producto.stockDisponible || 0;
+                      const cantidadActual = cantidadesDespacho[productoId] || 0;
+                      
+                      return (
+                        <div
+                          key={idx}
+                          className={`rounded-xl p-4 border-2 transition-all ${
+                            cantidadActual > 0
+                              ? 'bg-green-50 border-green-300'
+                              : 'bg-gray-50 border-gray-200'
+                          }`}
+                        >
                           <div className="flex items-center gap-4">
-                            <div>
-                              <p className="text-xs text-gray-500">Pedido</p>
-                              <p className="text-lg font-bold text-gray-900">
-                                {producto.cantidadPedida} {producto.unidad}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">Stock</p>
-                              <p className={`text-lg font-bold ${
-                                producto.completo ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {producto.stockDisponible} {producto.unidad}
-                              </p>
-                            </div>
-                            {!producto.completo && (
-                              <div>
-                                <p className="text-xs text-red-600 font-medium">Falta</p>
-                                <p className="text-lg font-bold text-red-700">
-                                  {producto.faltante} {producto.unidad}
-                                </p>
+                            {/* Info del producto */}
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">
+                                  {producto.despachado ? '📦' : cantidadActual > 0 ? '✅' : '⏸️'}
+                                </span>
+                                <div>
+                                  <h4 className="font-semibold text-gray-900">
+                                    {producto.productoNombre}
+                                  </h4>
+                                  <p className="text-xs text-gray-500">
+                                    {productoId}
+                                  </p>
+                                  {producto.cantidadDespachada > 0 && (
+                                    <p className="text-xs text-emerald-600 font-medium">
+                                      ✓ Ya despachado: {producto.cantidadDespachada} L
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                            )}
+                            </div>
+                            
+                            {/* Info de cantidades */}
+                            <div className="flex items-center gap-2 text-sm">
+                              <div className="text-center px-2 py-1 bg-blue-100 rounded-lg">
+                                <p className="text-xs text-blue-600">Pedido</p>
+                                <p className="font-bold text-blue-800">{producto.cantidadPedida} L</p>
+                              </div>
+                              {producto.cantidadDespachada > 0 && (
+                                <div className="text-center px-2 py-1 bg-emerald-100 rounded-lg">
+                                  <p className="text-xs text-emerald-600">Despachado</p>
+                                  <p className="font-bold text-emerald-800">{producto.cantidadDespachada} L</p>
+                                </div>
+                              )}
+                              <div className="text-center px-2 py-1 bg-amber-100 rounded-lg">
+                                <p className="text-xs text-amber-600">Pendiente</p>
+                                <p className="font-bold text-amber-800">{producto.pendientePorDespachar || producto.cantidadPedida} L</p>
+                              </div>
+                              <div className="text-center px-2 py-1 bg-green-100 rounded-lg">
+                                <p className="text-xs text-green-600">Stock</p>
+                                <p className="font-bold text-green-800">{maxCantidad} L</p>
+                              </div>
+                            </div>
+                            
+                            {/* Input de cantidad */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex flex-col items-center">
+                                <label className="text-xs text-gray-600 mb-1">Despachar</label>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleCantidadChange(productoId, cantidadActual - 10, maxCantidad)}
+                                    className="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 text-black font-bold transition-colors"
+                                    disabled={cantidadActual <= 1}
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={maxCantidad}
+                                    value={cantidadActual}
+                                    onChange={(e) => handleCantidadChange(productoId, parseFloat(e.target.value) || 1, maxCantidad)}
+                                    className="w-24 px-3 py-2 text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 font-bold text-lg text-black placeholder-black"
+                                  />
+                                  <button
+                                    onClick={() => handleCantidadChange(productoId, cantidadActual + 10, maxCantidad)}
+                                    className="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 text-black font-bold transition-colors"
+                                    disabled={cantidadActual >= maxCantidad}
+                                  >
+                                    +
+                                  </button>
+                                  <span className="text-gray-600 font-medium ml-1">L</span>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1">Máx: {maxCantidad} L</p>
+                              </div>
+                            </div>
+                            
+                            {/* Botón quitar */}
+                            <button
+                              onClick={() => handleExcluirProducto(productoId)}
+                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition-colors"
+                              title="Quitar del despacho"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })}
                 </div>
-              </div>
-
-              {/* Mensaje de productos faltantes */}
-              {!verificacionStock.pedidoCompleto && (
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-xl">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg className="h-6 w-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-yellow-800">
-                        Acción Requerida
-                      </h3>
-                      <div className="mt-2 text-sm text-yellow-700">
-                        <p>
-                          Para completar este pedido, es necesario producir o registrar los siguientes productos faltantes:
-                        </p>
-                        <ul className="list-disc list-inside mt-2 space-y-1">
-                          {verificacionStock.productos?.filter((p: any) => !p.completo).map((prod: any, idx: number) => (
-                            <li key={idx}>
-                              <strong>{prod.productoNombre}</strong>: {prod.faltante} {prod.unidad}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                
+                {/* Productos excluidos */}
+                {productosExcluidos.size > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">
+                      🚫 Productos Excluidos del Despacho
+                      <span className="text-xs font-normal text-gray-400">
+                        (Haz clic en + para volver a incluir)
+                      </span>
+                    </h4>
+                    <div className="space-y-2">
+                      {verificacionStock.productos
+                        .filter((producto: any) => productosExcluidos.has(producto.productoId || producto.idProductoCore))
+                        .map((producto: any, idx: number) => {
+                          const productoId = producto.productoId || producto.idProductoCore;
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-3 bg-gray-100 border border-gray-200 rounded-lg opacity-60"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl">❌</span>
+                                <div>
+                                  <p className="font-medium text-gray-700">{producto.productoNombre}</p>
+                                  <p className="text-xs text-gray-500">
+                                    Pedido: {producto.cantidadPedida} L | Stock: {producto.stockDisponible} L
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleIncluirProducto(productoId, producto.stockDisponible, producto.cantidadPedida)}
+                                className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg transition-colors text-sm font-medium"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Incluir
+                              </button>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Footer */}
-            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-between gap-3">
-              <button
-                onClick={() => {
-                  setShowVerificarStockModal(false);
-                  setVerificacionStock(null);
-                }}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cerrar
-              </button>
-              
-              {/* Mostrar botón si hay al menos 1 producto con stock disponible */}
-              {verificacionStock.productos?.some((p: any) => p.stockDisponible > 0) && (
-                <div className="flex-1 flex flex-col items-end gap-2">
-                  {!verificacionStock.pedidoCompleto && (
-                    <p className="text-xs text-amber-600 font-medium">
-                      ⚠️ Despacho parcial: solo productos con stock disponible
+            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    setShowVerificarStockModal(false);
+                    setVerificacionStock(null);
+                    setCantidadesDespacho({});
+                    setProductosExcluidos(new Set());
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={generandoRemision}
+                >
+                  Cancelar
+                </button>
+                
+                <div className="flex items-center gap-4">
+                  {/* Resumen del despacho */}
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">
+                      {calcularTotalesDespacho().productos} producto(s)
                     </p>
-                  )}
+                    <p className="text-lg font-bold text-gray-900">
+                      {calcularTotalesDespacho().cantidad.toLocaleString('es-CO')} Litros
+                    </p>
+                  </div>
+                  
+                  {/* Botón de generar remisión */}
                   <button
                     onClick={handleGenerarRemision}
-                    className={`px-6 py-2 font-medium rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 ${
-                      verificacionStock.pedidoCompleto
+                    disabled={generandoRemision || calcularTotalesDespacho().productos === 0}
+                    className={`px-6 py-3 font-medium rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      calcularTotalesDespacho().productos > 0
                         ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700'
-                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600'
+                        : 'bg-gray-300 text-gray-500'
                     }`}
                   >
-                    {verificacionStock.pedidoCompleto 
-                      ? '📄 Generar Remisión Completa' 
-                      : '📦 Despachar Productos Disponibles'
-                    }
+                    {generandoRemision ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        📄 Generar Remisión
+                      </>
+                    )}
                   </button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>

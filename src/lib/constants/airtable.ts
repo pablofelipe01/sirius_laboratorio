@@ -150,6 +150,84 @@ export type OrigenPedido = typeof SIRIUS_PEDIDOS_CORE_CONFIG.ORIGENES_PEDIDO[num
 export type EstadoPedido = typeof SIRIUS_PEDIDOS_CORE_CONFIG.ESTADOS_PEDIDO[number];
 
 // ============================================================================
+// Configuración para Sirius Remisiones Core
+// Sistema de gestión de remisiones y despachos
+// ============================================================================
+export const SIRIUS_REMISIONES_CORE_CONFIG = {
+  BASE_ID: process.env.AIRTABLE_BASE_ID_SIRIUS_REMISIONES_CORE!,
+  API_KEY: process.env.AIRTABLE_API_KEY_SIRIUS_REMISIONES_CORE!,
+  
+  TABLES: {
+    REMISIONES: process.env.AIRTABLE_TABLE_REMISIONES!,
+    PRODUCTOS_REMITIDOS: process.env.AIRTABLE_TABLE_PRODUCTOS_REMITIDOS!,
+  },
+  
+  // Field IDs para tabla Remisiones
+  FIELDS_REMISIONES: {
+    ID: process.env.AIRTABLE_FIELD_REMISION_ID!,                           // Formula: "SIRIUS-REM-0001"
+    NUMERACION: process.env.AIRTABLE_FIELD_REMISION_NUMERACION!,           // Auto Number
+    FECHA_REMISION: process.env.AIRTABLE_FIELD_REMISION_FECHA!,            // Created time
+    DOCUMENTO: process.env.AIRTABLE_FIELD_REMISION_DOCUMENTO!,             // Attachment
+    NOTAS: process.env.AIRTABLE_FIELD_REMISION_NOTAS!,                     // Long text
+    ID_CLIENTE: process.env.AIRTABLE_FIELD_REMISION_ID_CLIENTE!,           // Text
+    ID_PEDIDO: process.env.AIRTABLE_FIELD_REMISION_ID_PEDIDO!,             // Text
+    PRODUCTOS_REMITIDOS: process.env.AIRTABLE_FIELD_REMISION_PRODUCTOS!,   // Link to Productos Remitidos
+    AREA_ORIGEN: process.env.AIRTABLE_FIELD_REMISION_AREA_ORIGEN!,         // Single select
+    ESTADO: process.env.AIRTABLE_FIELD_REMISION_ESTADO!,                   // Single select
+    RESPONSABLE_ENTREGA: process.env.AIRTABLE_FIELD_REMISION_RESPONSABLE_ENTREGA!, // Text
+    TRANSPORTISTA: process.env.AIRTABLE_FIELD_REMISION_TRANSPORTISTA!,     // Text
+    RECEPTOR: process.env.AIRTABLE_FIELD_REMISION_RECEPTOR!,               // Text
+    FECHA_ENTREGA: process.env.AIRTABLE_FIELD_REMISION_FECHA_ENTREGA!,     // Date
+    FECHA_RECIBIDO: process.env.AIRTABLE_FIELD_REMISION_FECHA_RECIBIDO!,   // Date
+    ESTADO_FIRMA_TRANSPORTISTA: process.env.AIRTABLE_FIELD_REMISION_ESTADO_FIRMA_TRANSPORTISTA!, // Single select
+    COMENTARIO_TRANSPORTISTA: process.env.AIRTABLE_FIELD_REMISION_COMENTARIO_TRANSPORTISTA!, // Long text
+    ESTADO_FIRMA_RECEPTOR: process.env.AIRTABLE_FIELD_REMISION_ESTADO_FIRMA_RECEPTOR!, // Single select
+    COMENTARIO_RECEPTOR: process.env.AIRTABLE_FIELD_REMISION_COMENTARIO_RECEPTOR!, // Long text
+    URL_GENERADA: process.env.AIRTABLE_FIELD_REMISION_URL_GENERADA!,       // URL
+    NOMBRE_ARCHIVO: process.env.AIRTABLE_FIELD_REMISION_NOMBRE_ARCHIVO!,   // Text
+    TOTAL_CANTIDAD: process.env.AIRTABLE_FIELD_REMISION_TOTAL_CANTIDAD!,   // Rollup
+  },
+  
+  // Field IDs para tabla Productos Remitidos
+  FIELDS_PRODUCTOS_REMITIDOS: {
+    ID: process.env.AIRTABLE_FIELD_PRODUCTO_REMITIDO_ID!,                  // Auto Number
+    REMISION_VINCULADA: process.env.AIRTABLE_FIELD_PRODUCTO_REMITIDO_REMISION!, // Link to Remisiones
+    NOTAS: process.env.AIRTABLE_FIELD_PRODUCTO_REMITIDO_NOTAS!,            // Long text
+    CANTIDAD: process.env.AIRTABLE_FIELD_PRODUCTO_REMITIDO_CANTIDAD!,      // Number
+    UNIDAD: process.env.AIRTABLE_FIELD_PRODUCTO_REMITIDO_UNIDAD!,          // Text
+    ID_PRODUCTO: process.env.AIRTABLE_FIELD_PRODUCTO_REMITIDO_ID_PRODUCTO!, // Text
+  },
+  
+  // Valores permitidos para Area Origen
+  AREAS_ORIGEN: [
+    'Laboratorio',
+    'Producción',
+    'Almacén',
+    'Ventas'
+  ] as const,
+  
+  // Valores permitidos para Estado
+  ESTADOS_REMISION: [
+    'Borrador',
+    'Pendiente',
+    'En Tránsito',
+    'Entregada',
+    'Cancelada'
+  ] as const,
+  
+  // Valores permitidos para Estado Firma
+  ESTADOS_FIRMA: [
+    'Sin Firmar',
+    'Firmado'
+  ] as const,
+} as const;
+
+// Tipos para Sirius Remisiones Core
+export type AreaOrigenRemision = typeof SIRIUS_REMISIONES_CORE_CONFIG.AREAS_ORIGEN[number];
+export type EstadoRemision = typeof SIRIUS_REMISIONES_CORE_CONFIG.ESTADOS_REMISION[number];
+export type EstadoFirma = typeof SIRIUS_REMISIONES_CORE_CONFIG.ESTADOS_FIRMA[number];
+
+// ============================================================================
 // Configuración para Sirius Inventario Production Core
 // ============================================================================
 export const SIRIUS_INVENTARIO_CONFIG = {
@@ -246,6 +324,17 @@ export const buildSiriusPedidosCoreUrl = (tableId: string, recordId?: string) =>
 // Headers específicos para Sirius Pedidos Core
 export const getSiriusPedidosCoreHeaders = () => ({
   'Authorization': `Bearer ${SIRIUS_PEDIDOS_CORE_CONFIG.API_KEY}`,
+  'Content-Type': 'application/json',
+});
+
+// Helper específico para Sirius Remisiones Core
+export const buildSiriusRemisionesCoreUrl = (tableId: string, recordId?: string) => {
+  return buildAirtableUrl(tableId, recordId, SIRIUS_REMISIONES_CORE_CONFIG.BASE_ID);
+};
+
+// Headers específicos para Sirius Remisiones Core
+export const getSiriusRemisionesCoreHeaders = () => ({
+  'Authorization': `Bearer ${SIRIUS_REMISIONES_CORE_CONFIG.API_KEY}`,
   'Content-Type': 'application/json',
 });
 

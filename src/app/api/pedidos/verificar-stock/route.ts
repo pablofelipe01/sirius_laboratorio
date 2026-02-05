@@ -153,10 +153,11 @@ export async function GET(request: NextRequest) {
 
     console.log('🔍 Buscando stock con IDs:', { recordIdPedido, idPedidoCore });
 
-    // 3. Para cada producto, verificar stock disponible del pedido
+    // 3. Para cada producto, verificar stock disponible del pedido Y cantidades ya despachadas
     const verificacionStock = await Promise.all(
       detallesPedido.map(async (detalle) => {
-        const movimientosRecords = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+        // Obtener movimientos de ENTRADA (producción asignada al pedido)
+        const movimientosEntrada = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
           .select({
             filterByFormula: `AND(
               {tipo_movimiento} = "Entrada",
@@ -169,21 +170,50 @@ export async function GET(request: NextRequest) {
           })
           .firstPage();
 
-        console.log(`📊 Producto ${detalle.idProductoCore}: ${movimientosRecords.length} movimientos`);
+        // Obtener movimientos de SALIDA (despachos/remisiones)
+        const movimientosSalida = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+          .select({
+            filterByFormula: `AND(
+              {tipo_movimiento} = "Salida",
+              {product_id} = "${detalle.idProductoCore}",
+              OR(
+                {ubicacion_destino_id} = "${recordIdPedido}",
+                {ubicacion_destino_id} = "${idPedidoCore}"
+              )
+            )`
+          })
+          .firstPage();
 
-        const stockActual = movimientosRecords.reduce((total, movimiento) => {
-          return total + (movimiento.get('cantidad') as number || 0);
+        console.log(`📊 Producto ${detalle.idProductoCore}: ${movimientosEntrada.length} entradas, ${movimientosSalida.length} salidas`);
+
+        // Calcular totales
+        const totalEntradas = movimientosEntrada.reduce((total, mov) => {
+          return total + (mov.get('cantidad') as number || 0);
         }, 0);
 
-        const stockSuficiente = stockActual >= detalle.cantidadPedida;
-        const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockActual;
+        const totalSalidas = movimientosSalida.reduce((total, mov) => {
+          return total + (mov.get('cantidad') as number || 0);
+        }, 0);
+
+        // Stock disponible = entradas - salidas
+        const stockDisponible = totalEntradas - totalSalidas;
+        const stockSuficiente = stockDisponible >= detalle.cantidadPedida;
+        const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockDisponible;
+        
+        // Calcular pendiente por despachar
+        const cantidadDespachada = totalSalidas;
+        const pendientePorDespachar = detalle.cantidadPedida - cantidadDespachada;
 
         return {
           productoNombre: nombresProductos.get(detalle.idProductoCore) || detalle.idProductoCore,
           productoId: detalle.idProductoCore,
           cantidadPedida: detalle.cantidadPedida,
-          stockDisponible: stockActual,
+          cantidadDespachada,
+          pendientePorDespachar: Math.max(0, pendientePorDespachar),
+          stockDisponible: Math.max(0, stockDisponible), // No mostrar negativos
+          totalProducido: totalEntradas,
           completo: stockSuficiente,
+          despachado: cantidadDespachada >= detalle.cantidadPedida,
           faltante,
           unidad: detalle.unidad
         };
@@ -194,21 +224,28 @@ export async function GET(request: NextRequest) {
     const totalPedido = verificacionStock.reduce((sum, v) => sum + v.cantidadPedida, 0);
     const totalDisponible = verificacionStock.reduce((sum, v) => sum + v.stockDisponible, 0);
     const totalFaltante = verificacionStock.reduce((sum, v) => sum + v.faltante, 0);
+    const totalDespachado = verificacionStock.reduce((sum, v) => sum + v.cantidadDespachada, 0);
+    const totalPendiente = verificacionStock.reduce((sum, v) => sum + v.pendientePorDespachar, 0);
 
     // 5. Determinar si el pedido está completo
     const pedidoCompleto = verificacionStock.every(v => v.completo);
+    const pedidoDespachado = verificacionStock.every(v => v.despachado);
     const productosFaltantes = verificacionStock.filter(v => !v.completo);
 
     return NextResponse.json({
       success: true,
       pedidoCompleto,
+      pedidoDespachado,
       productos: verificacionStock,
       resumen: {
         totalPedido,
         totalDisponible,
         totalFaltante,
+        totalDespachado,
+        totalPendiente,
         totalProductos: verificacionStock.length,
         productosCompletos: verificacionStock.filter(v => v.completo).length,
+        productosDespachados: verificacionStock.filter(v => v.despachado).length,
         productosFaltantes: productosFaltantes.length
       }
     });
@@ -330,10 +367,11 @@ export async function POST(request: NextRequest) {
 
     console.log('🔍 Buscando stock con IDs (POST):', { recordIdPedido, idPedidoCore });
 
-    // 3. Para cada producto, verificar stock disponible del pedido
+    // 3. Para cada producto, verificar stock disponible del pedido Y cantidades ya despachadas
     const verificacionStock = await Promise.all(
       detallesPedido.map(async (detalle) => {
-        const movimientosRecords = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+        // Obtener movimientos de ENTRADA (producción asignada al pedido)
+        const movimientosEntrada = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
           .select({
             filterByFormula: `AND(
               {tipo_movimiento} = "Entrada",
@@ -346,21 +384,50 @@ export async function POST(request: NextRequest) {
           })
           .firstPage();
 
-        console.log(`📊 Producto ${detalle.idProductoCore}: ${movimientosRecords.length} movimientos (POST)`);
+        // Obtener movimientos de SALIDA (despachos/remisiones)
+        const movimientosSalida = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+          .select({
+            filterByFormula: `AND(
+              {tipo_movimiento} = "Salida",
+              {product_id} = "${detalle.idProductoCore}",
+              OR(
+                {ubicacion_destino_id} = "${recordIdPedido}",
+                {ubicacion_destino_id} = "${idPedidoCore}"
+              )
+            )`
+          })
+          .firstPage();
 
-        const stockActual = movimientosRecords.reduce((total, movimiento) => {
-          return total + (movimiento.get('cantidad') as number || 0);
+        console.log(`📊 Producto ${detalle.idProductoCore}: ${movimientosEntrada.length} entradas, ${movimientosSalida.length} salidas (POST)`);
+
+        // Calcular totales
+        const totalEntradas = movimientosEntrada.reduce((total, mov) => {
+          return total + (mov.get('cantidad') as number || 0);
         }, 0);
 
-        const stockSuficiente = stockActual >= detalle.cantidadPedida;
-        const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockActual;
- 
+        const totalSalidas = movimientosSalida.reduce((total, mov) => {
+          return total + (mov.get('cantidad') as number || 0);
+        }, 0);
+
+        // Stock disponible = entradas - salidas
+        const stockDisponible = totalEntradas - totalSalidas;
+        const stockSuficiente = stockDisponible >= detalle.cantidadPedida;
+        const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockDisponible;
+        
+        // Calcular pendiente por despachar
+        const cantidadDespachada = totalSalidas;
+        const pendientePorDespachar = detalle.cantidadPedida - cantidadDespachada;
+
         return {
           productoNombre: nombresProductos.get(detalle.idProductoCore) || detalle.idProductoCore,
           productoId: detalle.idProductoCore,
           cantidadPedida: detalle.cantidadPedida,
-          stockDisponible: stockActual,
+          cantidadDespachada,
+          pendientePorDespachar: Math.max(0, pendientePorDespachar),
+          stockDisponible: Math.max(0, stockDisponible), // No mostrar negativos
+          totalProducido: totalEntradas,
           completo: stockSuficiente,
+          despachado: cantidadDespachada >= detalle.cantidadPedida,
           faltante,
           unidad: detalle.unidad
         };
@@ -371,21 +438,28 @@ export async function POST(request: NextRequest) {
     const totalPedido = verificacionStock.reduce((sum, v) => sum + v.cantidadPedida, 0);
     const totalDisponible = verificacionStock.reduce((sum, v) => sum + v.stockDisponible, 0);
     const totalFaltante = verificacionStock.reduce((sum, v) => sum + v.faltante, 0);
+    const totalDespachado = verificacionStock.reduce((sum, v) => sum + v.cantidadDespachada, 0);
+    const totalPendiente = verificacionStock.reduce((sum, v) => sum + v.pendientePorDespachar, 0);
 
     // 5. Determinar si el pedido está completo
     const pedidoCompleto = verificacionStock.every(v => v.completo);
+    const pedidoDespachado = verificacionStock.every(v => v.despachado);
     const productosFaltantes = verificacionStock.filter(v => !v.completo);
 
     return NextResponse.json({
       success: true,
       pedidoCompleto,
+      pedidoDespachado,
       productos: verificacionStock,
       resumen: {
         totalPedido,
         totalDisponible,
         totalFaltante,
+        totalDespachado,
+        totalPendiente,
         totalProductos: verificacionStock.length,
         productosCompletos: verificacionStock.filter(v => v.completo).length,
+        productosDespachados: verificacionStock.filter(v => v.despachado).length,
         productosFaltantes: productosFaltantes.length
       }
     });
