@@ -48,7 +48,10 @@ export async function POST(request: NextRequest) {
               porcentaje: 0,
               totalPedido: 0,
               totalStock: 0,
-              completo: false
+              completo: false,
+              totalDespachado: 0,
+              porcentajeDespacho: 0,
+              despachado: false
             };
           }
 
@@ -75,10 +78,11 @@ export async function POST(request: NextRequest) {
           const detallesPedido = await Promise.all(detallesPromises);
           const idPedidoCore = pedidoRecord.get('ID Pedido Core') as string || '';
 
-          // Verificar stock para cada producto
+          // Verificar stock y despachos para cada producto
           const verificacionStock = await Promise.all(
             detallesPedido.map(async (detalle) => {
-              const movimientosRecords = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+              // Consultar Entradas (producción asignada al pedido)
+              const movimientosEntrada = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
                 .select({
                   filterByFormula: `AND(
                     {tipo_movimiento} = "Entrada",
@@ -91,21 +95,49 @@ export async function POST(request: NextRequest) {
                 })
                 .firstPage();
 
-              const stockActual = movimientosRecords.reduce((total, movimiento) => {
+              const stockActual = movimientosEntrada.reduce((total, movimiento) => {
                 return total + (movimiento.get('cantidad') as number || 0);
               }, 0);
 
+              // Consultar Salidas (despachos del pedido) - ubicacion_destino_id es el pedido
+              let cantidadDespachada = 0;
+              try {
+                const movimientosSalida = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+                  .select({
+                    filterByFormula: `AND(
+                      {tipo_movimiento} = "Salida",
+                      {product_id} = "${detalle.idProductoCore}",
+                      OR(
+                        {ubicacion_destino_id} = "${pedidoId}",
+                        {ubicacion_destino_id} = "${idPedidoCore}"
+                      )
+                    )`
+                  })
+                  .firstPage();
+
+                cantidadDespachada = movimientosSalida.reduce((total, movimiento) => {
+                  return total + (movimiento.get('cantidad') as number || 0);
+                }, 0);
+              } catch (e) {
+                // Si falla la consulta de salidas, continuar con 0
+                console.log('Error consultando salidas:', e);
+              }
+
               return {
                 cantidadPedida: detalle.cantidadPedida,
-                stockActual
+                stockActual,
+                cantidadDespachada
               };
             })
           );
 
           const totalPedido = verificacionStock.reduce((sum, v) => sum + v.cantidadPedida, 0);
           const totalStock = verificacionStock.reduce((sum, v) => sum + v.stockActual, 0);
+          const totalDespachado = verificacionStock.reduce((sum, v) => sum + v.cantidadDespachada, 0);
           const pedidoCompleto = verificacionStock.every(v => v.stockActual >= v.cantidadPedida);
+          const pedidoDespachado = verificacionStock.every(v => v.cantidadDespachada >= v.cantidadPedida);
           const porcentaje = totalPedido > 0 ? Math.round((totalStock / totalPedido) * 100) : 0;
+          const porcentajeDespacho = totalPedido > 0 ? Math.round((totalDespachado / totalPedido) * 100) : 0;
 
           return {
             pedidoId,
@@ -113,7 +145,10 @@ export async function POST(request: NextRequest) {
             porcentaje: Math.min(porcentaje, 100),
             totalPedido,
             totalStock,
-            completo: pedidoCompleto
+            completo: pedidoCompleto,
+            totalDespachado,
+            porcentajeDespacho: Math.min(porcentajeDespacho, 100),
+            despachado: pedidoDespachado
           };
 
         } catch (error: any) {
@@ -124,7 +159,10 @@ export async function POST(request: NextRequest) {
             porcentaje: 0,
             totalPedido: 0,
             totalStock: 0,
-            completo: false
+            completo: false,
+            totalDespachado: 0,
+            porcentajeDespacho: 0,
+            despachado: false
           };
         }
       })

@@ -1459,7 +1459,10 @@ export default function CalendarioProduccionPage() {
               porcentaje: resultado.porcentaje,
               totalPedido: resultado.totalPedido,
               totalStock: resultado.totalStock,
-              completo: resultado.completo
+              completo: resultado.completo,
+              totalDespachado: resultado.totalDespachado || 0,
+              porcentajeDespacho: resultado.porcentajeDespacho || 0,
+              despachado: resultado.despachado || false
             };
           }
         });
@@ -2537,9 +2540,37 @@ export default function CalendarioProduccionPage() {
                           </div>
                           <div className="flex items-center justify-between mt-1">
                             <span className="text-xs text-gray-500">{progreso.totalStock}L / {progreso.totalPedido}L</span>
-                            {progreso.completo && (
+                            {progreso.completo && !progreso.despachado && (
                               <span className="text-xs text-green-600 font-semibold">✓ Listo para despachar</span>
                             )}
+                          </div>
+                          
+                          {/* Barra de progreso de despacho */}
+                          <div className="mt-2">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium text-gray-600">📦 Progreso de Despacho</span>
+                              <span className={`text-xs font-bold ${
+                                progreso.despachado ? 'text-blue-600' : 
+                                progreso.porcentajeDespacho >= 50 ? 'text-cyan-600' : 'text-gray-500'
+                              }`}>
+                                {progreso.porcentajeDespacho}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                              <div
+                                className={`h-2.5 rounded-full transition-all duration-500 ${
+                                  progreso.despachado ? 'bg-blue-500' : 
+                                  progreso.porcentajeDespacho >= 50 ? 'bg-cyan-500' : 'bg-gray-400'
+                                }`}
+                                style={{ width: `${progreso.porcentajeDespacho}%` }}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-xs text-gray-500">{progreso.totalDespachado}L / {progreso.totalPedido}L</span>
+                              {progreso.despachado && (
+                                <span className="text-xs text-blue-600 font-semibold">✓ Despachado completo</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -4504,20 +4535,52 @@ export default function CalendarioProduccionPage() {
         </div>
       </div>
       
-      {/* Modal de Detalle del Pedido */}
-      {showPedidoDetalleModal && selectedPedidoDetalle && (
+      {/* Modal de Detalle del Pedido - MEJORADO */}
+      {showPedidoDetalleModal && selectedPedidoDetalle && (() => {
+        const progreso = progresosPedidos[selectedPedidoDetalle.id] || null;
+        return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-2xl">
-              <div className="flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header con ID grande */}
+            <div className={`px-6 py-5 rounded-t-2xl ${
+              progreso?.despachado 
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600'
+                : progreso?.completo 
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-600'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600'
+            }`}>
+              <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-white">
-                    📦 Detalle del Pedido
-                  </h2>
-                  <p className="text-indigo-200 text-sm">
+                  <p className="text-white/70 text-sm font-medium mb-1">Pedido</p>
+                  <h2 className="text-3xl font-bold text-white tracking-wide">
                     {selectedPedidoDetalle.idPedidoCore || `#${selectedPedidoDetalle.idNumerico}` || 'Sin ID'}
-                  </p>
+                  </h2>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                      selectedPedidoDetalle.estado === 'Recibido' 
+                        ? 'bg-yellow-400 text-yellow-900' 
+                        : selectedPedidoDetalle.estado === 'Procesando'
+                        ? 'bg-blue-400 text-blue-900'
+                        : selectedPedidoDetalle.estado === 'Completado'
+                        ? 'bg-green-400 text-green-900'
+                        : selectedPedidoDetalle.estado === 'Despachado'
+                        ? 'bg-indigo-400 text-indigo-900'
+                        : 'bg-white/30 text-white'
+                    }`}>
+                      {selectedPedidoDetalle.estado || 'Pendiente'}
+                    </span>
+                    {selectedPedidoDetalle.prioridad && (
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedPedidoDetalle.prioridad === 'Alta' 
+                          ? 'bg-red-400 text-red-900' 
+                          : selectedPedidoDetalle.prioridad === 'Media'
+                          ? 'bg-orange-400 text-orange-900'
+                          : 'bg-gray-300 text-gray-700'
+                      }`}>
+                        ⚡ {selectedPedidoDetalle.prioridad}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => {
@@ -4535,83 +4598,195 @@ export default function CalendarioProduccionPage() {
             
             {/* Body */}
             <div className="p-6 space-y-6">
-              {/* Estado y Fechas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Estado</h3>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    selectedPedidoDetalle.estado === 'Recibido' 
-                      ? 'bg-yellow-100 text-yellow-800' 
-                      : selectedPedidoDetalle.estado === 'Procesando'
-                      ? 'bg-blue-100 text-blue-800'
-                      : selectedPedidoDetalle.estado === 'Completado'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
+              
+              {/* Barras de Progreso - Producción y Despacho */}
+              {progreso ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Progreso de Producción */}
+                  <div className={`rounded-xl p-4 border-2 ${
+                    progreso.completo 
+                      ? 'bg-green-50 border-green-200' 
+                      : progreso.porcentaje >= 50 
+                        ? 'bg-yellow-50 border-yellow-200' 
+                        : 'bg-red-50 border-red-200'
                   }`}>
-                    {selectedPedidoDetalle.estado || 'Pendiente'}
-                  </span>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        ⚗️ Producción
+                      </span>
+                      <span className={`text-lg font-bold ${
+                        progreso.completo ? 'text-green-600' : 
+                        progreso.porcentaje >= 50 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {progreso.porcentaje}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden mb-2">
+                      <div
+                        className={`h-4 rounded-full transition-all duration-500 ${
+                          progreso.completo ? 'bg-green-500' : 
+                          progreso.porcentaje >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${progreso.porcentaje}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">{progreso.totalStock} / {progreso.totalPedido} L</span>
+                      {progreso.completo && (
+                        <span className="text-xs text-green-600 font-semibold bg-green-100 px-2 py-0.5 rounded-full">
+                          ✓ Completo
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Progreso de Despacho */}
+                  <div className={`rounded-xl p-4 border-2 ${
+                    progreso.despachado 
+                      ? 'bg-blue-50 border-blue-200' 
+                      : progreso.porcentajeDespacho >= 50 
+                        ? 'bg-cyan-50 border-cyan-200' 
+                        : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        📦 Despacho
+                      </span>
+                      <span className={`text-lg font-bold ${
+                        progreso.despachado ? 'text-blue-600' : 
+                        progreso.porcentajeDespacho >= 50 ? 'text-cyan-600' : 'text-gray-500'
+                      }`}>
+                        {progreso.porcentajeDespacho}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden mb-2">
+                      <div
+                        className={`h-4 rounded-full transition-all duration-500 ${
+                          progreso.despachado ? 'bg-blue-500' : 
+                          progreso.porcentajeDespacho >= 50 ? 'bg-cyan-500' : 'bg-gray-400'
+                        }`}
+                        style={{ width: `${progreso.porcentajeDespacho}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">{progreso.totalDespachado} / {progreso.totalPedido} L</span>
+                      {progreso.despachado && (
+                        <span className="text-xs text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">
+                          ✓ Entregado
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-100 rounded-xl p-4 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-24 mb-3"></div>
+                    <div className="h-4 bg-gray-200 rounded-full"></div>
+                  </div>
+                  <div className="bg-gray-100 rounded-xl p-4 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-24 mb-3"></div>
+                    <div className="h-4 bg-gray-200 rounded-full"></div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Info Cards Row */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Cliente */}
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🏢</span>
+                    <span className="text-xs font-medium text-indigo-600 uppercase tracking-wide">Cliente</span>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900 truncate">
+                    {selectedPedidoDetalle.nombreCliente || 'No especificado'}
+                  </p>
+                  {selectedPedidoDetalle.clienteId && (
+                    <p className="text-xs text-gray-500 mt-1 font-mono">
+                      {selectedPedidoDetalle.clienteId}
+                    </p>
+                  )}
                 </div>
                 
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Fecha del Pedido</h3>
-                  <p className="text-lg font-semibold text-gray-900">
-                    📅 {selectedPedidoDetalle.fechaPedido 
+                {/* Fecha Pedido */}
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">📅</span>
+                    <span className="text-xs font-medium text-amber-600 uppercase tracking-wide">Fecha Pedido</span>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900">
+                    {selectedPedidoDetalle.fechaPedido 
                       ? new Date(selectedPedidoDetalle.fechaPedido).toLocaleDateString('es-ES', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
                         })
                       : 'No especificada'}
                   </p>
                 </div>
-              </div>
-              
-              {/* Cliente */}
-              <div className="bg-indigo-50 rounded-xl p-4">
-                <h3 className="text-sm font-medium text-indigo-600 mb-2">🏢 Cliente</h3>
-                <p className="text-xl font-bold text-gray-900">
-                  {selectedPedidoDetalle.nombreCliente || 'Cliente no especificado'}
-                </p>
-                {selectedPedidoDetalle.clienteId && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    ID: {selectedPedidoDetalle.clienteId}
+                
+                {/* Fecha Entrega */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🚚</span>
+                    <span className="text-xs font-medium text-green-600 uppercase tracking-wide">Entrega Est.</span>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900">
+                    {selectedPedidoDetalle.fechaEntregaEstimada 
+                      ? new Date(selectedPedidoDetalle.fechaEntregaEstimada).toLocaleDateString('es-ES', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })
+                      : 'Por definir'}
                   </p>
-                )}
+                </div>
               </div>
               
-              {/* Productos */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  🧪 Productos del Pedido
-                  <span className="bg-indigo-100 text-indigo-700 text-sm px-2 py-0.5 rounded-full">
-                    {selectedPedidoDetalle.productos?.length || 0} productos
+              {/* Productos - Tabla mejorada */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                    🧪 Productos del Pedido
+                  </h3>
+                  <span className="bg-indigo-100 text-indigo-700 text-sm font-semibold px-3 py-1 rounded-full">
+                    {selectedPedidoDetalle.productos?.length || 0} items
                   </span>
-                </h3>
+                </div>
                 
                 {selectedPedidoDetalle.productos && selectedPedidoDetalle.productos.length > 0 ? (
-                  <div className="bg-gray-50 rounded-xl overflow-hidden">
+                  <>
                     <table className="w-full">
-                      <thead className="bg-gray-100">
+                      <thead className="bg-gray-100/50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Producto</th>
-                          <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Cantidad</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Unidad</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Producto</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Cantidad</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Unidad</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-gray-100">
                         {selectedPedidoDetalle.productos.map((prod: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-gray-100 transition-colors">
-                            <td className="px-4 py-3 text-gray-900 font-medium">
-                              {prod.nombre || 'Producto sin nombre'}
+                          <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center text-lg">
+                                  🧫
+                                </div>
+                                <span className="font-medium text-gray-900">
+                                  {prod.nombre || 'Producto sin nombre'}
+                                </span>
+                              </div>
                             </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className="inline-flex items-center justify-center bg-indigo-100 text-indigo-700 font-bold px-3 py-1 rounded-full">
+                            <td className="px-4 py-4 text-center">
+                              <span className="inline-flex items-center justify-center bg-indigo-600 text-white font-bold px-4 py-1.5 rounded-lg text-lg min-w-[60px]">
                                 {prod.cantidad || 0}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-center text-gray-600">
-                              {prod.unidad || 'L'}
+                            <td className="px-4 py-4 text-center">
+                              <span className="text-gray-600 font-medium">
+                                {prod.unidad || 'L'}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -4619,99 +4794,124 @@ export default function CalendarioProduccionPage() {
                     </table>
                     
                     {/* Total */}
-                    <div className="bg-indigo-600 px-4 py-3 flex justify-between items-center">
-                      <span className="text-white font-medium">Total Productos</span>
-                      <span className="text-white font-bold text-lg">
+                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-4 flex justify-between items-center">
+                      <span className="text-white font-semibold text-lg">Total del Pedido</span>
+                      <span className="text-white font-bold text-2xl">
                         {selectedPedidoDetalle.productos.reduce((sum: number, p: any) => sum + (p.cantidad || 0), 0)} L
                       </span>
                     </div>
-                  </div>
+                  </>
                 ) : (
-                  <div className="bg-gray-50 rounded-xl p-8 text-center text-gray-500">
+                  <div className="p-8 text-center text-gray-500">
                     <span className="text-4xl block mb-2">📭</span>
-                    <p>No hay productos detallados para este pedido</p>
+                    <p>No hay productos detallados</p>
                   </div>
                 )}
               </div>
               
               {/* Notas */}
               {selectedPedidoDetalle.notas && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                  <h3 className="text-sm font-medium text-yellow-700 mb-2 flex items-center gap-2">
-                    💬 Notas del Pedido
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-400 rounded-r-xl p-4">
+                  <h3 className="text-sm font-semibold text-amber-700 mb-2 flex items-center gap-2">
+                    💬 Notas del Cliente
                   </h3>
-                  <p className="text-gray-700 whitespace-pre-wrap">
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
                     {selectedPedidoDetalle.notas}
                   </p>
                 </div>
               )}
               
-              {/* Información adicional */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {selectedPedidoDetalle.fechaEntregaEstimada && (
-                  <div className="bg-green-50 rounded-lg p-3">
-                    <p className="text-green-600 font-medium">📦 Entrega Estimada</p>
-                    <p className="text-gray-700">
-                      {new Date(selectedPedidoDetalle.fechaEntregaEstimada).toLocaleDateString('es-ES')}
-                    </p>
-                  </div>
-                )}
-                
-                {selectedPedidoDetalle.prioridad && (
-                  <div className={`rounded-lg p-3 ${
-                    selectedPedidoDetalle.prioridad === 'Alta' 
-                      ? 'bg-red-50' 
-                      : selectedPedidoDetalle.prioridad === 'Media'
-                      ? 'bg-yellow-50'
-                      : 'bg-gray-50'
+              {/* Resumen Visual */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  📊 Resumen del Estado
+                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Timeline/Steps visual */}
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                    true ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
                   }`}>
-                    <p className={`font-medium ${
-                      selectedPedidoDetalle.prioridad === 'Alta' 
-                        ? 'text-red-600' 
-                        : selectedPedidoDetalle.prioridad === 'Media'
-                        ? 'text-yellow-600'
-                        : 'text-gray-600'
-                    }`}>⚡ Prioridad</p>
-                    <p className="text-gray-700">{selectedPedidoDetalle.prioridad}</p>
+                    <span>1</span>
+                    <span className="text-sm font-medium">Recibido</span>
+                    {true && <span>✓</span>}
                   </div>
-                )}
+                  <span className="text-gray-300">→</span>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                    (progreso?.porcentaje || 0) > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    <span>2</span>
+                    <span className="text-sm font-medium">En Producción</span>
+                    {(progreso?.porcentaje || 0) > 0 && <span>{progreso?.porcentaje}%</span>}
+                  </div>
+                  <span className="text-gray-300">→</span>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                    progreso?.completo ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    <span>3</span>
+                    <span className="text-sm font-medium">Listo</span>
+                    {progreso?.completo && <span>✓</span>}
+                  </div>
+                  <span className="text-gray-300">→</span>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                    (progreso?.porcentajeDespacho || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    <span>4</span>
+                    <span className="text-sm font-medium">Despachando</span>
+                    {(progreso?.porcentajeDespacho || 0) > 0 && <span>{progreso?.porcentajeDespacho}%</span>}
+                  </div>
+                  <span className="text-gray-300">→</span>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                    progreso?.despachado ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    <span>5</span>
+                    <span className="text-sm font-medium">Entregado</span>
+                    {progreso?.despachado && <span>✓</span>}
+                  </div>
+                </div>
               </div>
             </div>
             
-            {/* Footer */}
-            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-between gap-3">
-              <button
-                onClick={() => handleVerificarStock(selectedPedidoDetalle.id)}
-                disabled={loadingVerificacion}
-                className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loadingVerificacion ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Verificando...
-                  </>
-                ) : (
-                  <>
-                    📦 Despachar Pedido
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setShowPedidoDetalleModal(false);
-                  setSelectedPedidoDetalle(null);
-                }}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cerrar
-              </button>
+            {/* Footer con acciones */}
+            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl border-t border-gray-200">
+              <div className="flex flex-wrap gap-3 justify-between items-center">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleVerificarStock(selectedPedidoDetalle.id)}
+                    disabled={loadingVerificacion}
+                    className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {loadingVerificacion ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Verificando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>📦</span>
+                        <span>Despachar Pedido</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setShowPedidoDetalleModal(false);
+                    setSelectedPedidoDetalle(null);
+                  }}
+                  className="px-5 py-2.5 text-gray-700 bg-white border-2 border-gray-300 font-semibold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
       
       {/* Modal de Verificación de Stock */}
       {showVerificarStockModal && verificacionStock && (
