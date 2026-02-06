@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import LoteSelector from '@/components/LoteSelector';
 import { ModalPedido } from '@/components/ModalPedido';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Interfaces
 interface ProduccionEvento {
@@ -631,8 +632,52 @@ export default function CalendarioProduccionPage() {
   const [productosExcluidos, setProductosExcluidos] = useState<Set<string>>(new Set());
   const [generandoRemision, setGenerandoRemision] = useState(false);
   
+  // Estados para transportista
+  const [transportistaCedula, setTransportistaCedula] = useState('');
+  const [transportistaSeleccionado, setTransportistaSeleccionado] = useState<{
+    id: string;
+    codigo: string;
+    cedula: string;
+    nombreCompleto: string;
+    tipoUsuario: string;
+    telefono: string;
+  } | null>(null);
+  const [buscandoTransportista, setBuscandoTransportista] = useState(false);
+  const [showNuevoTransportistaModal, setShowNuevoTransportistaModal] = useState(false);
+  const [nuevoTransportista, setNuevoTransportista] = useState({
+    cedula: '',
+    nombreCompleto: '',
+    telefono: '',
+    correo: ''
+  });
+  const [creandoTransportista, setCreandoTransportista] = useState(false);
+  
   // Estado para progreso de stock (batch optimizado)
   const [progresosPedidos, setProgresosPedidos] = useState<Record<string, any>>({});
+  
+  // Estado para remisión del pedido seleccionado
+  const [remisionPedido, setRemisionPedido] = useState<{
+    id: string;
+    urlDocumento: string;
+    idRemision: string;
+    estado: string;
+    fechaRemision: string;
+    areaOrigen: string;
+    responsableEntrega: string;
+    notas: string;
+    totalCantidad: number;
+    nombreArchivo: string;
+    fechaPedidoDespachado: string;
+    fechaRecibido: string;
+    idCliente: string;
+    idPedido: string;
+    productos: { nombre: string; cantidad: number; unidad: string }[];
+    transportista: { nombre: string; cedula: string } | null;
+    receptor: { nombre: string; cedula: string } | null;
+    yaFirmada: boolean;
+  } | null>(null);
+  const [loadingRemision, setLoadingRemision] = useState(false);
+  const [showRemisionModal, setShowRemisionModal] = useState(false);
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -1086,9 +1131,9 @@ export default function CalendarioProduccionPage() {
       const data = await response.json();
       
       if (data.success && data.pedidos) {
-        // Filtrar solo pedidos pendientes (no completados ni cancelados)
+        // Filtrar pedidos activos (incluir Completado para ver info al día, excluir solo Cancelados)
         const pendientes = data.pedidos.filter((p: any) => 
-          p.estado !== 'Completado' && p.estado !== 'Cancelado'
+          p.estado !== 'Cancelado'
         );
         setPedidosPendientes(pendientes);
         
@@ -1188,6 +1233,93 @@ export default function CalendarioProduccionPage() {
       console.error('❌ Error guardando pedido:', error);
       alert('Error guardando pedido');
     }
+  };
+
+  // Buscar remisión existente para un pedido
+  const fetchRemisionPedido = async (pedidoId: string) => {
+    try {
+      setLoadingRemision(true);
+      const response = await fetch(`/api/remisiones?pedidoId=${encodeURIComponent(pedidoId)}`);
+      const data = await response.json();
+      if (data.success && data.remisiones && data.remisiones.length > 0) {
+        const remision = data.remisiones[0]; // La más reciente
+        
+        // Obtener detalles completos (productos y personas) desde el endpoint de firma
+        let productos: { nombre: string; cantidad: number; unidad: string }[] = [];
+        let transportista: { nombre: string; cedula: string } | null = null;
+        let receptor: { nombre: string; cedula: string } | null = null;
+        let yaFirmada = false;
+        
+        try {
+          const detailRes = await fetch(`/api/remisiones/firmar?remisionId=${remision.id}`);
+          const detailData = await detailRes.json();
+          if (detailData.success && detailData.remision) {
+            productos = detailData.remision.productos || [];
+            yaFirmada = detailData.remision.yaFirmada || false;
+            if (detailData.remision.transportista) {
+              transportista = {
+                nombre: detailData.remision.transportista.nombreCompleto || '',
+                cedula: detailData.remision.transportista.cedula || ''
+              };
+            }
+            if (detailData.remision.receptor) {
+              receptor = {
+                nombre: detailData.remision.receptor.nombreCompleto || '',
+                cedula: detailData.remision.receptor.cedula || ''
+              };
+            }
+          }
+        } catch (detailErr) {
+          console.warn('No se pudieron obtener detalles completos de la remisión:', detailErr);
+        }
+        
+        const remisionData = {
+          id: remision.id || '',
+          urlDocumento: remision.urlDocumento || '',
+          idRemision: remision.idRemision || '',
+          estado: remision.estado || '',
+          fechaRemision: remision.fechaRemision || '',
+          areaOrigen: remision.areaOrigen || '',
+          responsableEntrega: remision.responsableEntrega || '',
+          notas: remision.notas || '',
+          totalCantidad: remision.totalCantidad || 0,
+          nombreArchivo: remision.nombreArchivo || '',
+          fechaPedidoDespachado: remision.fechaPedidoDespachado || '',
+          fechaRecibido: remision.fechaRecibido || '',
+          idCliente: remision.idCliente || '',
+          idPedido: remision.idPedido || '',
+          productos,
+          transportista,
+          receptor,
+          yaFirmada,
+        };
+        setRemisionPedido(remisionData);
+
+        // Sincronizar estado del pedido si la remisión ya fue entregada
+        if (remisionData.estado === 'Entregada' && selectedPedidoDetalle && selectedPedidoDetalle.estado !== 'Completado') {
+          setSelectedPedidoDetalle((prev: any) => prev ? { ...prev, estado: 'Completado' } : prev);
+          // También actualizar en la lista de pedidos para que la tarjeta refleje el cambio
+          setPedidosPendientes(prev => prev.map(p => 
+            (p.idPedidoCore === pedidoId || p.id === pedidoId) 
+              ? { ...p, estado: 'Completado' } 
+              : p
+          ));
+        }
+      } else {
+        setRemisionPedido(null);
+      }
+    } catch (error) {
+      console.error('Error buscando remisión del pedido:', error);
+      setRemisionPedido(null);
+    } finally {
+      setLoadingRemision(false);
+    }
+  };
+
+  // Generar URL de firma de remisión
+  const getRemisionFirmaUrl = (remisionAirtableId: string) => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${baseUrl}/remisiones/firmar/${remisionAirtableId}`;
   };
 
   // Verificar stock del pedido antes de despachar
@@ -1307,6 +1439,32 @@ export default function CalendarioProduccionPage() {
         return !productosExcluidos.has(productoId) && cantidadDespacho >= p.cantidadPedida;
       });
 
+      // Obtener lotes del cliente desde los eventos del calendario
+      const clienteNombre = selectedPedidoDetalle?.nombreCliente || '';
+      const lotesCliente = new Map<string, { nombre: string; hectareas: number }>();
+      if (clienteNombre) {
+        eventos
+          .filter(ev => ev.cliente && ev.cliente.toLowerCase().includes(clienteNombre.toLowerCase()))
+          .forEach(ev => {
+            if (ev.lotesDetallados && ev.lotesDetallados.length > 0) {
+              ev.lotesDetallados.forEach(lote => {
+                if (!lotesCliente.has(lote.id)) {
+                  lotesCliente.set(lote.id, { nombre: lote.nombre, hectareas: lote.hectareas });
+                }
+              });
+            } else if (ev.idLotes && ev.idLotes.length > 0) {
+              ev.idLotes.forEach((id, idx) => {
+                if (!lotesCliente.has(id)) {
+                  lotesCliente.set(id, { nombre: id, hectareas: ev.hectareasLotes?.[idx] || 0 });
+                }
+              });
+            }
+          });
+      }
+      const lotesTexto = lotesCliente.size > 0
+        ? `Lotes de aplicación: ${Array.from(lotesCliente.values()).map(l => `${l.nombre} (${l.hectareas}ha)`).join(', ')}.`
+        : '';
+
       const response = await fetch('/api/remisiones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1316,9 +1474,14 @@ export default function CalendarioProduccionPage() {
           responsable: user?.nombre || '',
           areaOrigen: 'Laboratorio',
           esDespachoCompleto,
+          transportista: transportistaSeleccionado ? {
+            id: transportistaSeleccionado.id,
+            cedula: transportistaSeleccionado.cedula,
+            nombre: transportistaSeleccionado.nombreCompleto
+          } : null,
           notas: esDespachoCompleto 
-            ? 'Despacho completo generado desde Calendario de Producción' 
-            : `Despacho parcial - ${productosParaRemision.length} producto(s) despachado(s)`
+            ? `Despacho completo generado desde Calendario de Producción. ${lotesTexto}`.trim()
+            : `Despacho parcial - ${productosParaRemision.length} producto(s) despachado(s). ${lotesTexto}`.trim()
         }),
       });
 
@@ -1336,6 +1499,8 @@ export default function CalendarioProduccionPage() {
         setVerificacionStock(null);
         setCantidadesDespacho({});
         setProductosExcluidos(new Set());
+        setTransportistaSeleccionado(null);
+        setTransportistaCedula('');
         setShowPedidoDetalleModal(false);
         setSelectedPedidoDetalle(null);
         
@@ -1387,6 +1552,83 @@ export default function CalendarioProduccionPage() {
       ...prev,
       [productoId]: Math.min(stockDisponible, cantidadPedida)
     }));
+  };
+
+  // Buscar transportista por cédula
+  const buscarTransportista = async (cedula: string) => {
+    if (!cedula || cedula.length < 3) {
+      setTransportistaSeleccionado(null);
+      return;
+    }
+
+    setBuscandoTransportista(true);
+    try {
+      const response = await fetch(`/api/personas-remision?cedula=${encodeURIComponent(cedula)}&tipo=Transportista`);
+      const data = await response.json();
+
+      if (data.success && data.personas && data.personas.length > 0) {
+        // Buscar coincidencia exacta primero
+        const exactMatch = data.personas.find((p: any) => p.cedula === cedula);
+        if (exactMatch) {
+          setTransportistaSeleccionado(exactMatch);
+        } else {
+          // Si no hay coincidencia exacta, tomar el primero
+          setTransportistaSeleccionado(data.personas[0]);
+        }
+      } else {
+        setTransportistaSeleccionado(null);
+      }
+    } catch (error) {
+      console.error('Error buscando transportista:', error);
+      setTransportistaSeleccionado(null);
+    } finally {
+      setBuscandoTransportista(false);
+    }
+  };
+
+  // Crear nuevo transportista
+  const handleCrearTransportista = async () => {
+    if (!nuevoTransportista.cedula || !nuevoTransportista.nombreCompleto) {
+      alert('Cédula y nombre completo son requeridos');
+      return;
+    }
+
+    setCreandoTransportista(true);
+    try {
+      const response = await fetch('/api/personas-remision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cedula: nuevoTransportista.cedula,
+          nombreCompleto: nuevoTransportista.nombreCompleto,
+          tipoUsuario: 'Transportista',
+          telefono: nuevoTransportista.telefono || '',
+          correo: nuevoTransportista.correo || ''
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setTransportistaSeleccionado(data.persona);
+        setTransportistaCedula(data.persona.cedula);
+        setShowNuevoTransportistaModal(false);
+        setNuevoTransportista({ cedula: '', nombreCompleto: '', telefono: '', correo: '' });
+        
+        if (data.yaExistia) {
+          alert('Ya existía un transportista con esta cédula. Se ha seleccionado automáticamente.');
+        } else {
+          alert('✅ Transportista creado exitosamente');
+        }
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error creando transportista:', error);
+      alert('Error creando transportista');
+    } finally {
+      setCreandoTransportista(false);
+    }
   };
 
   // Calcular totales del despacho actual
@@ -2495,11 +2737,23 @@ export default function CalendarioProduccionPage() {
                           nombreCliente
                         });
                         setShowPedidoDetalleModal(true);
+                        // Si el pedido ya fue despachado, buscar la remisión asociada
+                        if (['Enviado', 'Completado', 'Despachado'].includes(pedido.estado)) {
+                          fetchRemisionPedido(pedido.idPedidoCore || pedido.id);
+                        } else {
+                          setRemisionPedido(null);
+                        }
                       }}
                       className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer hover:border-red-400"
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <span className="text-xs font-mono text-red-600 bg-red-100 px-2 py-0.5 rounded">
+                        <span className={`text-xs font-mono px-2 py-0.5 rounded ${
+                          pedido.estado === 'Completado'
+                            ? 'text-green-600 bg-green-100'
+                            : ['Enviado', 'Despachado'].includes(pedido.estado)
+                              ? 'text-blue-600 bg-blue-100'
+                              : 'text-red-600 bg-red-100'
+                        }`}>
                           {pedido.idPedidoCore || `#${pedido.idNumerico}` || 'Sin ID'}
                         </span>
                         <span className={`text-xs px-2 py-0.5 rounded ${
@@ -2507,9 +2761,13 @@ export default function CalendarioProduccionPage() {
                             ? 'bg-yellow-100 text-yellow-700' 
                             : pedido.estado === 'Procesando'
                             ? 'bg-blue-100 text-blue-700'
+                            : pedido.estado === 'Enviado' || pedido.estado === 'Despachado'
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : pedido.estado === 'Completado'
+                            ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-700'
                         }`}>
-                          {pedido.estado || 'Pendiente'}
+                          {pedido.estado === 'Completado' ? '✅ Entregado' : pedido.estado || 'Pendiente'}
                         </span>
                       </div>
                       
@@ -4543,11 +4801,13 @@ export default function CalendarioProduccionPage() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             {/* Header con ID grande */}
             <div className={`px-6 py-5 rounded-t-2xl ${
-              progreso?.despachado 
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600'
-                : progreso?.completo 
-                  ? 'bg-gradient-to-r from-green-600 to-emerald-600'
-                  : 'bg-gradient-to-r from-indigo-600 to-purple-600'
+              selectedPedidoDetalle.estado === 'Completado'
+                ? 'bg-gradient-to-r from-green-600 to-emerald-600'
+                : progreso?.despachado 
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600'
+                  : progreso?.completo 
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600'
+                    : 'bg-gradient-to-r from-indigo-600 to-purple-600'
             }`}>
               <div className="flex items-start justify-between">
                 <div>
@@ -4563,11 +4823,13 @@ export default function CalendarioProduccionPage() {
                         ? 'bg-blue-400 text-blue-900'
                         : selectedPedidoDetalle.estado === 'Completado'
                         ? 'bg-green-400 text-green-900'
-                        : selectedPedidoDetalle.estado === 'Despachado'
+                        : selectedPedidoDetalle.estado === 'Enviado' || selectedPedidoDetalle.estado === 'Despachado'
                         ? 'bg-indigo-400 text-indigo-900'
                         : 'bg-white/30 text-white'
                     }`}>
-                      {selectedPedidoDetalle.estado || 'Pendiente'}
+                      {selectedPedidoDetalle.estado === 'Completado' ? '✅ Entregado' 
+                        : selectedPedidoDetalle.estado === 'Enviado' ? '🚚 Enviado'
+                        : selectedPedidoDetalle.estado || 'Pendiente'}
                     </span>
                     {selectedPedidoDetalle.prioridad && (
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -4671,8 +4933,12 @@ export default function CalendarioProduccionPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">{progreso.totalDespachado} / {progreso.totalPedido} L</span>
                       {progreso.despachado && (
-                        <span className="text-xs text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">
-                          ✓ Entregado
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          selectedPedidoDetalle.estado === 'Completado'
+                            ? 'text-green-600 bg-green-100'
+                            : 'text-blue-600 bg-blue-100'
+                        }`}>
+                          {selectedPedidoDetalle.estado === 'Completado' ? '✓ Entregado' : '✓ Despachado'}
                         </span>
                       )}
                     </div>
@@ -4853,48 +5119,295 @@ export default function CalendarioProduccionPage() {
                   </div>
                   <span className="text-gray-300">→</span>
                   <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                    (progreso?.porcentajeDespacho || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-500'
+                    ['Enviado', 'Completado'].includes(selectedPedidoDetalle.estado) || progreso?.despachado
+                      ? 'bg-blue-100 text-blue-700' 
+                      : (progreso?.porcentajeDespacho || 0) > 0 
+                        ? 'bg-cyan-100 text-cyan-700'
+                        : 'bg-gray-200 text-gray-500'
                   }`}>
                     <span>4</span>
-                    <span className="text-sm font-medium">Despachando</span>
-                    {(progreso?.porcentajeDespacho || 0) > 0 && <span>{progreso?.porcentajeDespacho}%</span>}
+                    <span className="text-sm font-medium">Enviado</span>
+                    {['Enviado', 'Completado'].includes(selectedPedidoDetalle.estado) || progreso?.despachado
+                      ? <span>✓</span>
+                      : (progreso?.porcentajeDespacho || 0) > 0 && <span>{progreso?.porcentajeDespacho}%</span>
+                    }
                   </div>
                   <span className="text-gray-300">→</span>
                   <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                    progreso?.despachado ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'
+                    selectedPedidoDetalle.estado === 'Completado' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
                   }`}>
                     <span>5</span>
                     <span className="text-sm font-medium">Entregado</span>
-                    {progreso?.despachado && <span>✓</span>}
+                    {selectedPedidoDetalle.estado === 'Completado' && <span>✓</span>}
                   </div>
                 </div>
               </div>
             </div>
             
+            {/* Sección de Remisión (cuando ya fue despachado) */}
+            {['Enviado', 'Completado', 'Despachado'].includes(selectedPedidoDetalle.estado) && (
+              <div className="px-6 pb-4">
+                {loadingRemision ? (
+                  <div className="bg-blue-50 rounded-xl p-6 border-2 border-blue-200 animate-pulse">
+                    <div className="h-5 bg-blue-200 rounded w-48 mb-4"></div>
+                    <div className="flex gap-6">
+                      <div className="h-40 w-40 bg-blue-200 rounded-xl"></div>
+                      <div className="flex-1 space-y-3">
+                        <div className="h-4 bg-blue-200 rounded w-full"></div>
+                        <div className="h-4 bg-blue-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-blue-200 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : remisionPedido ? (
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 overflow-hidden">
+                    {/* Header de remisión */}
+                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">📋</span>
+                        <span className="text-white font-bold text-lg">{remisionPedido.idRemision}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          remisionPedido.estado === 'Entregada' 
+                            ? 'bg-green-100 text-green-700'
+                            : remisionPedido.estado === 'En Tránsito'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {remisionPedido.estado}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="p-5 space-y-4">
+                      {/* Fila superior: QR + Info general */}
+                      <div className="flex gap-5">
+                        {/* QR Code */}
+                        <div className="flex-shrink-0 flex flex-col items-center">
+                          <div className="bg-white p-3 rounded-xl shadow-md border border-blue-100">
+                            <QRCodeSVG
+                              value={getRemisionFirmaUrl(remisionPedido.id)}
+                              size={130}
+                              level="H"
+                              includeMargin={false}
+                              bgColor="#ffffff"
+                              fgColor="#1e3a5f"
+                            />
+                          </div>
+                          <p className="text-xs text-blue-500 mt-2 font-medium">Escanear para firmar</p>
+                        </div>
+                        
+                        {/* Info general */}
+                        <div className="flex-1">
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <span className="text-xs text-gray-500 uppercase tracking-wide">Pedido</span>
+                              <p className="text-sm font-bold text-indigo-700">{remisionPedido.idPedido}</p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500 uppercase tracking-wide">Cliente</span>
+                              <p className="text-sm font-semibold text-gray-800">{selectedPedidoDetalle.nombreCliente || remisionPedido.idCliente}</p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500 uppercase tracking-wide">Fecha Remisión</span>
+                              <p className="text-sm font-semibold text-gray-800">
+                                {remisionPedido.fechaRemision 
+                                  ? new Date(remisionPedido.fechaRemision).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+                                  : 'No especificada'}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500 uppercase tracking-wide">Total Remitido</span>
+                              <p className="text-sm font-bold text-blue-700">{remisionPedido.totalCantidad} L</p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500 uppercase tracking-wide">Responsable</span>
+                              <p className="text-sm font-semibold text-gray-800">{remisionPedido.responsableEntrega || 'No especificado'}</p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500 uppercase tracking-wide">Área Origen</span>
+                              <p className="text-sm font-semibold text-gray-800">{remisionPedido.areaOrigen || 'No especificada'}</p>
+                            </div>
+                            {remisionPedido.fechaPedidoDespachado && (
+                              <div>
+                                <span className="text-xs text-gray-500 uppercase tracking-wide">Fecha Despacho</span>
+                                <p className="text-sm font-semibold text-gray-800">
+                                  {new Date(remisionPedido.fechaPedidoDespachado).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </p>
+                              </div>
+                            )}
+                            {remisionPedido.fechaRecibido && (
+                              <div>
+                                <span className="text-xs text-gray-500 uppercase tracking-wide">Fecha Recibido</span>
+                                <p className="text-sm font-semibold text-green-700">
+                                  {new Date(remisionPedido.fechaRecibido).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Transportista y Receptor */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className={`rounded-lg p-3 border ${
+                          remisionPedido.transportista 
+                            ? 'bg-green-50 border-green-200' 
+                            : 'bg-gray-50 border-gray-200'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">🚚</span>
+                            <span className="text-xs font-semibold text-gray-600 uppercase">Transportista</span>
+                          </div>
+                          {remisionPedido.transportista ? (
+                            <div>
+                              <p className="text-sm font-bold text-gray-800">{remisionPedido.transportista.nombre}</p>
+                              <p className="text-xs text-gray-500">C.C. {remisionPedido.transportista.cedula}</p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-400 italic">Sin asignar</p>
+                          )}
+                        </div>
+                        <div className={`rounded-lg p-3 border ${
+                          remisionPedido.receptor 
+                            ? 'bg-green-50 border-green-200' 
+                            : 'bg-amber-50 border-amber-200'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">📥</span>
+                            <span className="text-xs font-semibold text-gray-600 uppercase">Receptor</span>
+                          </div>
+                          {remisionPedido.receptor ? (
+                            <div>
+                              <p className="text-sm font-bold text-gray-800">{remisionPedido.receptor.nombre}</p>
+                              <p className="text-xs text-gray-500">C.C. {remisionPedido.receptor.cedula}</p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-amber-600 italic">Pendiente de firma</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Tabla de productos remitidos */}
+                      {remisionPedido.productos && remisionPedido.productos.length > 0 && (
+                        <div className="bg-white rounded-lg border border-blue-100 overflow-hidden">
+                          <div className="bg-blue-50 px-3 py-2 border-b border-blue-100">
+                            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">🧪 Productos Remitidos ({remisionPedido.productos.length})</span>
+                          </div>
+                          <table className="w-full">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Producto</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">Cantidad</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500">Unidad</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {remisionPedido.productos.map((prod, idx) => (
+                                <tr key={idx} className="hover:bg-blue-50/30">
+                                  <td className="px-3 py-2 text-sm text-gray-800 font-medium">{prod.nombre}</td>
+                                  <td className="px-3 py-2 text-center">
+                                    <span className="inline-flex items-center justify-center bg-blue-600 text-white font-bold px-3 py-0.5 rounded text-sm min-w-[50px]">
+                                      {prod.cantidad}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-center text-sm text-gray-600">{prod.unidad}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr className="bg-blue-600">
+                                <td className="px-3 py-2 text-white font-semibold text-sm">Total</td>
+                                <td className="px-3 py-2 text-center text-white font-bold text-sm">
+                                  {remisionPedido.productos.reduce((sum, p) => sum + p.cantidad, 0)}
+                                </td>
+                                <td className="px-3 py-2 text-center text-white text-sm">L</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      )}
+                      
+                      {/* Notas */}
+                      {remisionPedido.notas && (
+                        <div className="bg-amber-50/60 rounded-lg p-3 border border-amber-200">
+                          <span className="text-xs font-semibold text-amber-700">📝 Notas</span>
+                          <p className="text-sm text-gray-700 mt-1">{remisionPedido.notas}</p>
+                        </div>
+                      )}
+                      
+                      {/* Botones de acción */}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <a
+                          href={getRemisionFirmaUrl(remisionPedido.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+                        >
+                          <span>📝</span>
+                          <span>Ver Remisión</span>
+                        </a>
+                        {remisionPedido.urlDocumento && (
+                          <a
+                            href={remisionPedido.urlDocumento}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+                          >
+                            <span>📄</span>
+                            <span>Ver Documento</span>
+                          </a>
+                        )}
+                        <button
+                          onClick={() => {
+                            const url = getRemisionFirmaUrl(remisionPedido.id);
+                            navigator.clipboard.writeText(url);
+                            alert('✅ Link de firma copiado al portapapeles');
+                          }}
+                          className="px-4 py-2 bg-white border-2 border-blue-300 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all flex items-center gap-2"
+                        >
+                          <span>🔗</span>
+                          <span>Copiar Link</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 text-center">
+                    <span className="text-gray-500">No se encontró remisión asociada</span>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {/* Footer con acciones */}
             <div className="bg-gray-50 px-6 py-4 rounded-b-2xl border-t border-gray-200">
               <div className="flex flex-wrap gap-3 justify-between items-center">
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleVerificarStock(selectedPedidoDetalle.id)}
-                    disabled={loadingVerificacion}
-                    className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {loadingVerificacion ? (
-                      <>
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Verificando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>📦</span>
-                        <span>Despachar Pedido</span>
-                      </>
-                    )}
-                  </button>
+                  {!['Enviado', 'Completado', 'Despachado'].includes(selectedPedidoDetalle.estado) && (
+                    // Pedido no despachado - mostrar Despachar
+                    <button
+                      onClick={() => handleVerificarStock(selectedPedidoDetalle.id)}
+                      disabled={loadingVerificacion}
+                      className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {loadingVerificacion ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Verificando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📦</span>
+                          <span>Despachar Pedido</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
                 
                 <button
@@ -4947,6 +5460,8 @@ export default function CalendarioProduccionPage() {
                   onClick={() => {
                     setShowVerificarStockModal(false);
                     setVerificacionStock(null);
+                    setTransportistaSeleccionado(null);
+                    setTransportistaCedula('');
                   }}
                   className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-all"
                 >
@@ -5104,6 +5619,98 @@ export default function CalendarioProduccionPage() {
                     })}
                 </div>
                 
+                {/* Sección de Transportista */}
+                <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    🚚 Transportista
+                    <span className="text-xs font-normal text-gray-400">
+                      (Ingresa la cédula para buscar)
+                    </span>
+                  </h4>
+                  
+                  <div className="flex gap-3 items-start">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={transportistaCedula}
+                          onChange={(e) => {
+                            setTransportistaCedula(e.target.value);
+                            buscarTransportista(e.target.value);
+                          }}
+                          placeholder="Número de cédula..."
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
+                        />
+                        {buscandoTransportista && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <svg className="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Transportista encontrado */}
+                      {transportistaSeleccionado && (
+                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                              <span className="text-green-600 text-lg">✓</span>
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{transportistaSeleccionado.nombreCompleto}</p>
+                              <p className="text-xs text-gray-500">
+                                CC: {transportistaSeleccionado.cedula}
+                                {transportistaSeleccionado.telefono && ` • Tel: ${transportistaSeleccionado.telefono}`}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setTransportistaSeleccionado(null);
+                                setTransportistaCedula('');
+                              }}
+                              className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* No encontrado */}
+                      {!buscandoTransportista && transportistaCedula.length >= 3 && !transportistaSeleccionado && (
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm text-yellow-700">
+                            ⚠️ No se encontró un transportista con esta cédula
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Botón agregar nuevo */}
+                    <button
+                      onClick={() => {
+                        setNuevoTransportista({
+                          cedula: transportistaCedula || '',
+                          nombreCompleto: '',
+                          telefono: '',
+                          correo: ''
+                        });
+                        setShowNuevoTransportistaModal(true);
+                      }}
+                      className="px-4 py-2.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-lg transition-colors text-sm font-medium flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Nuevo
+                    </button>
+                  </div>
+                </div>
+                
                 {/* Productos excluidos */}
                 {productosExcluidos.size > 0 && (
                   <div className="mt-6">
@@ -5159,6 +5766,8 @@ export default function CalendarioProduccionPage() {
                     setVerificacionStock(null);
                     setCantidadesDespacho({});
                     setProductosExcluidos(new Set());
+                    setTransportistaSeleccionado(null);
+                    setTransportistaCedula('');
                   }}
                   className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   disabled={generandoRemision}
@@ -5217,6 +5826,117 @@ export default function CalendarioProduccionPage() {
         clientes={clientesPedidos}
         idUsuarioResponsable={user?.idEmpleado}
       />
+
+      {/* Modal Nuevo Transportista */}
+      {showNuevoTransportistaModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  🚚 Nuevo Transportista
+                </h3>
+                <button
+                  onClick={() => setShowNuevoTransportistaModal(false)}
+                  className="text-white/80 hover:text-white hover:bg-white/20 p-1 rounded-full transition-all"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Número de Cédula <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nuevoTransportista.cedula}
+                  onChange={(e) => setNuevoTransportista(prev => ({ ...prev, cedula: e.target.value }))}
+                  placeholder="Ej: 1234567890"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre Completo <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nuevoTransportista.nombreCompleto}
+                  onChange={(e) => setNuevoTransportista(prev => ({ ...prev, nombreCompleto: e.target.value }))}
+                  placeholder="Ej: Juan Carlos Pérez"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Teléfono
+                </label>
+                <input
+                  type="text"
+                  value={nuevoTransportista.telefono}
+                  onChange={(e) => setNuevoTransportista(prev => ({ ...prev, telefono: e.target.value }))}
+                  placeholder="Ej: 3001234567"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  value={nuevoTransportista.correo}
+                  onChange={(e) => setNuevoTransportista(prev => ({ ...prev, correo: e.target.value }))}
+                  placeholder="Ej: correo@ejemplo.com"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-end gap-3">
+              <button
+                onClick={() => setShowNuevoTransportistaModal(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCrearTransportista}
+                disabled={creandoTransportista || !nuevoTransportista.cedula || !nuevoTransportista.nombreCompleto}
+                className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {creandoTransportista ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Guardar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <Footer />
     </>

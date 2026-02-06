@@ -4,8 +4,12 @@ import {
   SIRIUS_REMISIONES_CORE_CONFIG, 
   SIRIUS_PEDIDOS_CORE_CONFIG,
   SIRIUS_PRODUCT_CORE_CONFIG,
-  SIRIUS_INVENTARIO_CONFIG
+  SIRIUS_INVENTARIO_CONFIG,
+  SIRIUS_CLIENT_CORE_CONFIG
 } from '@/lib/constants/airtable';
+import { uploadToS3 } from '@/lib/s3';
+import { generarRemisionPDF, DatosRemisionPDF } from '@/lib/remision-pdf-generator';
+import { buscarOCrearPersona, vincularPersonaARemision } from '@/lib/personas-remision';
 
 // Configurar Airtable para Remisiones Core
 const baseRemisiones = new Airtable({
@@ -26,6 +30,33 @@ const baseProductCore = new Airtable({
 const baseInventario = new Airtable({
   apiKey: SIRIUS_INVENTARIO_CONFIG.API_KEY
 }).base(SIRIUS_INVENTARIO_CONFIG.BASE_ID);
+
+// Configurar Airtable para Client Core (para obtener nombres de clientes)
+const baseClientCore = new Airtable({
+  apiKey: SIRIUS_CLIENT_CORE_CONFIG.API_KEY
+}).base(SIRIUS_CLIENT_CORE_CONFIG.BASE_ID);
+
+/**
+ * Obtiene el nombre del cliente desde Sirius Client Core
+ */
+async function obtenerNombreCliente(idCliente: string): Promise<string> {
+  try {
+    const records = await baseClientCore(SIRIUS_CLIENT_CORE_CONFIG.TABLES.CLIENTES)
+      .select({
+        filterByFormula: `{ID} = "${idCliente}"`,
+        maxRecords: 1
+      })
+      .firstPage();
+    
+    if (records.length > 0) {
+      return records[0].get('Cliente') as string || idCliente;
+    }
+    return idCliente;
+  } catch (error) {
+    console.error('⚠️ Error obteniendo nombre de cliente:', error);
+    return idCliente;
+  }
+}
 
 // Función helper para obtener nombres de productos
 async function obtenerNombresProductos(productIds: string[]): Promise<Map<string, string>> {
@@ -185,15 +216,13 @@ export async function GET(request: NextRequest) {
       estado: record.get('Estado') as string || 'Borrador',
       areaOrigen: record.get('Area Origen') as string || '',
       responsableEntrega: record.get('Responsable Entrega') as string || '',
-      transportista: record.get('Transportista') as string || '',
-      receptor: record.get('Receptor') as string || '',
-      fechaEntrega: record.get('Fecha Entrega') as string || '',
+      fechaPedidoDespachado: record.get('Fecha Pedido Despachado') as string || '',
       fechaRecibido: record.get('Fecha Recibido') as string || '',
       notas: record.get('Notas de Remisión') as string || '',
       productosRemitidos: record.get('Productos Remitidos') as string[] || [],
       totalCantidad: record.get('Total Cantidad Remitida') as number || 0,
-      estadoFirmaTransportista: record.get('Estado Firma Transportista') as string || 'Sin Firmar',
-      estadoFirmaReceptor: record.get('Estado Firma Receptor') as string || 'Sin Firmar',
+      personas: record.get('Personas') as string[] || [],
+      urlDocumento: record.get('URL Remision Generada') as string || '',
     }));
 
     return NextResponse.json({
@@ -225,7 +254,8 @@ export async function POST(request: NextRequest) {
       responsable,
       areaOrigen = 'Laboratorio',
       notas = '',
-      esDespachoCompleto = true
+      esDespachoCompleto = true,
+      transportista = null
     } = body;
 
     console.log('📦 Creando remisión para pedido:', pedidoId);
@@ -294,30 +324,115 @@ export async function POST(request: NextRequest) {
     // 4. Crear la remisión con los productos vinculados
     const notasRemision = esDespachoCompleto 
       ? `Despacho completo del pedido ${idPedidoCore}. ${notas}`
-      : `Despacho parcial del pedido ${idPedidoCore}. ${notas}`;
+      : `Despacho parcial del pedido ${idPedidoCore}. Despacho parcial - ${productos.length} producto(s) despachado(s)`;
 
+    // Si hay transportista, marcar como "En Tránsito" y registrar fecha de despacho
+    const fechaActual = new Date().toISOString().split('T')[0];
+    
     const remisionRecord = await baseRemisiones(SIRIUS_REMISIONES_CORE_CONFIG.TABLES.REMISIONES)
       .create({
         'ID Cliente': idCliente,
         'ID Pedido': idPedidoCore,
         'Area Origen': areaOrigen,
-        'Estado': 'Pendiente',
+        'Estado': transportista ? 'En Tránsito' : 'Pendiente',
         'Responsable Entrega': responsable || '',
         'Notas de Remisión': notasRemision,
         'Productos Remitidos': productosRemitidosRecords,
-        'Estado Firma Transportista': 'Sin Firmar',
-        'Estado Firma Receptor': 'Sin Firmar'
+        'Fecha Pedido Despachado': transportista ? fechaActual : undefined,
       });
 
     console.log('✅ Remisión creada:', remisionRecord.id);
 
-    // 5. Obtener el ID legible de la remisión creada
+    // 5. Si hay transportista, crear/buscar persona y vincular
+    if (transportista) {
+      try {
+        const personaTransportista = await buscarOCrearPersona({
+          nombreCompleto: transportista.nombre,
+          cedula: transportista.cedula,
+          tipo: 'Transportista',
+          telefono: transportista.telefono,
+        });
+
+        await vincularPersonaARemision(remisionRecord.id, personaTransportista.recordId);
+        console.log('✅ Transportista vinculado:', personaTransportista.codigo);
+      } catch (error) {
+        console.error('❌ Error vinculando transportista:', error);
+      }
+    }
+
+    // 6. Obtener el ID legible de la remisión creada
     const remisionCreada = await baseRemisiones(SIRIUS_REMISIONES_CORE_CONFIG.TABLES.REMISIONES)
       .find(remisionRecord.id);
 
     const idRemision = remisionCreada.get('ID') as string || remisionRecord.id;
+    const numeracion = remisionCreada.get('numeracion') as number || 0;
 
-    // 6. Registrar movimientos de inventario (salida de productos)
+    // 7. Obtener nombre del cliente para el documento
+    const nombreCliente = await obtenerNombreCliente(idCliente);
+    console.log('📋 Cliente para documento:', nombreCliente);
+
+    // 8. Generar documento HTML y subir a S3
+    console.log('📄 Generando documento de remisión...');
+    
+    const productosParaDocumento: Array<{nombre: string; cantidad: number; unidad: string}> = productos.map((p: any) => ({
+      nombre: nombresProductos.get(p.productoId) || p.productoId,
+      cantidad: p.cantidad,
+      unidad: p.unidad || 'L'
+    }));
+
+    const datosRemision: DatosRemisionPDF = {
+      idRemision,
+      numeracion,
+      fechaRemision: new Date().toISOString().split('T')[0],
+      cliente: nombreCliente,
+      idCliente,
+      idPedido: idPedidoCore,
+      productos: productosParaDocumento,
+      responsableEntrega: responsable || '',
+      transportista: transportista ? {
+        nombre: transportista.nombre,
+        cedula: transportista.cedula,
+        fechaFirma: fechaActual
+      } : undefined,
+      areaOrigen,
+      notas: notas || undefined,
+    };
+
+    // Generar PDF profesional
+    console.log('📄 Generando PDF de remisión...');
+    const pdfBytes = await generarRemisionPDF(datosRemision);
+    console.log('✅ PDF generado:', pdfBytes.length, 'bytes');
+    
+    // Nombre del archivo = ID de la remisión (ej: SIRIUS-REM-0004.pdf)
+    const nombreArchivo = `${idRemision}.pdf`;
+
+    console.log('📤 Subiendo PDF a S3:', nombreArchivo);
+    const resultadoS3 = await uploadToS3(
+      Buffer.from(pdfBytes),
+      nombreArchivo,
+      'application/pdf'
+    );
+
+    let urlDocumento = '';
+    if (resultadoS3.success && resultadoS3.url) {
+      urlDocumento = resultadoS3.url;
+      console.log('✅ Documento subido a S3:', urlDocumento);
+
+      // Actualizar la remisión con la URL del documento
+      try {
+        await baseRemisiones(SIRIUS_REMISIONES_CORE_CONFIG.TABLES.REMISIONES)
+          .update(remisionRecord.id, {
+            'URL Remision Generada': urlDocumento
+          });
+        console.log('✅ Remisión actualizada con URL del documento');
+      } catch (updateError) {
+        console.warn('⚠️ No se pudo actualizar la remisión con la URL:', updateError);
+      }
+    } else {
+      console.warn('⚠️ Error subiendo documento a S3:', resultadoS3.error);
+    }
+
+    // 9. Registrar movimientos de inventario (salida de productos)
     console.log('📊 Registrando movimientos de inventario...');
     const resultadoInventario = await registrarMovimientosInventario(
       productos,
@@ -334,21 +449,47 @@ export async function POST(request: NextRequest) {
       console.log('✅ Todos los movimientos de inventario registrados:', resultadoInventario.movimientos.length);
     }
 
+    // 10. Actualizar estado del pedido si hay transportista
+    if (transportista) {
+      try {
+        console.log('📦 Actualizando estado del pedido a "Enviado"...');
+        await basePedidos(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.PEDIDOS)
+          .update(pedidoRecord.id, {
+            'Estado': 'Enviado'
+          });
+        console.log('✅ Estado del pedido actualizado a "Enviado"');
+      } catch (pedidoError) {
+        console.warn('⚠️ No se pudo actualizar el estado del pedido:', pedidoError);
+        // No lanzar error para no bloquear el flujo principal
+      }
+    }
+
     return NextResponse.json({
       success: true,
       remision: {
         id: remisionRecord.id,
         idRemision,
+        numeracion,
         idPedido: idPedidoCore,
         idCliente,
+        nombreCliente,
         productosRemitidos: productosRemitidosRecords.length,
-        estado: 'Pendiente',
-        esDespachoCompleto
+        estado: transportista ? 'En Tránsito' : 'Pendiente',
+        esDespachoCompleto,
+        urlDocumento,
+        nombreArchivo
       },
       inventario: {
         movimientosCreados: resultadoInventario.movimientos.length,
         errores: resultadoInventario.errores
       },
+      documento: {
+        subido: resultadoS3.success,
+        url: urlDocumento,
+        nombreArchivo,
+        error: resultadoS3.error
+      },
+      pedidoActualizado: transportista ? true : false,
       message: esDespachoCompleto 
         ? `Remisión ${idRemision} creada exitosamente para el pedido completo`
         : `Remisión ${idRemision} creada para despacho parcial del pedido`
@@ -374,14 +515,8 @@ export async function PATCH(request: NextRequest) {
     const { 
       remisionId,
       estado,
-      transportista,
-      receptor,
-      fechaEntrega,
+      fechaPedidoDespachado,
       fechaRecibido,
-      estadoFirmaTransportista,
-      comentarioTransportista,
-      estadoFirmaReceptor,
-      comentarioReceptor,
       notas
     } = body;
 
@@ -398,14 +533,8 @@ export async function PATCH(request: NextRequest) {
     const updateFields: Record<string, any> = {};
     
     if (estado) updateFields['Estado'] = estado;
-    if (transportista !== undefined) updateFields['Transportista'] = transportista;
-    if (receptor !== undefined) updateFields['Receptor'] = receptor;
-    if (fechaEntrega) updateFields['Fecha Entrega'] = fechaEntrega;
+    if (fechaPedidoDespachado) updateFields['Fecha Pedido Despachado'] = fechaPedidoDespachado;
     if (fechaRecibido) updateFields['Fecha Recibido'] = fechaRecibido;
-    if (estadoFirmaTransportista) updateFields['Estado Firma Transportista'] = estadoFirmaTransportista;
-    if (comentarioTransportista !== undefined) updateFields['Comentario Transportista'] = comentarioTransportista;
-    if (estadoFirmaReceptor) updateFields['Estado Firma Receptor'] = estadoFirmaReceptor;
-    if (comentarioReceptor !== undefined) updateFields['Comentario Receptor'] = comentarioReceptor;
     if (notas !== undefined) updateFields['Notas de Remisión'] = notas;
 
     const remisionActualizada = await baseRemisiones(SIRIUS_REMISIONES_CORE_CONFIG.TABLES.REMISIONES)
