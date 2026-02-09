@@ -524,39 +524,6 @@ export async function generarRemisionPDF(datos: DatosRemisionPDF): Promise<Uint8
     });
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  SIGNATURES
-  // ═══════════════════════════════════════════════════════════
-  y -= 28;
-  ensureSpace(80);
-
-  const sigW = (CONTENT_W - 60) / 2;
-  const sigLineY = y - 45;
-
-  // Transportista (left)
-  line(page, MARGIN, sigLineY, MARGIN + sigW, sigLineY, TEXT_SECONDARY, 0.75);
-  if (datos.transportista) {
-    page.drawText(sanitize(datos.transportista.nombre), {
-      x: MARGIN, y: sigLineY - 14, size: 9, font: bold, color: TEXT_PRIMARY
-    });
-    page.drawText(`C.C. ${sanitize(datos.transportista.cedula)}`, {
-      x: MARGIN, y: sigLineY - 26, size: 7.5, font: regular, color: TEXT_SECONDARY
-    });
-  }
-  textCenter(page, 'Transportista', regular, 7, MARGIN, sigW, sigLineY - 40, TEXT_MUTED);
-
-  // Receptor (right)
-  const rx = MARGIN + sigW + 60;
-  line(page, rx, sigLineY, rx + sigW, sigLineY, TEXT_SECONDARY, 0.75);
-  if (datos.receptor) {
-    page.drawText(sanitize(datos.receptor.nombre), {
-      x: rx, y: sigLineY - 14, size: 9, font: bold, color: TEXT_PRIMARY
-    });
-    page.drawText(`C.C. ${sanitize(datos.receptor.cedula)}`, {
-      x: rx, y: sigLineY - 26, size: 7.5, font: regular, color: TEXT_SECONDARY
-    });
-  }
-  textCenter(page, 'Receptor', regular, 7, rx, sigW, sigLineY - 40, TEXT_MUTED);
 
   // ═══════════════════════════════════════════════════════════
   //  FOOTER — every page
