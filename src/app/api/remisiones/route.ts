@@ -113,12 +113,12 @@ async function registrarMovimientosInventario(
           'ubicacion_destino_id': pedidoId, // Destino: El pedido
           'tipo_movimiento': 'Salida',
           'cantidad': producto.cantidad,
-          'unidad_medida': producto.unidad || 'L',
+          'unidad_medida': producto.unidad || 'Ud',
           'motivo': 'Despacho Remisión',
           'documento_referencia': remisionId,
           'responsable': responsable,
           'fecha_movimiento': new Date().toISOString(),
-          'observaciones': `Despacho de ${producto.cantidad} ${producto.unidad || 'L'} de ${nombreProducto} - Remisión: ${remisionId} - Pedido: ${pedidoId} - Cliente: ${clienteId}`
+          'observaciones': `Despacho de ${producto.cantidad} ${producto.unidad || 'Ud'} de ${nombreProducto} - Remisión: ${remisionId} - Pedido: ${pedidoId} - Cliente: ${clienteId}`
         });
 
       console.log('✅ Movimiento de inventario creado:', movimiento.id, 'para producto:', producto.productoId);
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
         const productoRemitido = await baseRemisiones(SIRIUS_REMISIONES_CORE_CONFIG.TABLES.PRODUCTOS_REMITIDOS)
           .create({
             'Cantidad': producto.cantidad,
-            'Unidad': producto.unidad || 'Litro',
+            'Unidad': producto.unidad || 'Ud',
             'ID Producto': producto.productoId,
             'Notas': producto.notas || `Producto: ${nombresProductos.get(producto.productoId) || producto.productoId}`
           });
@@ -375,7 +375,7 @@ export async function POST(request: NextRequest) {
     const productosParaDocumento: Array<{nombre: string; cantidad: number; unidad: string}> = productos.map((p: any) => ({
       nombre: nombresProductos.get(p.productoId) || p.productoId,
       cantidad: p.cantidad,
-      unidad: p.unidad || 'L'
+      unidad: p.unidad || 'Ud'
     }));
 
     const datosRemision: DatosRemisionPDF = {

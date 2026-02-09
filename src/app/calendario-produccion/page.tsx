@@ -1190,7 +1190,7 @@ export default function CalendarioProduccionPage() {
   };
 
   // Obtener productos de un pedido con nombres y cantidades
-  const getProductosPedido = (pedidoId: string): Array<{nombre: string; cantidad: number}> => {
+  const getProductosPedido = (pedidoId: string): Array<{nombre: string; cantidad: number; unidad: string}> => {
     const detalles = pedidosDetalles[pedidoId] || [];
     return detalles.map(detalle => {
       // El detalle tiene idProductoCore (ej: "SIRIUS-PRODUCT-0004")
@@ -1198,9 +1198,13 @@ export default function CalendarioProduccionPage() {
       const idProductoCore = detalle.idProductoCore || '';
       const producto = pedidosProductos[idProductoCore];
       const nombreProducto = producto?.nombre || idProductoCore || 'Sin nombre';
+      // Extraer unidad del nombre del producto, ej: "Trichoderma harzianum (Kg)" → "Kg"
+      const matchUnidad = nombreProducto.match(/\(([^)]+)\)\s*$/);
+      const unidad = matchUnidad ? matchUnidad[1] : 'L';
       return {
         nombre: nombreProducto,
-        cantidad: detalle.cantidad || 0
+        cantidad: detalle.cantidad || 0,
+        unidad
       };
     });
   };
@@ -1425,7 +1429,7 @@ export default function CalendarioProduccionPage() {
         return {
           productoId,
           cantidad: cantidadesDespacho[productoId] || 0,
-          unidad: p.unidad || 'Litro',
+          unidad: p.unidad || 'Ud',
           notas: p.productoNombre || p.nombreProducto
         };
       });
@@ -5049,7 +5053,7 @@ export default function CalendarioProduccionPage() {
                             </td>
                             <td className="px-4 py-4 text-center">
                               <span className="text-gray-600 font-medium">
-                                {prod.unidad || 'L'}
+                                {prod.unidad || 'Ud'}
                               </span>
                             </td>
                           </tr>
@@ -5061,7 +5065,7 @@ export default function CalendarioProduccionPage() {
                     <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-4 flex justify-between items-center">
                       <span className="text-white font-semibold text-lg">Total del Pedido</span>
                       <span className="text-white font-bold text-2xl">
-                        {selectedPedidoDetalle.productos.reduce((sum: number, p: any) => sum + (p.cantidad || 0), 0)} L
+                        {selectedPedidoDetalle.productos.reduce((sum: number, p: any) => sum + (p.cantidad || 0), 0)} {selectedPedidoDetalle.productos[0]?.unidad || 'Ud'}
                       </span>
                     </div>
                   </>
@@ -5320,7 +5324,7 @@ export default function CalendarioProduccionPage() {
                                 <td className="px-3 py-2 text-center text-white font-bold text-sm">
                                   {remisionPedido.productos.reduce((sum, p) => sum + p.cantidad, 0)}
                                 </td>
-                                <td className="px-3 py-2 text-center text-white text-sm">L</td>
+                                <td className="px-3 py-2 text-center text-white text-sm">{remisionPedido.productos[0]?.unidad || 'Ud'}</td>
                               </tr>
                             </tfoot>
                           </table>

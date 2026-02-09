@@ -18,6 +18,12 @@ const baseProductCore = new Airtable({
 }).base(SIRIUS_PRODUCT_CORE_CONFIG.BASE_ID);
 
 // Función helper para obtener nombres de productos
+// Extraer unidad de medida del nombre del producto, ej: "Trichoderma harzianum (Kg)" → "Kg"
+function extraerUnidadDeNombre(nombreProducto: string): string {
+  const match = nombreProducto.match(/\(([^)]+)\)\s*$/);
+  return match ? match[1] : 'L';
+}
+
 async function obtenerNombresProductos(productIds: string[]): Promise<Map<string, string>> {
   const nombresMap = new Map<string, string>();
   
@@ -120,14 +126,13 @@ export async function GET(request: NextRequest) {
         
         const idProductoCore = detalleRecord.get('ID Producto Core') as string || '';
         const cantidadPedida = detalleRecord.get('Cantidad Pedido') as number || 0;
-        const unidad = 'L';
         
         return {
           detalleId,
           nombreProducto: idProductoCore,
           idProductoCore,
           cantidadPedida,
-          unidad
+          unidad: '' // Se asignará después de obtener nombres de productos
         };
       } catch (error) {
         console.error('❌ Error procesando detalle del pedido:', detalleId, error);
@@ -146,6 +151,14 @@ export async function GET(request: NextRequest) {
     // Obtener nombres de productos
     const productIds = detallesPedido.map(d => d.idProductoCore).filter(id => id);
     const nombresProductos = await obtenerNombresProductos(productIds);
+
+    // Asignar unidad de medida basada en el nombre del producto
+    detallesPedido.forEach(detalle => {
+      if (!detalle.unidad) {
+        const nombre = nombresProductos.get(detalle.idProductoCore) || '';
+        detalle.unidad = extraerUnidadDeNombre(nombre);
+      }
+    });
 
     // Obtener el ID legible del pedido y Record ID
     const idPedidoCore = pedidoRecord.get('ID Pedido Core') as string || '';
@@ -334,14 +347,13 @@ export async function POST(request: NextRequest) {
         
         const idProductoCore = detalleRecord.get('ID Producto Core') as string || '';
         const cantidadPedida = detalleRecord.get('Cantidad Pedido') as number || 0;
-        const unidad = 'L';
         
         return {
           detalleId,
           nombreProducto: idProductoCore,
           idProductoCore,
           cantidadPedida,
-          unidad
+          unidad: '' // Se asignará después de obtener nombres de productos
         };
       } catch (error) {
         console.error('❌ Error procesando detalle del pedido:', detalleId, error);
@@ -360,6 +372,14 @@ export async function POST(request: NextRequest) {
     // Obtener nombres de productos
     const productIds = detallesPedido.map(d => d.idProductoCore).filter(id => id);
     const nombresProductos = await obtenerNombresProductos(productIds);
+
+    // Asignar unidad de medida basada en el nombre del producto
+    detallesPedido.forEach(detalle => {
+      if (!detalle.unidad) {
+        const nombre = nombresProductos.get(detalle.idProductoCore) || '';
+        detalle.unidad = extraerUnidadDeNombre(nombre);
+      }
+    });
 
     // Obtener el ID legible del pedido y Record ID
     const idPedidoCore = pedidoRecord.get('ID Pedido Core') as string || '';
