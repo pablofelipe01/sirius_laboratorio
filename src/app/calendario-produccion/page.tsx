@@ -1479,9 +1479,7 @@ export default function CalendarioProduccionPage() {
             cedula: transportistaSeleccionado.cedula,
             nombre: transportistaSeleccionado.nombreCompleto
           } : null,
-          notas: esDespachoCompleto 
-            ? `Despacho completo generado desde Calendario de Producción. ${lotesTexto}`.trim()
-            : `Despacho parcial - ${productosParaRemision.length} producto(s) despachado(s). ${lotesTexto}`.trim()
+          notas: selectedPedidoDetalle?.notas || ''
         }),
       });
 

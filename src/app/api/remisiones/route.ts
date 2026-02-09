@@ -322,9 +322,7 @@ export async function POST(request: NextRequest) {
     );
 
     // 4. Crear la remisión con los productos vinculados
-    const notasRemision = esDespachoCompleto 
-      ? `Despacho completo del pedido ${idPedidoCore}. ${notas}`
-      : `Despacho parcial del pedido ${idPedidoCore}. Despacho parcial - ${productos.length} producto(s) despachado(s)`;
+    const notasRemision = notas || '';
 
     // Si hay transportista, marcar como "En Tránsito" y registrar fecha de despacho
     const fechaActual = new Date().toISOString().split('T')[0];
