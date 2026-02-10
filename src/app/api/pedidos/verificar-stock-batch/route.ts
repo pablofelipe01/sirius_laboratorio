@@ -95,11 +95,56 @@ export async function POST(request: NextRequest) {
                 })
                 .firstPage();
 
-              const stockActual = movimientosEntrada.reduce((total, movimiento) => {
+              // Consultar Entradas de stock general (STOCK-GENERAL o sin ubicación)
+              const movimientosEntradaGeneral = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+                .select({
+                  filterByFormula: `AND(
+                    {tipo_movimiento} = "Entrada",
+                    {product_id} = "${detalle.idProductoCore}",
+                    OR(
+                      {ubicacion_destino_id} = "STOCK-GENERAL",
+                      {ubicacion_destino_id} = BLANK(),
+                      {ubicacion_destino_id} = ""
+                    )
+                  )`
+                })
+                .firstPage();
+
+              const stockPedido = movimientosEntrada.reduce((total, movimiento) => {
                 return total + (movimiento.get('cantidad') as number || 0);
               }, 0);
 
-              // Consultar Salidas (despachos del pedido) - ubicacion_destino_id es el pedido
+              const stockGeneral = movimientosEntradaGeneral.reduce((total, movimiento) => {
+                return total + (movimiento.get('cantidad') as number || 0);
+              }, 0);
+
+              // Consultar Salidas de stock general
+              let salidasGeneral = 0;
+              try {
+                const movimientosSalidaGeneral = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+                  .select({
+                    filterByFormula: `AND(
+                      {tipo_movimiento} = "Salida",
+                      {product_id} = "${detalle.idProductoCore}",
+                      OR(
+                        {ubicacion_destino_id} = "STOCK-GENERAL",
+                        {ubicacion_destino_id} = BLANK(),
+                        {ubicacion_destino_id} = ""
+                      )
+                    )`
+                  })
+                  .firstPage();
+
+                salidasGeneral = movimientosSalidaGeneral.reduce((total, movimiento) => {
+                  return total + (movimiento.get('cantidad') as number || 0);
+                }, 0);
+              } catch (e) {
+                console.log('Error consultando salidas general:', e);
+              }
+
+              const stockActual = stockPedido + Math.max(0, stockGeneral - salidasGeneral);
+
+              // Consultar Salidas (despachos del pedido)
               let cantidadDespachada = 0;
               try {
                 const movimientosSalida = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
@@ -119,7 +164,6 @@ export async function POST(request: NextRequest) {
                   return total + (movimiento.get('cantidad') as number || 0);
                 }, 0);
               } catch (e) {
-                // Si falla la consulta de salidas, continuar con 0
                 console.log('Error consultando salidas:', e);
               }
 

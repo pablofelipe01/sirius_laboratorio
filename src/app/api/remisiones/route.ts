@@ -450,12 +450,15 @@ export async function POST(request: NextRequest) {
     // 10. Actualizar estado del pedido si hay transportista
     if (transportista) {
       try {
-        console.log('📦 Actualizando estado del pedido a "Enviado"...');
+        // Si es despacho completo -> Enviado (todo despachado)
+        // Si es parcial -> Enviado Parcial (aún quedan productos por despachar)
+        const nuevoEstado = esDespachoCompleto ? 'Enviado' : 'Enviado Parcial';
+        console.log(`📦 Actualizando estado del pedido a "${nuevoEstado}"...`);
         await basePedidos(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.PEDIDOS)
           .update(pedidoRecord.id, {
-            'Estado': 'Enviado'
+            'Estado': nuevoEstado
           });
-        console.log('✅ Estado del pedido actualizado a "Enviado"');
+        console.log(`✅ Estado del pedido actualizado a "${nuevoEstado}"`);
       } catch (pedidoError) {
         console.warn('⚠️ No se pudo actualizar el estado del pedido:', pedidoError);
         // No lanzar error para no bloquear el flujo principal

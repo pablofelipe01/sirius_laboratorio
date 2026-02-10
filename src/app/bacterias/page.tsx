@@ -135,6 +135,7 @@ export default function BacteriasPage() {
   // Estados para el modal de Sirius Bacter (Agregar Producto)
   // ========================================================================
   const [showSiriusBacterModal, setShowSiriusBacterModal] = useState(false);
+  const [modoProduccionSB, setModoProduccionSB] = useState<'normal' | 'pedido'>('normal');
   const [clientesSB, setClientesSB] = useState<ClienteSiriusBacter[]>([]);
   const [pedidosSB, setPedidosSB] = useState<PedidoSiriusBacter[]>([]);
   const [productosSB, setProductosSB] = useState<ProductoPedidoSiriusBacter[]>([]);
@@ -147,12 +148,17 @@ export default function BacteriasPage() {
   const [isSubmittingSB, setIsSubmittingSB] = useState(false);
   const [cantidadSB, setCantidadSB] = useState('');
   const [responsableSB, setResponsableSB] = useState('');
+  const [observacionesSB, setObservacionesSB] = useState('');
   const [detallesCacheSB, setDetallesCacheSB] = useState<Record<string, any[]>>({});
+  const [productosCatalogoSB, setProductosCatalogoSB] = useState<Array<{id: string; codigo: string; nombre: string}>>([]);
+  const [productoCatalogoSelSB, setProductoCatalogoSelSB] = useState('');
+  const [loadingCatalogoSB, setLoadingCatalogoSB] = useState(false);
 
   // ========================================================================
   // Estados para el modal de Bacillus thuringiensis (Agregar Producto)
   // ========================================================================
   const [showBacillusModal, setShowBacillusModal] = useState(false);
+  const [modoProduccionBT, setModoProduccionBT] = useState<'normal' | 'pedido'>('normal');
   const [clientesBT, setClientesBT] = useState<ClienteSiriusBacter[]>([]);
   const [pedidosBT, setPedidosBT] = useState<PedidoSiriusBacter[]>([]);
   const [productosBT, setProductosBT] = useState<ProductoPedidoSiriusBacter[]>([]);
@@ -165,7 +171,11 @@ export default function BacteriasPage() {
   const [isSubmittingBT, setIsSubmittingBT] = useState(false);
   const [cantidadBT, setCantidadBT] = useState('');
   const [responsableBT, setResponsableBT] = useState('');
+  const [observacionesBT, setObservacionesBT] = useState('');
   const [detallesCacheBT, setDetallesCacheBT] = useState<Record<string, any[]>>({});
+  const [productosCatalogoBT, setProductosCatalogoBT] = useState<Array<{id: string; codigo: string; nombre: string}>>([]);
+  const [productoCatalogoSelBT, setProductoCatalogoSelBT] = useState('');
+  const [loadingCatalogoBT, setLoadingCatalogoBT] = useState(false);
   const [productosCacheSB, setProductosCacheSB] = useState<Record<string, { id: string; codigoProducto: string; nombre: string }>>({});
 
   // Cargar microorganismos desde Airtable
@@ -217,6 +227,57 @@ export default function BacteriasPage() {
   // Funciones para el modal de Sirius Bacter (Agregar Producto)
   // ========================================================================
   
+  // Cargar productos del catálogo que contengan "sirius bacter" o "siriusbacter"
+  const fetchProductosCatalogoSB = async () => {
+    setLoadingCatalogoSB(true);
+    try {
+      const response = await fetch('/api/sirius-product-core?maxRecords=200');
+      const data = await response.json();
+      if (data.success && data.productos) {
+        const filtrados = data.productos
+          .filter((p: any) => {
+            const nombre = (p.nombre || '').toLowerCase();
+            return nombre.includes('sirius bacter') || nombre.includes('siriusbacter') || nombre.includes('sirius-bacter');
+          })
+          .map((p: any) => ({ id: p.id, codigo: p.codigoProducto, nombre: p.nombre }));
+        setProductosCatalogoSB(filtrados);
+        // Si solo hay uno, preseleccionarlo
+        if (filtrados.length === 1) {
+          setProductoCatalogoSelSB(filtrados[0].codigo);
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error cargando catálogo SB:', err);
+    } finally {
+      setLoadingCatalogoSB(false);
+    }
+  };
+
+  // Cargar productos del catálogo que contengan "bacillus thuringiensis"
+  const fetchProductosCatalogoBT = async () => {
+    setLoadingCatalogoBT(true);
+    try {
+      const response = await fetch('/api/sirius-product-core?maxRecords=200');
+      const data = await response.json();
+      if (data.success && data.productos) {
+        const filtrados = data.productos
+          .filter((p: any) => {
+            const nombre = (p.nombre || '').toLowerCase();
+            return nombre.includes('bacillus thuringiensis');
+          })
+          .map((p: any) => ({ id: p.id, codigo: p.codigoProducto, nombre: p.nombre }));
+        setProductosCatalogoBT(filtrados);
+        if (filtrados.length === 1) {
+          setProductoCatalogoSelBT(filtrados[0].codigo);
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error cargando catálogo BT:', err);
+    } finally {
+      setLoadingCatalogoBT(false);
+    }
+  };
+
   // Cargar clientes desde Sirius Clientes Core
   const fetchClientesSB = async () => {
     setLoadingClientesSB(true);
@@ -320,14 +381,17 @@ export default function BacteriasPage() {
   // Abrir modal de Sirius Bacter
   const handleAbrirModalSiriusBacter = () => {
     setShowSiriusBacterModal(true);
+    setModoProduccionSB('normal');
     setClienteSeleccionadoSB('');
     setPedidoSeleccionadoSB('');
     setProductoSeleccionadoSB('');
+    setProductoCatalogoSelSB('');
     setCantidadSB('');
     setResponsableSB('');
+    setObservacionesSB('');
     setPedidosSB([]);
     setProductosSB([]);
-    fetchClientesSB();
+    fetchProductosCatalogoSB();
   };
 
   // Manejar cambio de cliente
@@ -348,38 +412,56 @@ export default function BacteriasPage() {
 
   // Enviar registro de Sirius Bacter
   const handleSubmitSiriusBacter = async () => {
-    if (!productoSeleccionadoSB || !cantidadSB) {
-      alert('Por favor seleccione un producto y especifique la cantidad');
-      return;
+    if (modoProduccionSB === 'normal') {
+      // Modo producción normal: solo necesita producto del catálogo y cantidad
+      if (!productoCatalogoSelSB || !cantidadSB) {
+        alert('Por favor seleccione un producto y especifique la cantidad');
+        return;
+      }
+    } else {
+      // Modo pedido: necesita producto del pedido y cantidad
+      if (!productoSeleccionadoSB || !cantidadSB) {
+        alert('Por favor seleccione un producto y especifique la cantidad');
+        return;
+      }
     }
 
     setIsSubmittingSB(true);
     try {
-      const productoSelec = productosSB.find(p => p.id === productoSeleccionadoSB);
-      const clienteSelec = clientesSB.find(c => c.id === clienteSeleccionadoSB);
-      const pedidoSelec = pedidosSB.find(p => p.id === pedidoSeleccionadoSB);
+      let productoId = '';
+      let observaciones = '';
+      let ubicacionDestino = '';
 
-      console.log('🔍 [SIRIUS BACTER] Debug datos:');
-      console.log('  - pedidoSeleccionadoSB:', pedidoSeleccionadoSB);
-      console.log('  - pedidoSelec:', pedidoSelec);
-      console.log('  - idPedidoCore:', pedidoSelec?.idPedidoCore);
-      console.log('  - productoSeleccionadoSB:', productoSeleccionadoSB);
-      console.log('  - productosSB array:', productosSB);
-      console.log('  - productoSelec:', productoSelec);
-      console.log('  - idProductoCore:', productoSelec?.idProductoCore);
+      if (modoProduccionSB === 'normal') {
+        // Producción normal - sin pedido
+        productoId = productoCatalogoSelSB;
+        const prodCatalogo = productosCatalogoSB.find(p => p.codigo === productoCatalogoSelSB);
+        observaciones = `Producción Normal Sirius Bacter - ${prodCatalogo?.nombre || productoCatalogoSelSB}${observacionesSB ? ` - ${observacionesSB}` : ''}`;
+        ubicacionDestino = 'STOCK-GENERAL';
+      } else {
+        // Producción para pedido específico
+        const productoSelec = productosSB.find(p => p.id === productoSeleccionadoSB);
+        const clienteSelec = clientesSB.find(c => c.id === clienteSeleccionadoSB);
+        const pedidoSelec = pedidosSB.find(p => p.id === pedidoSeleccionadoSB);
+        productoId = productoSelec?.idProductoCore || '';
+        ubicacionDestino = pedidoSelec?.idPedidoCore || '';
+        observaciones = `Producción Sirius Bacter - Cliente: ${clienteSelec?.nombre || 'N/A'} - Pedido: ${pedidoSelec?.idPedidoCore || 'N/A'}${observacionesSB ? ` - ${observacionesSB}` : ''}`;
+      }
+
+      console.log('🔍 [SIRIUS BACTER] Registrando:', { modoProduccionSB, productoId, ubicacionDestino, cantidad: cantidadSB });
 
       // Crear movimiento de inventario (Entrada de Sirius Bacter - Producción)
       const response = await fetch('/api/productos-secos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          productoId: productoSelec?.idProductoCore || '',
+          productoId,
           cantidad: parseFloat(cantidadSB),
-          unidadMedida: 'L',  // Sirius Bacter es en litros
-          motivo: 'Producción',  // No es compra, es producción
-          ubicacionDestinoId: pedidoSelec?.idPedidoCore || '',  // Código del pedido (ej: SIRIUS-PED-0003)
+          unidadMedida: 'L',
+          motivo: 'Producción',
+          ubicacionDestinoId: ubicacionDestino,
           responsable: responsableSB || user?.nombre || 'Sistema',
-          observaciones: `Producción Sirius Bacter - Cliente: ${clienteSelec?.nombre || 'N/A'} - Pedido: ${pedidoSelec?.idPedidoCore || 'N/A'}`,
+          observaciones,
           fechaMovimiento: new Date().toISOString()
         })
       });
@@ -387,7 +469,10 @@ export default function BacteriasPage() {
       const result = await response.json();
       
       if (result.success) {
-        setSuccessMessage(`✅ Sirius Bacter registrado exitosamente para ${clienteSelec?.nombre}`);
+        const mensaje = modoProduccionSB === 'normal' 
+          ? `✅ ${cantidadSB} L de Sirius Bacter registrados (Producción Normal)`
+          : `✅ Sirius Bacter registrado exitosamente para pedido`;
+        setSuccessMessage(mensaje);
         setShowSuccessModal(true);
         setShowSiriusBacterModal(false);
         
@@ -395,8 +480,10 @@ export default function BacteriasPage() {
         setClienteSeleccionadoSB('');
         setPedidoSeleccionadoSB('');
         setProductoSeleccionadoSB('');
+        setProductoCatalogoSelSB('');
         setCantidadSB('');
         setResponsableSB('');
+        setObservacionesSB('');
       } else {
         alert(`Error: ${result.error || 'No se pudo registrar el producto'}`);
       }
@@ -515,14 +602,17 @@ export default function BacteriasPage() {
   // Abrir modal de Bacillus thuringiensis
   const handleAbrirModalBacillus = () => {
     setShowBacillusModal(true);
+    setModoProduccionBT('normal');
     setClienteSeleccionadoBT('');
     setPedidoSeleccionadoBT('');
     setProductoSeleccionadoBT('');
+    setProductoCatalogoSelBT('');
     setCantidadBT('');
     setResponsableBT('');
+    setObservacionesBT('');
     setPedidosBT([]);
     setProductosBT([]);
-    fetchClientesBT();
+    fetchProductosCatalogoBT();
   };
 
   // Manejar cambio de cliente
@@ -542,38 +632,51 @@ export default function BacteriasPage() {
 
   // Enviar producción de Bacillus thuringiensis
   const handleSubmitBacillus = async () => {
-    if (!productoSeleccionadoBT || !cantidadBT) {
-      alert('Por favor seleccione un producto y especifique la cantidad');
-      return;
+    if (modoProduccionBT === 'normal') {
+      if (!productoCatalogoSelBT || !cantidadBT) {
+        alert('Por favor seleccione un producto y especifique la cantidad');
+        return;
+      }
+    } else {
+      if (!productoSeleccionadoBT || !cantidadBT) {
+        alert('Por favor seleccione un producto y especifique la cantidad');
+        return;
+      }
     }
 
     setIsSubmittingBT(true);
     try {
-      const productoSelec = productosBT.find(p => p.id === productoSeleccionadoBT);
-      const clienteSelec = clientesBT.find(c => c.id === clienteSeleccionadoBT);
-      const pedidoSelec = pedidosBT.find(p => p.id === pedidoSeleccionadoBT);
+      let productoId = '';
+      let observaciones = '';
+      let ubicacionDestino = '';
 
-      console.log('🔍 [BACILLUS] Debug datos:');
-      console.log('  - pedidoSeleccionadoBT:', pedidoSeleccionadoBT);
-      console.log('  - pedidoSelec:', pedidoSelec);
-      console.log('  - idPedidoCore:', pedidoSelec?.idPedidoCore);
-      console.log('  - productoSeleccionadoBT:', productoSeleccionadoBT);
-      console.log('  - productosBT array:', productosBT);
-      console.log('  - productoSelec:', productoSelec);
-      console.log('  - idProductoCore:', productoSelec?.idProductoCore);
+      if (modoProduccionBT === 'normal') {
+        productoId = productoCatalogoSelBT;
+        const prodCatalogo = productosCatalogoBT.find(p => p.codigo === productoCatalogoSelBT);
+        observaciones = `Producción Normal Bacillus thuringiensis - ${prodCatalogo?.nombre || productoCatalogoSelBT}${observacionesBT ? ` - ${observacionesBT}` : ''}`;
+        ubicacionDestino = 'STOCK-GENERAL';
+      } else {
+        const productoSelec = productosBT.find(p => p.id === productoSeleccionadoBT);
+        const clienteSelec = clientesBT.find(c => c.id === clienteSeleccionadoBT);
+        const pedidoSelec = pedidosBT.find(p => p.id === pedidoSeleccionadoBT);
+        productoId = productoSelec?.idProductoCore || '';
+        ubicacionDestino = pedidoSelec?.idPedidoCore || '';
+        observaciones = `Producción Bacillus thuringiensis - Cliente: ${clienteSelec?.nombre || 'N/A'} - Pedido: ${pedidoSelec?.idPedidoCore || 'N/A'}${observacionesBT ? ` - ${observacionesBT}` : ''}`;
+      }
 
-      // Crear movimiento de inventario (Entrada de Bacillus thuringiensis - Producción)
+      console.log('🔍 [BACILLUS] Registrando:', { modoProduccionBT, productoId, ubicacionDestino, cantidad: cantidadBT });
+
       const response = await fetch('/api/productos-secos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          productoId: productoSelec?.idProductoCore || '',
+          productoId,
           cantidad: parseFloat(cantidadBT),
-          unidadMedida: 'L',  // Bacillus thuringiensis es en litros
-          motivo: 'Producción',  // No es compra, es producción
-          ubicacionDestinoId: pedidoSelec?.idPedidoCore || '',  // Código del pedido (ej: SIRIUS-PED-0003)
+          unidadMedida: 'L',
+          motivo: 'Producción',
+          ubicacionDestinoId: ubicacionDestino,
           responsable: responsableBT || user?.nombre || 'Sistema',
-          observaciones: `Producción Bacillus thuringiensis - Cliente: ${clienteSelec?.nombre || 'N/A'} - Pedido: ${pedidoSelec?.idPedidoCore || 'N/A'}`,
+          observaciones,
           fechaMovimiento: new Date().toISOString()
         })
       });
@@ -581,16 +684,20 @@ export default function BacteriasPage() {
       const result = await response.json();
       
       if (result.success) {
-        setSuccessMessage(`✅ Bacillus thuringiensis registrado exitosamente para ${clienteSelec?.nombre}`);
+        const mensaje = modoProduccionBT === 'normal'
+          ? `✅ ${cantidadBT} L de Bacillus thuringiensis registrados (Producción Normal)`
+          : `✅ Bacillus thuringiensis registrado exitosamente para pedido`;
+        setSuccessMessage(mensaje);
         setShowSuccessModal(true);
         setShowBacillusModal(false);
         
-        // Limpiar formulario
         setClienteSeleccionadoBT('');
         setPedidoSeleccionadoBT('');
         setProductoSeleccionadoBT('');
+        setProductoCatalogoSelBT('');
         setCantidadBT('');
         setResponsableBT('');
+        setObservacionesBT('');
       } else {
         alert(`Error: ${result.error || 'No se pudo registrar el producto'}`);
       }
@@ -2166,7 +2273,7 @@ export default function BacteriasPage() {
       )}
 
       {/* ================================================================== */}
-      {/* Modal de Sirius Bacter - Agregar Producto (similar a Cosecha) */}
+      {/* Modal de Sirius Bacter - Agregar Producto */}
       {/* ================================================================== */}
       {showSiriusBacterModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -2178,7 +2285,7 @@ export default function BacteriasPage() {
                   <span className="text-4xl">🧬</span>
                   <div>
                     <h2 className="text-2xl font-bold">Agregar Sirius Bacter</h2>
-                    <p className="text-purple-200">Seleccione cliente y pedido para registrar el producto</p>
+                    <p className="text-purple-200">Registrar producción de Sirius Bacter</p>
                   </div>
                 </div>
                 <button
@@ -2194,99 +2301,66 @@ export default function BacteriasPage() {
 
             {/* Contenido del modal */}
             <div className="p-6 space-y-6">
-              {/* Selector de Cliente */}
+              {/* Toggle de modo de producción */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  👤 Cliente
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  🔄 Tipo de Registro
                 </label>
-                <select
-                  value={clienteSeleccionadoSB}
-                  onChange={(e) => handleClienteChangeSB(e.target.value)}
-                  className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900"
-                  disabled={loadingClientesSB}
-                >
-                  <option value="">
-                    {loadingClientesSB ? 'Cargando clientes...' : 'Seleccione un cliente'}
-                  </option>
-                  {clientesSB.map((cliente) => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.nombre} ({cliente.codigo})
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setModoProduccionSB('normal'); setClienteSeleccionadoSB(''); setPedidoSeleccionadoSB(''); setProductoSeleccionadoSB(''); }}
+                    className={`py-3 px-4 rounded-lg font-semibold text-sm transition-all border-2 ${
+                      modoProduccionSB === 'normal'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-lg'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400'
+                    }`}
+                  >
+                    🏭 Producción Normal
+                  </button>
+                  <button
+                    onClick={() => { setModoProduccionSB('pedido'); setProductoCatalogoSelSB(''); fetchClientesSB(); }}
+                    className={`py-3 px-4 rounded-lg font-semibold text-sm transition-all border-2 ${
+                      modoProduccionSB === 'pedido'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-lg'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400'
+                    }`}
+                  >
+                    📦 Pedido Específico
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {modoProduccionSB === 'normal' 
+                    ? '📝 Registro de producción sin vincular a un pedido. Se almacena en stock general.'
+                    : '📝 Registro de producción vinculada a un pedido de cliente específico.'}
+                </p>
               </div>
 
-              {/* Selector de Pedido */}
-              {clienteSeleccionadoSB && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    📦 Pedido Pendiente
-                  </label>
-                  <select
-                    value={pedidoSeleccionadoSB}
-                    onChange={(e) => handlePedidoChangeSB(e.target.value)}
-                    className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900"
-                    disabled={loadingPedidosSB}
-                  >
-                    <option value="">
-                      {loadingPedidosSB ? 'Cargando pedidos...' : 
-                       pedidosSB.length === 0 ? 'No hay pedidos pendientes' : 'Seleccione un pedido'}
-                    </option>
-                    {pedidosSB.map((pedido) => (
-                      <option key={pedido.id} value={pedido.id}>
-                        {pedido.idPedidoCore} - {new Date(pedido.fechaPedido).toLocaleDateString('es-CO')} ({pedido.estado})
-                      </option>
-                    ))}
-                  </select>
-                  {pedidosSB.length === 0 && !loadingPedidosSB && clienteSeleccionadoSB && (
-                    <p className="text-amber-600 text-sm mt-2">
-                      ⚠️ Este cliente no tiene pedidos pendientes con productos de Sirius Bacter
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Selector de Producto */}
-              {pedidoSeleccionadoSB && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    🧬 Producto Sirius Bacter
-                  </label>
-                  <select
-                    value={productoSeleccionadoSB}
-                    onChange={(e) => {
-                      const productoId = e.target.value;
-                      setProductoSeleccionadoSB(productoId);
-                      // Precargar cantidad del pedido
-                      const producto = productosSB.find(p => p.id === productoId);
-                      if (producto) {
-                        setCantidadSB(producto.cantidad.toString());
-                      }
-                    }}
-                    className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900"
-                    disabled={loadingProductosSB}
-                  >
-                    <option value="">
-                      {loadingProductosSB ? 'Cargando productos...' : 
-                       productosSB.length === 0 ? 'No hay productos de Sirius Bacter' : 'Seleccione un producto'}
-                    </option>
-                    {productosSB.map((producto) => (
-                      <option key={producto.id} value={producto.id}>
-                        {producto.nombreProducto} - Cantidad pedida: {producto.cantidad} L
-                      </option>
-                    ))}
-                  </select>
-                  {productosSB.length === 0 && !loadingProductosSB && pedidoSeleccionadoSB && (
-                    <p className="text-amber-600 text-sm mt-2">
-                      ⚠️ Este pedido no contiene productos de Sirius Bacter
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Cantidad y Responsable */}
-              {productoSeleccionadoSB && (
+              {/* ============ MODO PRODUCCIÓN NORMAL ============ */}
+              {modoProduccionSB === 'normal' && (
                 <>
+                  {/* Selector de producto del catálogo */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      🧬 Producto
+                    </label>
+                    <select
+                      value={productoCatalogoSelSB}
+                      onChange={(e) => setProductoCatalogoSelSB(e.target.value)}
+                      className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900"
+                      disabled={loadingCatalogoSB}
+                    >
+                      <option value="">
+                        {loadingCatalogoSB ? 'Cargando productos...' : 'Seleccione producto'}
+                      </option>
+                      {productosCatalogoSB.map((prod) => (
+                        <option key={prod.id} value={prod.codigo}>
+                          {prod.nombre} ({prod.codigo})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Cantidad, Responsable */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -2298,7 +2372,7 @@ export default function BacteriasPage() {
                         onChange={(e) => setCantidadSB(e.target.value)}
                         placeholder="Ej: 100"
                         min="1"
-                        className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-900"
+                        className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
                       />
                     </div>
                     <div>
@@ -2320,17 +2394,176 @@ export default function BacteriasPage() {
                     </div>
                   </div>
 
-                  {/* Resumen del producto seleccionado */}
-                  {productosSB.find(p => p.id === productoSeleccionadoSB) && (
+                  {/* Observaciones */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📝 Observaciones (opcional)
+                    </label>
+                    <textarea
+                      value={observacionesSB}
+                      onChange={(e) => setObservacionesSB(e.target.value)}
+                      placeholder="Notas adicionales sobre esta producción..."
+                      rows={2}
+                      className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+
+                  {/* Resumen */}
+                  {productoCatalogoSelSB && cantidadSB && (
                     <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
                       <h4 className="font-semibold text-purple-800 mb-2">📋 Resumen del Registro</h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <p><span className="font-medium">Cliente:</span> {clientesSB.find(c => c.id === clienteSeleccionadoSB)?.nombre}</p>
-                        <p><span className="font-medium">Pedido:</span> {pedidosSB.find(p => p.id === pedidoSeleccionadoSB)?.idPedidoCore}</p>
-                        <p><span className="font-medium">Producto:</span> {productosSB.find(p => p.id === productoSeleccionadoSB)?.nombreProducto}</p>
-                        <p><span className="font-medium">Cantidad:</span> {cantidadSB || '---'} L</p>
+                        <p><span className="font-medium">Tipo:</span> Producción Normal</p>
+                        <p><span className="font-medium">Destino:</span> Stock General</p>
+                        <p><span className="font-medium">Producto:</span> {productosCatalogoSB.find(p => p.codigo === productoCatalogoSelSB)?.nombre}</p>
+                        <p><span className="font-medium">Cantidad:</span> {cantidadSB} L</p>
                       </div>
                     </div>
+                  )}
+                </>
+              )}
+
+              {/* ============ MODO PEDIDO ESPECÍFICO ============ */}
+              {modoProduccionSB === 'pedido' && (
+                <>
+                  {/* Selector de Cliente */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      👤 Cliente
+                    </label>
+                    <select
+                      value={clienteSeleccionadoSB}
+                      onChange={(e) => handleClienteChangeSB(e.target.value)}
+                      className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900"
+                      disabled={loadingClientesSB}
+                    >
+                      <option value="">
+                        {loadingClientesSB ? 'Cargando clientes...' : 'Seleccione un cliente'}
+                      </option>
+                      {clientesSB.map((cliente) => (
+                        <option key={cliente.id} value={cliente.id}>
+                          {cliente.nombre} ({cliente.codigo})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Selector de Pedido */}
+                  {clienteSeleccionadoSB && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📦 Pedido Pendiente
+                      </label>
+                      <select
+                        value={pedidoSeleccionadoSB}
+                        onChange={(e) => handlePedidoChangeSB(e.target.value)}
+                        className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900"
+                        disabled={loadingPedidosSB}
+                      >
+                        <option value="">
+                          {loadingPedidosSB ? 'Cargando pedidos...' : 
+                           pedidosSB.length === 0 ? 'No hay pedidos pendientes' : 'Seleccione un pedido'}
+                        </option>
+                        {pedidosSB.map((pedido) => (
+                          <option key={pedido.id} value={pedido.id}>
+                            {pedido.idPedidoCore} - {new Date(pedido.fechaPedido).toLocaleDateString('es-CO')} ({pedido.estado})
+                          </option>
+                        ))}
+                      </select>
+                      {pedidosSB.length === 0 && !loadingPedidosSB && clienteSeleccionadoSB && (
+                        <p className="text-amber-600 text-sm mt-2">
+                          ⚠️ Este cliente no tiene pedidos pendientes con productos de Sirius Bacter
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selector de Producto */}
+                  {pedidoSeleccionadoSB && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        🧬 Producto Sirius Bacter
+                      </label>
+                      <select
+                        value={productoSeleccionadoSB}
+                        onChange={(e) => {
+                          const productoId = e.target.value;
+                          setProductoSeleccionadoSB(productoId);
+                          const producto = productosSB.find(p => p.id === productoId);
+                          if (producto) {
+                            setCantidadSB(producto.cantidad.toString());
+                          }
+                        }}
+                        className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900"
+                        disabled={loadingProductosSB}
+                      >
+                        <option value="">
+                          {loadingProductosSB ? 'Cargando productos...' : 
+                           productosSB.length === 0 ? 'No hay productos de Sirius Bacter' : 'Seleccione un producto'}
+                        </option>
+                        {productosSB.map((producto) => (
+                          <option key={producto.id} value={producto.id}>
+                            {producto.nombreProducto} - Cantidad pedida: {producto.cantidad} L
+                          </option>
+                        ))}
+                      </select>
+                      {productosSB.length === 0 && !loadingProductosSB && pedidoSeleccionadoSB && (
+                        <p className="text-amber-600 text-sm mt-2">
+                          ⚠️ Este pedido no contiene productos de Sirius Bacter
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Cantidad y Responsable */}
+                  {productoSeleccionadoSB && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            📊 Cantidad (Litros)
+                          </label>
+                          <input
+                            type="number"
+                            value={cantidadSB}
+                            onChange={(e) => setCantidadSB(e.target.value)}
+                            placeholder="Ej: 100"
+                            min="1"
+                            className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            👷 Responsable
+                          </label>
+                          <select
+                            value={responsableSB}
+                            onChange={(e) => setResponsableSB(e.target.value)}
+                            className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900"
+                          >
+                            <option value="">Seleccione responsable</option>
+                            {usuarios.map((u) => (
+                              <option key={u.id} value={u.nombre}>
+                                {u.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Resumen del producto seleccionado */}
+                      {productosSB.find(p => p.id === productoSeleccionadoSB) && (
+                        <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+                          <h4 className="font-semibold text-purple-800 mb-2">📋 Resumen del Registro</h4>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <p><span className="font-medium">Cliente:</span> {clientesSB.find(c => c.id === clienteSeleccionadoSB)?.nombre}</p>
+                            <p><span className="font-medium">Pedido:</span> {pedidosSB.find(p => p.id === pedidoSeleccionadoSB)?.idPedidoCore}</p>
+                            <p><span className="font-medium">Producto:</span> {productosSB.find(p => p.id === productoSeleccionadoSB)?.nombreProducto}</p>
+                            <p><span className="font-medium">Cantidad:</span> {cantidadSB || '---'} L</p>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -2345,9 +2578,13 @@ export default function BacteriasPage() {
                 </button>
                 <button
                   onClick={handleSubmitSiriusBacter}
-                  disabled={!productoSeleccionadoSB || !cantidadSB || isSubmittingSB}
+                  disabled={
+                    isSubmittingSB || !cantidadSB || 
+                    (modoProduccionSB === 'normal' ? !productoCatalogoSelSB : !productoSeleccionadoSB)
+                  }
                   className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                    !productoSeleccionadoSB || !cantidadSB || isSubmittingSB
+                    isSubmittingSB || !cantidadSB || 
+                    (modoProduccionSB === 'normal' ? !productoCatalogoSelSB : !productoSeleccionadoSB)
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-purple-600 hover:bg-purple-700 text-white'
                   }`}
@@ -2373,7 +2610,7 @@ export default function BacteriasPage() {
                   <span className="text-4xl">🦠</span>
                   <div>
                     <h2 className="text-2xl font-bold">Agregar Bacillus thuringiensis</h2>
-                    <p className="text-orange-200">Seleccione cliente y pedido para registrar el producto</p>
+                    <p className="text-orange-200">Registrar producción de Bacillus thuringiensis</p>
                   </div>
                 </div>
                 <button
@@ -2389,147 +2626,292 @@ export default function BacteriasPage() {
 
             {/* Contenido del modal */}
             <div className="p-6 space-y-6">
-              {/* 1. Selector de Cliente */}
+              {/* Toggle de modo de producción */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  🏢 Cliente
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  🔄 Tipo de Registro
                 </label>
-                <select 
-                  value={clienteSeleccionadoBT}
-                  onChange={(e) => handleClienteChangeBT(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
-                  disabled={loadingClientesBT}
-                >
-                  <option value="">
-                    {loadingClientesBT ? 'Cargando clientes...' : '-- Seleccione un cliente --'}
-                  </option>
-                  {clientesBT.map(cliente => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.nombre} ({cliente.codigo})
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setModoProduccionBT('normal'); setClienteSeleccionadoBT(''); setPedidoSeleccionadoBT(''); setProductoSeleccionadoBT(''); }}
+                    className={`py-3 px-4 rounded-lg font-semibold text-sm transition-all border-2 ${
+                      modoProduccionBT === 'normal'
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-lg'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-orange-400'
+                    }`}
+                  >
+                    🏭 Producción Normal
+                  </button>
+                  <button
+                    onClick={() => { setModoProduccionBT('pedido'); setProductoCatalogoSelBT(''); fetchClientesBT(); }}
+                    className={`py-3 px-4 rounded-lg font-semibold text-sm transition-all border-2 ${
+                      modoProduccionBT === 'pedido'
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-lg'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-orange-400'
+                    }`}
+                  >
+                    📦 Pedido Específico
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {modoProduccionBT === 'normal' 
+                    ? '📝 Registro de producción sin vincular a un pedido. Se almacena en stock general.'
+                    : '📝 Registro de producción vinculada a un pedido de cliente específico.'}
+                </p>
               </div>
 
-              {/* 2. Selector de Pedido */}
-              {clienteSeleccionadoBT && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    📋 Pedido Pendiente
-                  </label>
-                  <select
-                    value={pedidoSeleccionadoBT}
-                    onChange={(e) => handlePedidoChangeBT(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
-                    disabled={loadingPedidosBT}
-                  >
-                    <option value="">
-                      {loadingPedidosBT ? 'Cargando pedidos...' : '-- Seleccione un pedido --'}
-                    </option>
-                    {pedidosBT.map(pedido => (
-                      <option key={pedido.id} value={pedido.id}>
-                        {pedido.idPedidoCore} - {new Date(pedido.fechaPedido).toLocaleDateString()} 
-                        ({pedido.estado})
-                      </option>
-                    ))}
-                  </select>
-                  {pedidosBT.length === 0 && clienteSeleccionadoBT && !loadingPedidosBT && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      ℹ️ No hay pedidos pendientes para este cliente
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* 3. Selector de Producto */}
-              {pedidoSeleccionadoBT && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    🦠 Producto Bacillus thuringiensis
-                  </label>
-                  <select
-                    value={productoSeleccionadoBT}
-                    onChange={(e) => {
-                      const productoId = e.target.value;
-                      setProductoSeleccionadoBT(productoId);
-                      // Precargar cantidad del pedido
-                      const producto = productosBT.find(p => p.id === productoId);
-                      if (producto) {
-                        setCantidadBT(producto.cantidad.toString());
-                      }
-                    }}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
-                    disabled={loadingProductosBT}
-                  >
-                    <option value="">
-                      {loadingProductosBT ? 'Cargando productos...' : '-- Seleccione un producto --'}
-                    </option>
-                    {productosBT.map(producto => (
-                      <option key={producto.id} value={producto.id}>
-                        {producto.nombreProducto} - Cantidad pedida: {producto.cantidad} L
-                      </option>
-                    ))}
-                  </select>
-                  {productosBT.length === 0 && pedidoSeleccionadoBT && !loadingProductosBT && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      ℹ️ No hay productos de Bacillus thuringiensis en este pedido
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* 4. Cantidad y Responsable */}
-              {productoSeleccionadoBT && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* ============ MODO PRODUCCIÓN NORMAL ============ */}
+              {modoProduccionBT === 'normal' && (
+                <>
+                  {/* Selector de producto del catálogo */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      📊 Cantidad (L)
-                    </label>
-                    <input
-                      type="number"
-                      value={cantidadBT}
-                      onChange={(e) => setCantidadBT(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-900"
-                      placeholder="Cantidad en litros"
-                      min="0.1"
-                      step="0.1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      👤 Responsable
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      🦠 Producto
                     </label>
                     <select
-                      value={responsableBT}
-                      onChange={(e) => setResponsableBT(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
+                      value={productoCatalogoSelBT}
+                      onChange={(e) => setProductoCatalogoSelBT(e.target.value)}
+                      className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900"
+                      disabled={loadingCatalogoBT}
                     >
-                      <option value="">-- Seleccione responsable --</option>
-                      {usuarios.map(usuario => (
-                        <option key={usuario.id} value={usuario.nombre}>
-                          {usuario.nombre}
+                      <option value="">
+                        {loadingCatalogoBT ? 'Cargando productos...' : 'Seleccione producto'}
+                      </option>
+                      {productosCatalogoBT.map((prod) => (
+                        <option key={prod.id} value={prod.codigo}>
+                          {prod.nombre} ({prod.codigo})
                         </option>
                       ))}
                     </select>
                   </div>
-                </div>
+
+                  {/* Cantidad, Responsable */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📊 Cantidad (Litros)
+                      </label>
+                      <input
+                        type="number"
+                        value={cantidadBT}
+                        onChange={(e) => setCantidadBT(e.target.value)}
+                        placeholder="Ej: 100"
+                        min="1"
+                        className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900 placeholder-gray-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        👷 Responsable
+                      </label>
+                      <select
+                        value={responsableBT}
+                        onChange={(e) => setResponsableBT(e.target.value)}
+                        className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900"
+                      >
+                        <option value="">Seleccione responsable</option>
+                        {usuarios.map((u) => (
+                          <option key={u.id} value={u.nombre}>
+                            {u.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Observaciones */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📝 Observaciones (opcional)
+                    </label>
+                    <textarea
+                      value={observacionesBT}
+                      onChange={(e) => setObservacionesBT(e.target.value)}
+                      placeholder="Notas adicionales sobre esta producción..."
+                      rows={2}
+                      className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+
+                  {/* Resumen */}
+                  {productoCatalogoSelBT && cantidadBT && (
+                    <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-orange-800 mb-2">📋 Resumen del Registro</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <p><span className="font-medium">Tipo:</span> Producción Normal</p>
+                        <p><span className="font-medium">Destino:</span> Stock General</p>
+                        <p><span className="font-medium">Producto:</span> {productosCatalogoBT.find(p => p.codigo === productoCatalogoSelBT)?.nombre}</p>
+                        <p><span className="font-medium">Cantidad:</span> {cantidadBT} L</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ============ MODO PEDIDO ESPECÍFICO ============ */}
+              {modoProduccionBT === 'pedido' && (
+                <>
+                  {/* Selector de Cliente */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      🏢 Cliente
+                    </label>
+                    <select 
+                      value={clienteSeleccionadoBT}
+                      onChange={(e) => handleClienteChangeBT(e.target.value)}
+                      className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900"
+                      disabled={loadingClientesBT}
+                    >
+                      <option value="">
+                        {loadingClientesBT ? 'Cargando clientes...' : 'Seleccione un cliente'}
+                      </option>
+                      {clientesBT.map(cliente => (
+                        <option key={cliente.id} value={cliente.id}>
+                          {cliente.nombre} ({cliente.codigo})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Selector de Pedido */}
+                  {clienteSeleccionadoBT && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📋 Pedido Pendiente
+                      </label>
+                      <select
+                        value={pedidoSeleccionadoBT}
+                        onChange={(e) => handlePedidoChangeBT(e.target.value)}
+                        className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900"
+                        disabled={loadingPedidosBT}
+                      >
+                        <option value="">
+                          {loadingPedidosBT ? 'Cargando pedidos...' : 
+                           pedidosBT.length === 0 ? 'No hay pedidos pendientes' : 'Seleccione un pedido'}
+                        </option>
+                        {pedidosBT.map(pedido => (
+                          <option key={pedido.id} value={pedido.id}>
+                            {pedido.idPedidoCore} - {new Date(pedido.fechaPedido).toLocaleDateString('es-CO')} ({pedido.estado})
+                          </option>
+                        ))}
+                      </select>
+                      {pedidosBT.length === 0 && clienteSeleccionadoBT && !loadingPedidosBT && (
+                        <p className="text-amber-600 text-sm mt-2">
+                          ⚠️ Este cliente no tiene pedidos pendientes
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selector de Producto */}
+                  {pedidoSeleccionadoBT && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        🦠 Producto Bacillus thuringiensis
+                      </label>
+                      <select
+                        value={productoSeleccionadoBT}
+                        onChange={(e) => {
+                          const productoId = e.target.value;
+                          setProductoSeleccionadoBT(productoId);
+                          const producto = productosBT.find(p => p.id === productoId);
+                          if (producto) {
+                            setCantidadBT(producto.cantidad.toString());
+                          }
+                        }}
+                        className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900"
+                        disabled={loadingProductosBT}
+                      >
+                        <option value="">
+                          {loadingProductosBT ? 'Cargando productos...' : 
+                           productosBT.length === 0 ? 'No hay productos de Bacillus' : 'Seleccione un producto'}
+                        </option>
+                        {productosBT.map(producto => (
+                          <option key={producto.id} value={producto.id}>
+                            {producto.nombreProducto} - Cantidad pedida: {producto.cantidad} L
+                          </option>
+                        ))}
+                      </select>
+                      {productosBT.length === 0 && pedidoSeleccionadoBT && !loadingProductosBT && (
+                        <p className="text-amber-600 text-sm mt-2">
+                          ⚠️ Este pedido no contiene productos de Bacillus thuringiensis
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Cantidad y Responsable */}
+                  {productoSeleccionadoBT && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            📊 Cantidad (Litros)
+                          </label>
+                          <input
+                            type="number"
+                            value={cantidadBT}
+                            onChange={(e) => setCantidadBT(e.target.value)}
+                            placeholder="Ej: 100"
+                            min="1"
+                            className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900 placeholder-gray-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            👷 Responsable
+                          </label>
+                          <select
+                            value={responsableBT}
+                            onChange={(e) => setResponsableBT(e.target.value)}
+                            className="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-gray-900"
+                          >
+                            <option value="">Seleccione responsable</option>
+                            {usuarios.map(u => (
+                              <option key={u.id} value={u.nombre}>
+                                {u.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Resumen */}
+                      {productosBT.find(p => p.id === productoSeleccionadoBT) && (
+                        <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4">
+                          <h4 className="font-semibold text-orange-800 mb-2">📋 Resumen del Registro</h4>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <p><span className="font-medium">Cliente:</span> {clientesBT.find(c => c.id === clienteSeleccionadoBT)?.nombre}</p>
+                            <p><span className="font-medium">Pedido:</span> {pedidosBT.find(p => p.id === pedidoSeleccionadoBT)?.idPedidoCore}</p>
+                            <p><span className="font-medium">Producto:</span> {productosBT.find(p => p.id === productoSeleccionadoBT)?.nombreProducto}</p>
+                            <p><span className="font-medium">Cantidad:</span> {cantidadBT || '---'} L</p>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
               )}
             </div>
 
             {/* Footer con botones */}
             <div className="border-t border-gray-200 p-6">
-              <div className="flex space-x-4">
+              <div className="flex gap-4">
                 <button
                   onClick={() => setShowBacillusModal(false)}
-                  className="flex-1 py-3 px-4 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-all"
+                  className="flex-1 py-3 px-4 border-2 border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-all"
                 >
-                  ❌ Cancelar
+                  Cancelar
                 </button>
                 <button
                   onClick={handleSubmitBacillus}
-                  disabled={!productoSeleccionadoBT || !cantidadBT || isSubmittingBT}
+                  disabled={
+                    isSubmittingBT || !cantidadBT || 
+                    (modoProduccionBT === 'normal' ? !productoCatalogoSelBT : !productoSeleccionadoBT)
+                  }
                   className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                    !productoSeleccionadoBT || !cantidadBT || isSubmittingBT
+                    isSubmittingBT || !cantidadBT || 
+                    (modoProduccionBT === 'normal' ? !productoCatalogoSelBT : !productoSeleccionadoBT)
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-orange-600 hover:bg-orange-700 text-white'
                   }`}

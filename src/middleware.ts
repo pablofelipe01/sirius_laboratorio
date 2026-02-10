@@ -23,6 +23,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Rutas públicas por prefijo (para rutas dinámicas)
+  const publicPrefixes = [
+    '/remisiones/firmar/',   // Firma de remisiones desde link de email
+  ];
+  if (publicPrefixes.some(prefix => pathname.startsWith(prefix))) {
+    return NextResponse.next();
+  }
+
   // Todas las demás rutas requieren autenticación
   console.log(`🔍 Checking ${pathname} access`);
   

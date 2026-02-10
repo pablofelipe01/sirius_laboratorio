@@ -221,13 +221,24 @@ export async function POST(request: NextRequest) {
 
     // ========================================================================
     // PASO 1: Verificar que el producto existe en Sirius Product Core
-    // Buscar por "Codigo Producto" ya que body.productoId es el código, no el Record ID
+    // Si productoId empieza con "rec", es un Airtable Record ID → fetch directo
+    // Si no, buscar por "Codigo Producto"
     // ========================================================================
     const productosBaseUrl = buildSiriusProductCoreUrl(SIRIUS_PRODUCT_CORE_CONFIG.TABLES.PRODUCTOS);
-    const filterFormula = encodeURIComponent(`{Codigo Producto}="${body.productoId}"`);
-    const productoUrl = `${productosBaseUrl}?filterByFormula=${filterFormula}&maxRecords=1`;
     
-    console.log('🔍 Verificando producto por código:', productoUrl);
+    let productoUrl: string;
+    const esRecordId = body.productoId.startsWith('rec');
+    
+    if (esRecordId) {
+      // Fetch directo por Record ID
+      productoUrl = `${productosBaseUrl}/${body.productoId}`;
+      console.log('🔍 Verificando producto por Record ID:', productoUrl);
+    } else {
+      // Buscar por Codigo Producto
+      const filterFormula = encodeURIComponent(`{Codigo Producto}="${body.productoId}"`);
+      productoUrl = `${productosBaseUrl}?filterByFormula=${filterFormula}&maxRecords=1`;
+      console.log('🔍 Verificando producto por código:', productoUrl);
+    }
     
     const productoResponse = await fetch(productoUrl, {
       method: 'GET',
@@ -242,17 +253,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const productosData = await productoResponse.json();
+    const productoResponseData = await productoResponse.json();
     
-    if (!productosData.records || productosData.records.length === 0) {
-      console.error('❌ Producto no encontrado con código:', body.productoId);
-      return NextResponse.json(
-        { success: false, error: `Producto no encontrado con código: ${body.productoId}` },
-        { status: 404 }
-      );
+    // Normalizar: fetch directo devuelve un record, filtro devuelve { records: [...] }
+    let producto: any;
+    if (esRecordId) {
+      if (!productoResponseData.id) {
+        console.error('❌ Producto no encontrado con Record ID:', body.productoId);
+        return NextResponse.json(
+          { success: false, error: `Producto no encontrado con ID: ${body.productoId}` },
+          { status: 404 }
+        );
+      }
+      producto = productoResponseData;
+    } else {
+      if (!productoResponseData.records || productoResponseData.records.length === 0) {
+        console.error('❌ Producto no encontrado con código:', body.productoId);
+        return NextResponse.json(
+          { success: false, error: `Producto no encontrado con código: ${body.productoId}` },
+          { status: 404 }
+        );
+      }
+      producto = productoResponseData.records[0];
     }
-
-    const producto = productosData.records[0];
     const codigoProducto = producto.fields['Codigo Producto'] || body.productoId;
     const nombreProducto = producto.fields['Nombre Comercial'] || 'Producto';
     
@@ -298,9 +321,9 @@ export async function POST(request: NextRequest) {
     if (FIELD_IDS.MOTIVO) {
       movimientoFields[FIELD_IDS.MOTIVO] = motivo;
     }
-    // Ubicación destino (ej: ID del pedido)
-    if (body.ubicacionDestinoId && FIELD_IDS.UBICACION_DESTINO_ID) {
-      movimientoFields[FIELD_IDS.UBICACION_DESTINO_ID] = body.ubicacionDestinoId;
+    // Ubicación destino: pedido específico o STOCK-GENERAL por defecto
+    if (FIELD_IDS.UBICACION_DESTINO_ID) {
+      movimientoFields[FIELD_IDS.UBICACION_DESTINO_ID] = body.ubicacionDestinoId || 'STOCK-GENERAL';
     }
     if (FIELD_IDS.FECHA_MOVIMIENTO) {
       movimientoFields[FIELD_IDS.FECHA_MOVIMIENTO] = fechaMovimiento;

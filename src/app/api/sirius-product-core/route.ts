@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Airtable from 'airtable';
 
-// Validar configuración requerida
-if (!process.env.AIRTABLE_API_KEY || !process.env.AIRTABLE_BASE_ID) {
-  throw new Error('Variables de entorno AIRTABLE_API_KEY y AIRTABLE_BASE_ID son requeridas');
-}
+// Configurar Airtable con la base de Sirius Product Core
+const productCoreBase = new Airtable({
+  apiKey: process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE || process.env.AIRTABLE_API_KEY
+}).base(process.env.AIRTABLE_BASE_ID_SIRIUS_PRODUCT_CORE || process.env.AIRTABLE_BASE_ID || '');
 
-// Configurar Airtable de forma segura
-const base = new Airtable({
-  apiKey: process.env.AIRTABLE_API_KEY
-}).base(process.env.AIRTABLE_BASE_ID);
-
-// Variable de entorno para la tabla Sirius Product Core
-const SIRIUS_PRODUCT_CORE_TABLE_ID = process.env.AIRTABLE_TABLE_SIRIUS_PRODUCT_CORE;
+// Tabla de productos
+const PRODUCTOS_TABLE = process.env.AIRTABLE_TABLE_PRODUCTOS;
 
 interface SiriusProduct {
   id: string;
+  codigoProducto: string;
   nombre: string;
   categoria?: string;
   descripcion?: string;
@@ -29,8 +25,8 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🔍 SIRIUS-PRODUCT-CORE API: Iniciando GET request...');
 
-    if (!SIRIUS_PRODUCT_CORE_TABLE_ID) {
-      console.error('❌ SIRIUS-PRODUCT-CORE API: AIRTABLE_TABLE_SIRIUS_PRODUCT_CORE no configurado');
+    if (!PRODUCTOS_TABLE) {
+      console.error('❌ SIRIUS-PRODUCT-CORE API: AIRTABLE_TABLE_PRODUCTOS no configurado');
       return NextResponse.json(
         { success: false, error: 'Tabla Sirius Product Core no configurada' },
         { status: 500 }
@@ -64,7 +60,7 @@ export async function GET(request: NextRequest) {
     // Opciones de consulta
     const selectOptions: any = {
       maxRecords,
-      sort: [{ field: 'Nombre', direction: 'asc' }]
+      sort: [{ field: 'Nombre Comercial', direction: 'asc' }]
     };
 
     if (filterFormula) {
@@ -74,7 +70,7 @@ export async function GET(request: NextRequest) {
     console.log('🌐 SIRIUS-PRODUCT-CORE API: Consultando Airtable con opciones:', selectOptions);
 
     // Obtener registros de Airtable
-    const records = await base(SIRIUS_PRODUCT_CORE_TABLE_ID)
+    const records = await productCoreBase(PRODUCTOS_TABLE)
       .select(selectOptions)
       .all();
 
@@ -83,7 +79,8 @@ export async function GET(request: NextRequest) {
     // Transformar datos
     const productos: SiriusProduct[] = records.map(record => ({
       id: record.id,
-      nombre: record.fields['Nombre'] as string || '',
+      codigoProducto: record.fields['Codigo Producto'] as string || '',
+      nombre: record.fields['Nombre Comercial'] as string || record.fields['Nombre'] as string || '',
       categoria: record.fields['Categoria'] as string || '',
       descripcion: record.fields['Descripcion'] as string || '',
       precio: record.fields['Precio'] as number || 0,
@@ -116,8 +113,8 @@ export async function POST(request: NextRequest) {
   try {
     console.log('📝 SIRIUS-PRODUCT-CORE API: Iniciando POST request...');
 
-    if (!SIRIUS_PRODUCT_CORE_TABLE_ID) {
-      console.error('❌ SIRIUS-PRODUCT-CORE API: AIRTABLE_TABLE_SIRIUS_PRODUCT_CORE no configurado');
+    if (!PRODUCTOS_TABLE) {
+      console.error('❌ SIRIUS-PRODUCT-CORE API: AIRTABLE_TABLE_PRODUCTOS no configurado');
       return NextResponse.json(
         { success: false, error: 'Tabla Sirius Product Core no configurada' },
         { status: 500 }
@@ -147,14 +144,15 @@ export async function POST(request: NextRequest) {
     console.log('📦 SIRIUS-PRODUCT-CORE API: Datos para Airtable:', recordData);
 
     // Crear registro en Airtable
-    const record = await base(SIRIUS_PRODUCT_CORE_TABLE_ID).create(recordData);
+    const record = await productCoreBase(PRODUCTOS_TABLE).create(recordData);
 
     console.log('✅ SIRIUS-PRODUCT-CORE API: Producto creado con ID:', record.id);
 
     // Transformar respuesta
     const nuevoProducto: SiriusProduct = {
       id: record.id,
-      nombre: record.fields['Nombre'] as string,
+      codigoProducto: record.fields['Codigo Producto'] as string || '',
+      nombre: record.fields['Nombre Comercial'] as string || record.fields['Nombre'] as string,
       categoria: record.fields['Categoria'] as string || '',
       descripcion: record.fields['Descripcion'] as string || '',
       precio: record.fields['Precio'] as number || 0,
@@ -186,7 +184,7 @@ export async function PUT(request: NextRequest) {
   try {
     console.log('🔄 SIRIUS-PRODUCT-CORE API: Iniciando PUT request...');
 
-    if (!SIRIUS_PRODUCT_CORE_TABLE_ID) {
+    if (!PRODUCTOS_TABLE) {
       return NextResponse.json(
         { success: false, error: 'Tabla Sirius Product Core no configurada' },
         { status: 500 }
@@ -213,11 +211,12 @@ export async function PUT(request: NextRequest) {
     if (body.disponible !== undefined) fieldsToUpdate['Disponible'] = body.disponible;
 
     // Actualizar registro en Airtable
-    const record = await base(SIRIUS_PRODUCT_CORE_TABLE_ID).update(body.id, fieldsToUpdate);
+    const record = await productCoreBase(PRODUCTOS_TABLE).update(body.id, fieldsToUpdate);
 
     const productoActualizado: SiriusProduct = {
       id: record.id,
-      nombre: record.fields['Nombre'] as string,
+      codigoProducto: record.fields['Codigo Producto'] as string || '',
+      nombre: record.fields['Nombre Comercial'] as string || record.fields['Nombre'] as string,
       categoria: record.fields['Categoria'] as string || '',
       descripcion: record.fields['Descripcion'] as string || '',
       precio: record.fields['Precio'] as number || 0,
@@ -249,7 +248,7 @@ export async function DELETE(request: NextRequest) {
   try {
     console.log('🗑️ SIRIUS-PRODUCT-CORE API: Iniciando DELETE request...');
 
-    if (!SIRIUS_PRODUCT_CORE_TABLE_ID) {
+    if (!PRODUCTOS_TABLE) {
       return NextResponse.json(
         { success: false, error: 'Tabla Sirius Product Core no configurada' },
         { status: 500 }
@@ -267,7 +266,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Eliminar registro de Airtable
-    await base(SIRIUS_PRODUCT_CORE_TABLE_ID).destroy(id);
+    await productCoreBase(PRODUCTOS_TABLE).destroy(id);
 
     console.log('✅ SIRIUS-PRODUCT-CORE API: Producto eliminado con ID:', id);
 

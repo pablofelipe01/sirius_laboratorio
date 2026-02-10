@@ -167,6 +167,7 @@ export async function GET(request: NextRequest) {
     console.log('🔍 Buscando stock con IDs:', { recordIdPedido, idPedidoCore });
 
     // 3. Para cada producto, verificar stock disponible del pedido Y cantidades ya despachadas
+    //    Además consultar stock general (STOCK-GENERAL) disponible para despacho
     const verificacionStock = await Promise.all(
       detallesPedido.map(async (detalle) => {
         // Obtener movimientos de ENTRADA (producción asignada al pedido)
@@ -183,7 +184,7 @@ export async function GET(request: NextRequest) {
           })
           .firstPage();
 
-        // Obtener movimientos de SALIDA (despachos/remisiones)
+        // Obtener movimientos de SALIDA (despachos/remisiones del pedido)
         const movimientosSalida = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
           .select({
             filterByFormula: `AND(
@@ -197,9 +198,38 @@ export async function GET(request: NextRequest) {
           })
           .firstPage();
 
-        console.log(`📊 Producto ${detalle.idProductoCore}: ${movimientosEntrada.length} entradas, ${movimientosSalida.length} salidas`);
+        // --- Stock General: entradas y salidas en STOCK-GENERAL o sin ubicación asignada ---
+        const movimientosEntradaGeneral = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+          .select({
+            filterByFormula: `AND(
+              {tipo_movimiento} = "Entrada",
+              {product_id} = "${detalle.idProductoCore}",
+              OR(
+                {ubicacion_destino_id} = "STOCK-GENERAL",
+                {ubicacion_destino_id} = BLANK(),
+                {ubicacion_destino_id} = ""
+              )
+            )`
+          })
+          .firstPage();
 
-        // Calcular totales
+        const movimientosSalidaGeneral = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+          .select({
+            filterByFormula: `AND(
+              {tipo_movimiento} = "Salida",
+              {product_id} = "${detalle.idProductoCore}",
+              OR(
+                {ubicacion_destino_id} = "STOCK-GENERAL",
+                {ubicacion_destino_id} = BLANK(),
+                {ubicacion_destino_id} = ""
+              )
+            )`
+          })
+          .firstPage();
+
+        console.log(`📊 Producto ${detalle.idProductoCore}: ${movimientosEntrada.length} entradas pedido, ${movimientosSalida.length} salidas pedido, ${movimientosEntradaGeneral.length} entradas general, ${movimientosSalidaGeneral.length} salidas general`);
+
+        // Calcular totales del pedido
         const totalEntradas = movimientosEntrada.reduce((total, mov) => {
           return total + (mov.get('cantidad') as number || 0);
         }, 0);
@@ -208,10 +238,24 @@ export async function GET(request: NextRequest) {
           return total + (mov.get('cantidad') as number || 0);
         }, 0);
 
-        // Stock disponible = entradas - salidas
+        // Calcular totales de stock general
+        const totalEntradasGeneral = movimientosEntradaGeneral.reduce((total, mov) => {
+          return total + (mov.get('cantidad') as number || 0);
+        }, 0);
+
+        const totalSalidasGeneral = movimientosSalidaGeneral.reduce((total, mov) => {
+          return total + (mov.get('cantidad') as number || 0);
+        }, 0);
+
+        // Stock disponible del pedido = entradas pedido - salidas pedido
         const stockDisponible = totalEntradas - totalSalidas;
-        const stockSuficiente = stockDisponible >= detalle.cantidadPedida;
-        const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockDisponible;
+        // Stock disponible general = entradas general - salidas general
+        const stockGeneral = Math.max(0, totalEntradasGeneral - totalSalidasGeneral);
+        // Stock total = pedido + general
+        const stockTotal = Math.max(0, stockDisponible) + stockGeneral;
+
+        const stockSuficiente = stockTotal >= detalle.cantidadPedida;
+        const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockTotal;
         
         // Calcular pendiente por despachar
         const cantidadDespachada = totalSalidas;
@@ -223,7 +267,9 @@ export async function GET(request: NextRequest) {
           cantidadPedida: detalle.cantidadPedida,
           cantidadDespachada,
           pendientePorDespachar: Math.max(0, pendientePorDespachar),
-          stockDisponible: Math.max(0, stockDisponible), // No mostrar negativos
+          stockDisponible: Math.max(0, stockDisponible), // Stock asignado al pedido
+          stockGeneral, // Stock en STOCK-GENERAL
+          stockTotal, // Suma de ambos
           totalProducido: totalEntradas,
           completo: stockSuficiente,
           despachado: cantidadDespachada >= detalle.cantidadPedida,
@@ -235,10 +281,11 @@ export async function GET(request: NextRequest) {
 
     // 4. Calcular totales para el resumen
     const totalPedido = verificacionStock.reduce((sum, v) => sum + v.cantidadPedida, 0);
-    const totalDisponible = verificacionStock.reduce((sum, v) => sum + v.stockDisponible, 0);
+    const totalDisponible = verificacionStock.reduce((sum, v) => sum + v.stockTotal, 0);
     const totalFaltante = verificacionStock.reduce((sum, v) => sum + v.faltante, 0);
     const totalDespachado = verificacionStock.reduce((sum, v) => sum + v.cantidadDespachada, 0);
     const totalPendiente = verificacionStock.reduce((sum, v) => sum + v.pendientePorDespachar, 0);
+    const totalStockGeneral = verificacionStock.reduce((sum, v) => sum + v.stockGeneral, 0);
 
     // 5. Determinar si el pedido está completo
     const pedidoCompleto = verificacionStock.every(v => v.completo);
@@ -256,6 +303,7 @@ export async function GET(request: NextRequest) {
         totalFaltante,
         totalDespachado,
         totalPendiente,
+        totalStockGeneral,
         totalProductos: verificacionStock.length,
         productosCompletos: verificacionStock.filter(v => v.completo).length,
         productosDespachados: verificacionStock.filter(v => v.despachado).length,
@@ -388,6 +436,7 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Buscando stock con IDs (POST):', { recordIdPedido, idPedidoCore });
 
     // 3. Para cada producto, verificar stock disponible del pedido Y cantidades ya despachadas
+    //    Además consultar stock general (STOCK-GENERAL) disponible para despacho
     const verificacionStock = await Promise.all(
       detallesPedido.map(async (detalle) => {
         // Obtener movimientos de ENTRADA (producción asignada al pedido)
@@ -404,7 +453,7 @@ export async function POST(request: NextRequest) {
           })
           .firstPage();
 
-        // Obtener movimientos de SALIDA (despachos/remisiones)
+        // Obtener movimientos de SALIDA (despachos/remisiones del pedido)
         const movimientosSalida = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
           .select({
             filterByFormula: `AND(
@@ -418,9 +467,38 @@ export async function POST(request: NextRequest) {
           })
           .firstPage();
 
-        console.log(`📊 Producto ${detalle.idProductoCore}: ${movimientosEntrada.length} entradas, ${movimientosSalida.length} salidas (POST)`);
+        // --- Stock General: entradas y salidas en STOCK-GENERAL o sin ubicación asignada ---
+        const movimientosEntradaGeneral = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+          .select({
+            filterByFormula: `AND(
+              {tipo_movimiento} = "Entrada",
+              {product_id} = "${detalle.idProductoCore}",
+              OR(
+                {ubicacion_destino_id} = "STOCK-GENERAL",
+                {ubicacion_destino_id} = BLANK(),
+                {ubicacion_destino_id} = ""
+              )
+            )`
+          })
+          .firstPage();
 
-        // Calcular totales
+        const movimientosSalidaGeneral = await baseInventario(SIRIUS_INVENTARIO_CONFIG.TABLES.MOVIMIENTOS_INVENTARIO)
+          .select({
+            filterByFormula: `AND(
+              {tipo_movimiento} = "Salida",
+              {product_id} = "${detalle.idProductoCore}",
+              OR(
+                {ubicacion_destino_id} = "STOCK-GENERAL",
+                {ubicacion_destino_id} = BLANK(),
+                {ubicacion_destino_id} = ""
+              )
+            )`
+          })
+          .firstPage();
+
+        console.log(`📊 Producto ${detalle.idProductoCore}: ${movimientosEntrada.length} entradas pedido, ${movimientosSalida.length} salidas pedido, ${movimientosEntradaGeneral.length} entradas general, ${movimientosSalidaGeneral.length} salidas general (POST)`);
+
+        // Calcular totales del pedido
         const totalEntradas = movimientosEntrada.reduce((total, mov) => {
           return total + (mov.get('cantidad') as number || 0);
         }, 0);
@@ -429,10 +507,24 @@ export async function POST(request: NextRequest) {
           return total + (mov.get('cantidad') as number || 0);
         }, 0);
 
-        // Stock disponible = entradas - salidas
+        // Calcular totales de stock general
+        const totalEntradasGeneral = movimientosEntradaGeneral.reduce((total, mov) => {
+          return total + (mov.get('cantidad') as number || 0);
+        }, 0);
+
+        const totalSalidasGeneral = movimientosSalidaGeneral.reduce((total, mov) => {
+          return total + (mov.get('cantidad') as number || 0);
+        }, 0);
+
+        // Stock disponible del pedido = entradas pedido - salidas pedido
         const stockDisponible = totalEntradas - totalSalidas;
-        const stockSuficiente = stockDisponible >= detalle.cantidadPedida;
-        const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockDisponible;
+        // Stock disponible general = entradas general - salidas general
+        const stockGeneral = Math.max(0, totalEntradasGeneral - totalSalidasGeneral);
+        // Stock total = pedido + general
+        const stockTotal = Math.max(0, stockDisponible) + stockGeneral;
+
+        const stockSuficiente = stockTotal >= detalle.cantidadPedida;
+        const faltante = stockSuficiente ? 0 : detalle.cantidadPedida - stockTotal;
         
         // Calcular pendiente por despachar
         const cantidadDespachada = totalSalidas;
@@ -444,7 +536,9 @@ export async function POST(request: NextRequest) {
           cantidadPedida: detalle.cantidadPedida,
           cantidadDespachada,
           pendientePorDespachar: Math.max(0, pendientePorDespachar),
-          stockDisponible: Math.max(0, stockDisponible), // No mostrar negativos
+          stockDisponible: Math.max(0, stockDisponible), // Stock asignado al pedido
+          stockGeneral, // Stock en STOCK-GENERAL
+          stockTotal, // Suma de ambos
           totalProducido: totalEntradas,
           completo: stockSuficiente,
           despachado: cantidadDespachada >= detalle.cantidadPedida,
@@ -456,10 +550,11 @@ export async function POST(request: NextRequest) {
 
     // 4. Calcular totales para el resumen
     const totalPedido = verificacionStock.reduce((sum, v) => sum + v.cantidadPedida, 0);
-    const totalDisponible = verificacionStock.reduce((sum, v) => sum + v.stockDisponible, 0);
+    const totalDisponible = verificacionStock.reduce((sum, v) => sum + v.stockTotal, 0);
     const totalFaltante = verificacionStock.reduce((sum, v) => sum + v.faltante, 0);
     const totalDespachado = verificacionStock.reduce((sum, v) => sum + v.cantidadDespachada, 0);
     const totalPendiente = verificacionStock.reduce((sum, v) => sum + v.pendientePorDespachar, 0);
+    const totalStockGeneral = verificacionStock.reduce((sum, v) => sum + v.stockGeneral, 0);
 
     // 5. Determinar si el pedido está completo
     const pedidoCompleto = verificacionStock.every(v => v.completo);
@@ -477,6 +572,7 @@ export async function POST(request: NextRequest) {
         totalFaltante,
         totalDespachado,
         totalPendiente,
+        totalStockGeneral,
         totalProductos: verificacionStock.length,
         productosCompletos: verificacionStock.filter(v => v.completo).length,
         productosDespachados: verificacionStock.filter(v => v.despachado).length,

@@ -655,8 +655,8 @@ export default function CalendarioProduccionPage() {
   // Estado para progreso de stock (batch optimizado)
   const [progresosPedidos, setProgresosPedidos] = useState<Record<string, any>>({});
   
-  // Estado para remisión del pedido seleccionado
-  const [remisionPedido, setRemisionPedido] = useState<{
+  // Estado para remisiones del pedido seleccionado (soporta múltiples remisiones)
+  type RemisionData = {
     id: string;
     urlDocumento: string;
     idRemision: string;
@@ -675,7 +675,8 @@ export default function CalendarioProduccionPage() {
     transportista: { nombre: string; cedula: string } | null;
     receptor: { nombre: string; cedula: string } | null;
     yaFirmada: boolean;
-  } | null>(null);
+  };
+  const [remisionesPedido, setRemisionesPedido] = useState<RemisionData[]>([]);
   const [loadingRemision, setLoadingRemision] = useState(false);
   const [showRemisionModal, setShowRemisionModal] = useState(false);
 
@@ -1214,6 +1215,15 @@ export default function CalendarioProduccionPage() {
     return clientesMap[clienteId] || clienteId || 'Cliente sin asignar';
   };
 
+  // Obtener la unidad dominante de un pedido basado en sus productos
+  // Si todos los productos son "Kg" devuelve "Kg", si son "L" devuelve "L", si mixto devuelve la primera unidad
+  const getUnidadPedido = (pedidoId: string): string => {
+    const productos = getProductosPedido(pedidoId);
+    if (productos.length === 0) return 'L';
+    const unidades = [...new Set(productos.map(p => p.unidad))];
+    return unidades[0] || 'L';
+  };
+
   // Guardar nuevo pedido
   const handleGuardarPedido = async (pedidoData: any) => {
     try {
@@ -1239,82 +1249,73 @@ export default function CalendarioProduccionPage() {
     }
   };
 
-  // Buscar remisión existente para un pedido
+  // Buscar remisiones existentes para un pedido (soporta múltiples)
   const fetchRemisionPedido = async (pedidoId: string) => {
     try {
       setLoadingRemision(true);
       const response = await fetch(`/api/remisiones?pedidoId=${encodeURIComponent(pedidoId)}`);
       const data = await response.json();
       if (data.success && data.remisiones && data.remisiones.length > 0) {
-        const remision = data.remisiones[0]; // La más reciente
-        
-        // Obtener detalles completos (productos y personas) desde el endpoint de firma
-        let productos: { nombre: string; cantidad: number; unidad: string }[] = [];
-        let transportista: { nombre: string; cedula: string } | null = null;
-        let receptor: { nombre: string; cedula: string } | null = null;
-        let yaFirmada = false;
-        
-        try {
-          const detailRes = await fetch(`/api/remisiones/firmar?remisionId=${remision.id}`);
-          const detailData = await detailRes.json();
-          if (detailData.success && detailData.remision) {
-            productos = detailData.remision.productos || [];
-            yaFirmada = detailData.remision.yaFirmada || false;
-            if (detailData.remision.transportista) {
-              transportista = {
-                nombre: detailData.remision.transportista.nombreCompleto || '',
-                cedula: detailData.remision.transportista.cedula || ''
-              };
+        // Procesar TODAS las remisiones del pedido
+        const remisionesData: RemisionData[] = await Promise.all(
+          data.remisiones.map(async (remision: any) => {
+            let productos: { nombre: string; cantidad: number; unidad: string }[] = [];
+            let transportista: { nombre: string; cedula: string } | null = null;
+            let receptor: { nombre: string; cedula: string } | null = null;
+            let yaFirmada = false;
+            
+            try {
+              const detailRes = await fetch(`/api/remisiones/firmar?remisionId=${remision.id}`);
+              const detailData = await detailRes.json();
+              if (detailData.success && detailData.remision) {
+                productos = detailData.remision.productos || [];
+                yaFirmada = detailData.remision.yaFirmada || false;
+                if (detailData.remision.transportista) {
+                  transportista = {
+                    nombre: detailData.remision.transportista.nombreCompleto || '',
+                    cedula: detailData.remision.transportista.cedula || ''
+                  };
+                }
+                if (detailData.remision.receptor) {
+                  receptor = {
+                    nombre: detailData.remision.receptor.nombreCompleto || '',
+                    cedula: detailData.remision.receptor.cedula || ''
+                  };
+                }
+              }
+            } catch (detailErr) {
+              console.warn('No se pudieron obtener detalles de remisión:', remision.id, detailErr);
             }
-            if (detailData.remision.receptor) {
-              receptor = {
-                nombre: detailData.remision.receptor.nombreCompleto || '',
-                cedula: detailData.remision.receptor.cedula || ''
-              };
-            }
-          }
-        } catch (detailErr) {
-          console.warn('No se pudieron obtener detalles completos de la remisión:', detailErr);
-        }
-        
-        const remisionData = {
-          id: remision.id || '',
-          urlDocumento: remision.urlDocumento || '',
-          idRemision: remision.idRemision || '',
-          estado: remision.estado || '',
-          fechaRemision: remision.fechaRemision || '',
-          areaOrigen: remision.areaOrigen || '',
-          responsableEntrega: remision.responsableEntrega || '',
-          notas: remision.notas || '',
-          totalCantidad: remision.totalCantidad || 0,
-          nombreArchivo: remision.nombreArchivo || '',
-          fechaPedidoDespachado: remision.fechaPedidoDespachado || '',
-          fechaRecibido: remision.fechaRecibido || '',
-          idCliente: remision.idCliente || '',
-          idPedido: remision.idPedido || '',
-          productos,
-          transportista,
-          receptor,
-          yaFirmada,
-        };
-        setRemisionPedido(remisionData);
-
-        // Sincronizar estado del pedido si la remisión ya fue entregada
-        if (remisionData.estado === 'Entregada' && selectedPedidoDetalle && selectedPedidoDetalle.estado !== 'Completado') {
-          setSelectedPedidoDetalle((prev: any) => prev ? { ...prev, estado: 'Completado' } : prev);
-          // También actualizar en la lista de pedidos para que la tarjeta refleje el cambio
-          setPedidosPendientes(prev => prev.map(p => 
-            (p.idPedidoCore === pedidoId || p.id === pedidoId) 
-              ? { ...p, estado: 'Completado' } 
-              : p
-          ));
-        }
+            
+            return {
+              id: remision.id || '',
+              urlDocumento: remision.urlDocumento || '',
+              idRemision: remision.idRemision || '',
+              estado: remision.estado || '',
+              fechaRemision: remision.fechaRemision || '',
+              areaOrigen: remision.areaOrigen || '',
+              responsableEntrega: remision.responsableEntrega || '',
+              notas: remision.notas || '',
+              totalCantidad: remision.totalCantidad || 0,
+              nombreArchivo: remision.nombreArchivo || '',
+              fechaPedidoDespachado: remision.fechaPedidoDespachado || '',
+              fechaRecibido: remision.fechaRecibido || '',
+              idCliente: remision.idCliente || '',
+              idPedido: remision.idPedido || '',
+              productos,
+              transportista,
+              receptor,
+              yaFirmada,
+            };
+          })
+        );
+        setRemisionesPedido(remisionesData);
       } else {
-        setRemisionPedido(null);
+        setRemisionesPedido([]);
       }
     } catch (error) {
-      console.error('Error buscando remisión del pedido:', error);
-      setRemisionPedido(null);
+      console.error('Error buscando remisiones del pedido:', error);
+      setRemisionesPedido([]);
     } finally {
       setLoadingRemision(false);
     }
@@ -1362,15 +1363,28 @@ export default function CalendarioProduccionPage() {
         console.log('📊 Resumen:', data.resumen);
         setVerificacionStock(data);
         
-        // Inicializar cantidades de despacho con el mínimo entre stock disponible y cantidad pedida
+        // Inicializar cantidades de despacho: stock pedido es obligatorio, general se ajusta
         const cantidadesIniciales: Record<string, number> = {};
         data.productos.forEach((prod: any) => {
           const productoId = prod.productoId || prod.idProductoCore;
-          // Valor inicial: el menor entre stock disponible y cantidad pedida
-          cantidadesIniciales[productoId] = Math.min(prod.stockDisponible || 0, prod.cantidadPedida || 0);
+          const stockPedido = prod.stockDisponible || 0;
+          const stockGenrl = prod.stockGeneral || 0;
+          const stockTotal = prod.stockTotal || (stockPedido + stockGenrl);
+          const pendiente = prod.pendientePorDespachar ?? prod.cantidadPedida;
+          // Siempre despachar al menos todo el stock del pedido, más general hasta completar pendiente
+          cantidadesIniciales[productoId] = Math.min(stockTotal, Math.max(stockPedido, pendiente));
         });
         setCantidadesDespacho(cantidadesIniciales);
-        setProductosExcluidos(new Set()); // Limpiar productos excluidos
+        
+        // Auto-excluir productos ya completamente despachados
+        const yaDespachadosSet = new Set<string>();
+        data.productos.forEach((prod: any) => {
+          const productoId = prod.productoId || prod.idProductoCore;
+          if (prod.despachado || (prod.pendientePorDespachar !== undefined && prod.pendientePorDespachar <= 0)) {
+            yaDespachadosSet.add(productoId);
+          }
+        });
+        setProductosExcluidos(yaDespachadosSet);
         
         setShowVerificarStockModal(true);
       } else {
@@ -1436,11 +1450,14 @@ export default function CalendarioProduccionPage() {
 
       console.log('📦 Productos para remisión:', productosParaRemision);
 
-      // Determinar si es despacho completo (todos los productos con cantidad completa)
+      // Determinar si es despacho completo:
+      // Un producto está completo si ya fue totalmente despachado O si este despacho cubre lo pendiente
       const esDespachoCompleto = verificacionStock.productos.every((p: any) => {
         const productoId = p.productoId || p.idProductoCore;
         const cantidadDespacho = cantidadesDespacho[productoId] || 0;
-        return !productosExcluidos.has(productoId) && cantidadDespacho >= p.cantidadPedida;
+        const pendiente = p.pendientePorDespachar ?? p.cantidadPedida;
+        // Producto completo si: ya está totalmente despachado, O este envío cubre el pendiente
+        return p.despachado || (!productosExcluidos.has(productoId) && cantidadDespacho >= pendiente);
       });
 
       // Obtener lotes del cliente desde los eventos del calendario
@@ -1495,6 +1512,39 @@ export default function CalendarioProduccionPage() {
           .join('\n');
         
         alert(`✅ ${data.message}\n\nID Remisión: ${data.remision.idRemision}\n\nProductos despachados:\n${resumenProductos}`);
+
+        // 📧 Enviar notificación por correo al cliente (fire-and-forget)
+        const urlRemision = getRemisionFirmaUrl(data.remision.id);
+        fetch('/api/remisiones/notificar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idCliente: data.remision.idCliente,
+            idRemision: data.remision.idRemision,
+            remisionId: data.remision.id,
+            nombreCliente: data.remision.nombreCliente || selectedPedidoDetalle?.nombreCliente || '',
+            productos: productosParaRemision.map((p: any) => ({
+              nombre: p.notas || p.nombreProducto || 'Producto',
+              cantidad: p.cantidad,
+              unidad: p.unidad || 'L'
+            })),
+            cantidadTotal: productosParaRemision.reduce((sum: number, p: any) => sum + (p.cantidad || 0), 0),
+            esDespachoCompleto,
+            idPedido: selectedPedidoDetalle?.idPedidoCore || selectedPedidoDetalle?.id || '',
+            urlRemision,
+          }),
+        })
+        .then(res => res.json())
+        .then(notifData => {
+          if (notifData.emailsEnviados > 0) {
+            console.log(`📧 Notificación enviada a ${notifData.emailsEnviados} correo(s)`);
+          } else {
+            console.log('📧 No se enviaron correos de notificación:', notifData.message);
+          }
+        })
+        .catch(err => {
+          console.error('📧 Error enviando notificación (no bloqueante):', err);
+        });
         
         // Cerrar modales y recargar datos
         setShowVerificarStockModal(false);
@@ -1521,9 +1571,9 @@ export default function CalendarioProduccionPage() {
   };
 
   // Funciones para manejar el formulario de despacho
-  const handleCantidadChange = (productoId: string, cantidad: number, maxCantidad: number) => {
-    // Asegurar que la cantidad esté entre 0 y el máximo permitido
-    const cantidadValida = Math.max(0, Math.min(cantidad, maxCantidad));
+  const handleCantidadChange = (productoId: string, cantidad: number, maxCantidad: number, minCantidad: number = 0) => {
+    // Asegurar que la cantidad esté entre el mínimo (stock pedido obligatorio) y el máximo
+    const cantidadValida = Math.max(minCantidad, Math.min(cantidad, maxCantidad));
     setCantidadesDespacho(prev => ({
       ...prev,
       [productoId]: cantidadValida
@@ -1543,16 +1593,16 @@ export default function CalendarioProduccionPage() {
     }));
   };
 
-  const handleIncluirProducto = (productoId: string, stockDisponible: number, cantidadPedida: number) => {
+  const handleIncluirProducto = (productoId: string, stockTotal: number, cantidadPedida: number, stockPedido: number = 0) => {
     setProductosExcluidos(prev => {
       const newSet = new Set(prev);
       newSet.delete(productoId);
       return newSet;
     });
-    // Restaurar cantidad al mínimo entre stock y pedido
+    // Restaurar: stock pedido es obligatorio, más general hasta completar
     setCantidadesDespacho(prev => ({
       ...prev,
-      [productoId]: Math.min(stockDisponible, cantidadPedida)
+      [productoId]: Math.min(stockTotal, Math.max(stockPedido, cantidadPedida))
     }));
   };
 
@@ -2739,11 +2789,11 @@ export default function CalendarioProduccionPage() {
                           nombreCliente
                         });
                         setShowPedidoDetalleModal(true);
-                        // Si el pedido ya fue despachado, buscar la remisión asociada
-                        if (['Enviado', 'Completado', 'Despachado'].includes(pedido.estado)) {
+                        // Si el pedido ya fue despachado (total o parcial), buscar la remisión asociada
+                        if (['Enviado', 'Enviado Parcial', 'Completado', 'Despachado'].includes(pedido.estado)) {
                           fetchRemisionPedido(pedido.idPedidoCore || pedido.id);
                         } else {
-                          setRemisionPedido(null);
+                          setRemisionesPedido([]);
                         }
                       }}
                       className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer hover:border-red-400"
@@ -2752,7 +2802,7 @@ export default function CalendarioProduccionPage() {
                         <span className={`text-xs font-mono px-2 py-0.5 rounded ${
                           pedido.estado === 'Completado'
                             ? 'text-green-600 bg-green-100'
-                            : ['Enviado', 'Despachado'].includes(pedido.estado)
+                            : ['Enviado', 'Enviado Parcial', 'Despachado'].includes(pedido.estado)
                               ? 'text-blue-600 bg-blue-100'
                               : 'text-red-600 bg-red-100'
                         }`}>
@@ -2765,11 +2815,13 @@ export default function CalendarioProduccionPage() {
                             ? 'bg-blue-100 text-blue-700'
                             : pedido.estado === 'Enviado' || pedido.estado === 'Despachado'
                             ? 'bg-indigo-100 text-indigo-700'
+                            : pedido.estado === 'Enviado Parcial'
+                            ? 'bg-orange-100 text-orange-700'
                             : pedido.estado === 'Completado'
                             ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-700'
                         }`}>
-                          {pedido.estado === 'Completado' ? '✅ Entregado' : pedido.estado || 'Pendiente'}
+                          {pedido.estado === 'Completado' ? '✅ Entregado' : pedido.estado === 'Enviado Parcial' ? '📦 Parcial' : pedido.estado || 'Pendiente'}
                         </span>
                       </div>
                       
@@ -2799,7 +2851,7 @@ export default function CalendarioProduccionPage() {
                             />
                           </div>
                           <div className="flex items-center justify-between mt-1">
-                            <span className="text-xs text-gray-500">{progreso.totalStock}L / {progreso.totalPedido}L</span>
+                            <span className="text-xs text-gray-500">{progreso.totalStock}{getUnidadPedido(pedido.id)} / {progreso.totalPedido}{getUnidadPedido(pedido.id)}</span>
                             {progreso.completo && !progreso.despachado && (
                               <span className="text-xs text-green-600 font-semibold">✓ Listo para despachar</span>
                             )}
@@ -2826,7 +2878,7 @@ export default function CalendarioProduccionPage() {
                               />
                             </div>
                             <div className="flex items-center justify-between mt-1">
-                              <span className="text-xs text-gray-500">{progreso.totalDespachado}L / {progreso.totalPedido}L</span>
+                              <span className="text-xs text-gray-500">{progreso.totalDespachado}{getUnidadPedido(pedido.id)} / {progreso.totalPedido}{getUnidadPedido(pedido.id)}</span>
                               {progreso.despachado && (
                                 <span className="text-xs text-blue-600 font-semibold">✓ Despachado completo</span>
                               )}
@@ -2858,7 +2910,7 @@ export default function CalendarioProduccionPage() {
                               {productos.map((prod: any, idx: number) => (
                                 <li key={idx} className="flex justify-between">
                                   <span className="truncate flex-1">{prod.nombre}</span>
-                                  <span className="font-semibold text-indigo-600 ml-2">x{prod.cantidad}</span>
+                                  <span className="font-semibold text-indigo-600 ml-2">x{prod.cantidad} {prod.unidad}</span>
                                 </li>
                               ))}
                             </ul>
@@ -4827,10 +4879,13 @@ export default function CalendarioProduccionPage() {
                         ? 'bg-green-400 text-green-900'
                         : selectedPedidoDetalle.estado === 'Enviado' || selectedPedidoDetalle.estado === 'Despachado'
                         ? 'bg-indigo-400 text-indigo-900'
+                        : selectedPedidoDetalle.estado === 'Enviado Parcial'
+                        ? 'bg-orange-400 text-orange-900'
                         : 'bg-white/30 text-white'
                     }`}>
                       {selectedPedidoDetalle.estado === 'Completado' ? '✅ Entregado' 
                         : selectedPedidoDetalle.estado === 'Enviado' ? '🚚 Enviado'
+                        : selectedPedidoDetalle.estado === 'Enviado Parcial' ? '📦 Enviado Parcial'
                         : selectedPedidoDetalle.estado || 'Pendiente'}
                     </span>
                     {selectedPedidoDetalle.prioridad && (
@@ -4895,7 +4950,7 @@ export default function CalendarioProduccionPage() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">{progreso.totalStock} / {progreso.totalPedido} L</span>
+                      <span className="text-sm text-gray-600">{progreso.totalStock} / {progreso.totalPedido} {getUnidadPedido(selectedPedidoDetalle.id)}</span>
                       {progreso.completo && (
                         <span className="text-xs text-green-600 font-semibold bg-green-100 px-2 py-0.5 rounded-full">
                           ✓ Completo
@@ -4933,7 +4988,7 @@ export default function CalendarioProduccionPage() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">{progreso.totalDespachado} / {progreso.totalPedido} L</span>
+                      <span className="text-sm text-gray-600">{progreso.totalDespachado} / {progreso.totalPedido} {getUnidadPedido(selectedPedidoDetalle.id)}</span>
                       {progreso.despachado && (
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                           selectedPedidoDetalle.estado === 'Completado'
@@ -5146,8 +5201,8 @@ export default function CalendarioProduccionPage() {
               </div>
             </div>
             
-            {/* Sección de Remisión (cuando ya fue despachado) */}
-            {['Enviado', 'Completado', 'Despachado'].includes(selectedPedidoDetalle.estado) && (
+            {/* Sección de Remisión (cuando ya tiene remisiones) */}
+            {['Enviado', 'Enviado Parcial', 'Completado', 'Despachado', 'Entregado'].includes(selectedPedidoDetalle.estado) && (
               <div className="px-6 pb-4">
                 {loadingRemision ? (
                   <div className="bg-blue-50 rounded-xl p-6 border-2 border-blue-200 animate-pulse">
@@ -5161,23 +5216,33 @@ export default function CalendarioProduccionPage() {
                       </div>
                     </div>
                   </div>
-                ) : remisionPedido ? (
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 overflow-hidden">
+                ) : remisionesPedido.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">📋</span>
+                      <span className="text-sm font-bold text-gray-700">Remisiones ({remisionesPedido.length})</span>
+                      <span className="text-xs text-gray-400">
+                        Total: {remisionesPedido.reduce((s, r) => s + r.totalCantidad, 0)} {getUnidadPedido(selectedPedidoDetalle?.id || '')}
+                      </span>
+                    </div>
+                    {remisionesPedido.map((remision, remIdx) => (
+                  <div key={remision.id || remIdx} className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 overflow-hidden">
                     {/* Header de remisión */}
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-xl">📋</span>
-                        <span className="text-white font-bold text-lg">{remisionPedido.idRemision}</span>
+                        <span className="text-white font-bold text-lg">{remision.idRemision}</span>
+                        <span className="text-blue-200 text-xs ml-1">({remIdx + 1}/{remisionesPedido.length})</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          remisionPedido.estado === 'Entregada' 
+                          remision.estado === 'Entregada' 
                             ? 'bg-green-100 text-green-700'
-                            : remisionPedido.estado === 'En Tránsito'
+                            : remision.estado === 'En Tránsito'
                               ? 'bg-yellow-100 text-yellow-700'
                               : 'bg-blue-100 text-blue-700'
                         }`}>
-                          {remisionPedido.estado}
+                          {remision.estado}
                         </span>
                       </div>
                     </div>
@@ -5189,7 +5254,7 @@ export default function CalendarioProduccionPage() {
                         <div className="flex-shrink-0 flex flex-col items-center">
                           <div className="bg-white p-3 rounded-xl shadow-md border border-blue-100">
                             <QRCodeSVG
-                              value={getRemisionFirmaUrl(remisionPedido.id)}
+                              value={getRemisionFirmaUrl(remision.id)}
                               size={130}
                               level="H"
                               includeMargin={false}
@@ -5205,45 +5270,45 @@ export default function CalendarioProduccionPage() {
                           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                             <div>
                               <span className="text-xs text-gray-500 uppercase tracking-wide">Pedido</span>
-                              <p className="text-sm font-bold text-indigo-700">{remisionPedido.idPedido}</p>
+                              <p className="text-sm font-bold text-indigo-700">{remision.idPedido}</p>
                             </div>
                             <div>
                               <span className="text-xs text-gray-500 uppercase tracking-wide">Cliente</span>
-                              <p className="text-sm font-semibold text-gray-800">{selectedPedidoDetalle.nombreCliente || remisionPedido.idCliente}</p>
+                              <p className="text-sm font-semibold text-gray-800">{selectedPedidoDetalle.nombreCliente || remision.idCliente}</p>
                             </div>
                             <div>
                               <span className="text-xs text-gray-500 uppercase tracking-wide">Fecha Remisión</span>
                               <p className="text-sm font-semibold text-gray-800">
-                                {remisionPedido.fechaRemision 
-                                  ? new Date(remisionPedido.fechaRemision).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+                                {remision.fechaRemision 
+                                  ? new Date(remision.fechaRemision).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
                                   : 'No especificada'}
                               </p>
                             </div>
                             <div>
                               <span className="text-xs text-gray-500 uppercase tracking-wide">Total Remitido</span>
-                              <p className="text-sm font-bold text-blue-700">{remisionPedido.totalCantidad} L</p>
+                              <p className="text-sm font-bold text-blue-700">{remision.totalCantidad} {getUnidadPedido(selectedPedidoDetalle?.id || '')}</p>
                             </div>
                             <div>
                               <span className="text-xs text-gray-500 uppercase tracking-wide">Responsable</span>
-                              <p className="text-sm font-semibold text-gray-800">{remisionPedido.responsableEntrega || 'No especificado'}</p>
+                              <p className="text-sm font-semibold text-gray-800">{remision.responsableEntrega || 'No especificado'}</p>
                             </div>
                             <div>
                               <span className="text-xs text-gray-500 uppercase tracking-wide">Área Origen</span>
-                              <p className="text-sm font-semibold text-gray-800">{remisionPedido.areaOrigen || 'No especificada'}</p>
+                              <p className="text-sm font-semibold text-gray-800">{remision.areaOrigen || 'No especificada'}</p>
                             </div>
-                            {remisionPedido.fechaPedidoDespachado && (
+                            {remision.fechaPedidoDespachado && (
                               <div>
                                 <span className="text-xs text-gray-500 uppercase tracking-wide">Fecha Despacho</span>
                                 <p className="text-sm font-semibold text-gray-800">
-                                  {new Date(remisionPedido.fechaPedidoDespachado).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  {new Date(remision.fechaPedidoDespachado).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </p>
                               </div>
                             )}
-                            {remisionPedido.fechaRecibido && (
+                            {remision.fechaRecibido && (
                               <div>
                                 <span className="text-xs text-gray-500 uppercase tracking-wide">Fecha Recibido</span>
                                 <p className="text-sm font-semibold text-green-700">
-                                  {new Date(remisionPedido.fechaRecibido).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  {new Date(remision.fechaRecibido).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </p>
                               </div>
                             )}
@@ -5254,7 +5319,7 @@ export default function CalendarioProduccionPage() {
                       {/* Transportista y Receptor */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className={`rounded-lg p-3 border ${
-                          remisionPedido.transportista 
+                          remision.transportista 
                             ? 'bg-green-50 border-green-200' 
                             : 'bg-gray-50 border-gray-200'
                         }`}>
@@ -5262,17 +5327,17 @@ export default function CalendarioProduccionPage() {
                             <span className="text-base">🚚</span>
                             <span className="text-xs font-semibold text-gray-600 uppercase">Transportista</span>
                           </div>
-                          {remisionPedido.transportista ? (
+                          {remision.transportista ? (
                             <div>
-                              <p className="text-sm font-bold text-gray-800">{remisionPedido.transportista.nombre}</p>
-                              <p className="text-xs text-gray-500">C.C. {remisionPedido.transportista.cedula}</p>
+                              <p className="text-sm font-bold text-gray-800">{remision.transportista.nombre}</p>
+                              <p className="text-xs text-gray-500">C.C. {remision.transportista.cedula}</p>
                             </div>
                           ) : (
                             <p className="text-sm text-gray-400 italic">Sin asignar</p>
                           )}
                         </div>
                         <div className={`rounded-lg p-3 border ${
-                          remisionPedido.receptor 
+                          remision.receptor 
                             ? 'bg-green-50 border-green-200' 
                             : 'bg-amber-50 border-amber-200'
                         }`}>
@@ -5280,10 +5345,10 @@ export default function CalendarioProduccionPage() {
                             <span className="text-base">📥</span>
                             <span className="text-xs font-semibold text-gray-600 uppercase">Receptor</span>
                           </div>
-                          {remisionPedido.receptor ? (
+                          {remision.receptor ? (
                             <div>
-                              <p className="text-sm font-bold text-gray-800">{remisionPedido.receptor.nombre}</p>
-                              <p className="text-xs text-gray-500">C.C. {remisionPedido.receptor.cedula}</p>
+                              <p className="text-sm font-bold text-gray-800">{remision.receptor.nombre}</p>
+                              <p className="text-xs text-gray-500">C.C. {remision.receptor.cedula}</p>
                             </div>
                           ) : (
                             <p className="text-sm text-amber-600 italic">Pendiente de firma</p>
@@ -5292,10 +5357,10 @@ export default function CalendarioProduccionPage() {
                       </div>
                       
                       {/* Tabla de productos remitidos */}
-                      {remisionPedido.productos && remisionPedido.productos.length > 0 && (
+                      {remision.productos && remision.productos.length > 0 && (
                         <div className="bg-white rounded-lg border border-blue-100 overflow-hidden">
                           <div className="bg-blue-50 px-3 py-2 border-b border-blue-100">
-                            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">🧪 Productos Remitidos ({remisionPedido.productos.length})</span>
+                            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">🧪 Productos Remitidos ({remision.productos.length})</span>
                           </div>
                           <table className="w-full">
                             <thead className="bg-gray-50">
@@ -5306,7 +5371,7 @@ export default function CalendarioProduccionPage() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {remisionPedido.productos.map((prod, idx) => (
+                              {remision.productos.map((prod, idx) => (
                                 <tr key={idx} className="hover:bg-blue-50/30">
                                   <td className="px-3 py-2 text-sm text-gray-800 font-medium">{prod.nombre}</td>
                                   <td className="px-3 py-2 text-center">
@@ -5322,9 +5387,9 @@ export default function CalendarioProduccionPage() {
                               <tr className="bg-blue-600">
                                 <td className="px-3 py-2 text-white font-semibold text-sm">Total</td>
                                 <td className="px-3 py-2 text-center text-white font-bold text-sm">
-                                  {remisionPedido.productos.reduce((sum, p) => sum + p.cantidad, 0)}
+                                  {remision.productos.reduce((sum, p) => sum + p.cantidad, 0)}
                                 </td>
-                                <td className="px-3 py-2 text-center text-white text-sm">{remisionPedido.productos[0]?.unidad || 'Ud'}</td>
+                                <td className="px-3 py-2 text-center text-white text-sm">{remision.productos[0]?.unidad || 'Ud'}</td>
                               </tr>
                             </tfoot>
                           </table>
@@ -5332,17 +5397,17 @@ export default function CalendarioProduccionPage() {
                       )}
                       
                       {/* Notas */}
-                      {remisionPedido.notas && (
+                      {remision.notas && (
                         <div className="bg-amber-50/60 rounded-lg p-3 border border-amber-200">
                           <span className="text-xs font-semibold text-amber-700">📝 Notas</span>
-                          <p className="text-sm text-gray-700 mt-1">{remisionPedido.notas}</p>
+                          <p className="text-sm text-gray-700 mt-1">{remision.notas}</p>
                         </div>
                       )}
                       
                       {/* Botones de acción */}
                       <div className="flex flex-wrap gap-2 pt-1">
                         <a
-                          href={getRemisionFirmaUrl(remisionPedido.id)}
+                          href={getRemisionFirmaUrl(remision.id)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
@@ -5350,9 +5415,9 @@ export default function CalendarioProduccionPage() {
                           <span>📝</span>
                           <span>Ver Remisión</span>
                         </a>
-                        {remisionPedido.urlDocumento && (
+                        {remision.urlDocumento && (
                           <a
-                            href={remisionPedido.urlDocumento}
+                            href={remision.urlDocumento}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
@@ -5363,7 +5428,7 @@ export default function CalendarioProduccionPage() {
                         )}
                         <button
                           onClick={() => {
-                            const url = getRemisionFirmaUrl(remisionPedido.id);
+                            const url = getRemisionFirmaUrl(remision.id);
                             navigator.clipboard.writeText(url);
                             alert('✅ Link de firma copiado al portapapeles');
                           }}
@@ -5374,6 +5439,8 @@ export default function CalendarioProduccionPage() {
                         </button>
                       </div>
                     </div>
+                  </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 text-center">
@@ -5387,29 +5454,39 @@ export default function CalendarioProduccionPage() {
             <div className="bg-gray-50 px-6 py-4 rounded-b-2xl border-t border-gray-200">
               <div className="flex flex-wrap gap-3 justify-between items-center">
                 <div className="flex gap-2">
-                  {!['Enviado', 'Completado', 'Despachado'].includes(selectedPedidoDetalle.estado) && (
-                    // Pedido no despachado - mostrar Despachar
-                    <button
-                      onClick={() => handleVerificarStock(selectedPedidoDetalle.id)}
-                      disabled={loadingVerificacion}
-                      className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {loadingVerificacion ? (
-                        <>
-                          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          <span>Verificando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>📦</span>
-                          <span>Despachar Pedido</span>
-                        </>
-                      )}
-                    </button>
-                  )}
+                  {(() => {
+                    // Mostrar botón de despacho basado en datos reales, no solo el estado textual
+                    const prog = progresosPedidos[selectedPedidoDetalle.id];
+                    const yaDespachadoCompleto = prog?.despachado === true;
+                    const estadoBloqueado = selectedPedidoDetalle.estado === 'Cancelado';
+                    
+                    if (!estadoBloqueado && !yaDespachadoCompleto) {
+                      const tieneDespachosPrevios = ['Enviado', 'Enviado Parcial', 'Despachado', 'Completado'].includes(selectedPedidoDetalle.estado);
+                      return (
+                        <button
+                          onClick={() => handleVerificarStock(selectedPedidoDetalle.id)}
+                          disabled={loadingVerificacion}
+                          className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {loadingVerificacion ? (
+                            <>
+                              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>Verificando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>📦</span>
+                              <span>{tieneDespachosPrevios ? 'Despachar Restante' : 'Despachar Pedido'}</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
                 
                 <button
@@ -5454,7 +5531,7 @@ export default function CalendarioProduccionPage() {
                   <p className="text-white/90 text-sm mt-1">
                     {verificacionStock.resumen.productosCompletos} de {verificacionStock.resumen.totalProductos} productos disponibles
                     {verificacionStock.resumen.totalDespachado > 0 && (
-                      <> • Ya despachado: {verificacionStock.resumen.totalDespachado} L</>
+                      <> • Ya despachado: {verificacionStock.resumen.totalDespachado} {getUnidadPedido(selectedPedidoDetalle?.id || '')}</>
                     )}
                   </p>
                 </div>
@@ -5477,26 +5554,30 @@ export default function CalendarioProduccionPage() {
             {/* Body */}
             <div className="p-6 space-y-6">
               {/* Resumen del despacho actual */}
-              <div className="grid grid-cols-5 gap-3">
+              <div className="grid grid-cols-6 gap-3">
                 <div className="bg-blue-50 rounded-xl p-3 text-center">
                   <p className="text-blue-600 font-medium text-xs mb-1">Total Pedido</p>
-                  <p className="text-xl font-bold text-gray-900">{verificacionStock.resumen.totalPedido} L</p>
+                  <p className="text-xl font-bold text-gray-900">{verificacionStock.resumen.totalPedido} {getUnidadPedido(selectedPedidoDetalle?.id || '')}</p>
                 </div>
                 <div className="bg-emerald-50 rounded-xl p-3 text-center">
                   <p className="text-emerald-600 font-medium text-xs mb-1">Ya Despachado</p>
-                  <p className="text-xl font-bold text-emerald-700">{verificacionStock.resumen.totalDespachado || 0} L</p>
+                  <p className="text-xl font-bold text-emerald-700">{verificacionStock.resumen.totalDespachado || 0} {getUnidadPedido(selectedPedidoDetalle?.id || '')}</p>
                 </div>
                 <div className="bg-amber-50 rounded-xl p-3 text-center">
                   <p className="text-amber-600 font-medium text-xs mb-1">Pendiente</p>
-                  <p className="text-xl font-bold text-amber-700">{verificacionStock.resumen.totalPendiente || verificacionStock.resumen.totalPedido} L</p>
+                  <p className="text-xl font-bold text-amber-700">{verificacionStock.resumen.totalPendiente || verificacionStock.resumen.totalPedido} {getUnidadPedido(selectedPedidoDetalle?.id || '')}</p>
                 </div>
-                <div className="bg-green-50 rounded-xl p-3 text-center">
-                  <p className="text-green-600 font-medium text-xs mb-1">Stock Disponible</p>
-                  <p className="text-xl font-bold text-green-700">{verificacionStock.resumen.totalDisponible} L</p>
+                <div className="bg-indigo-50 rounded-xl p-3 text-center border border-indigo-200">
+                  <p className="text-indigo-600 font-medium text-xs mb-1">📋 Stock Pedido</p>
+                  <p className="text-xl font-bold text-indigo-700">{(verificacionStock.resumen.totalDisponible || 0) - (verificacionStock.resumen.totalStockGeneral || 0)} {getUnidadPedido(selectedPedidoDetalle?.id || '')}</p>
+                </div>
+                <div className={`rounded-xl p-3 text-center border ${(verificacionStock.resumen.totalStockGeneral || 0) > 0 ? 'bg-teal-50 border-teal-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <p className={`font-medium text-xs mb-1 ${(verificacionStock.resumen.totalStockGeneral || 0) > 0 ? 'text-teal-600' : 'text-gray-400'}`}>🏭 Stock General</p>
+                  <p className={`text-xl font-bold ${(verificacionStock.resumen.totalStockGeneral || 0) > 0 ? 'text-teal-700' : 'text-gray-400'}`}>{verificacionStock.resumen.totalStockGeneral || 0} {getUnidadPedido(selectedPedidoDetalle?.id || '')}</p>
                 </div>
                 <div className="bg-purple-50 rounded-xl p-3 text-center">
                   <p className="text-purple-600 font-medium text-xs mb-1">A Despachar Ahora</p>
-                  <p className="text-xl font-bold text-purple-700">{calcularTotalesDespacho().cantidad.toLocaleString('es-CO')} L</p>
+                  <p className="text-xl font-bold text-purple-700">{calcularTotalesDespacho().cantidad.toLocaleString('es-CO')} {getUnidadPedido(selectedPedidoDetalle?.id || '')}</p>
                 </div>
               </div>
 
@@ -5515,7 +5596,9 @@ export default function CalendarioProduccionPage() {
                     .filter((producto: any) => !productosExcluidos.has(producto.productoId || producto.idProductoCore))
                     .map((producto: any, idx: number) => {
                       const productoId = producto.productoId || producto.idProductoCore;
-                      const maxCantidad = producto.stockDisponible || 0;
+                      const stockPedido = producto.stockDisponible || 0;
+                      const stockGeneral = producto.stockGeneral || 0;
+                      const maxCantidad = producto.stockTotal || (stockPedido + stockGeneral);
                       const cantidadActual = cantidadesDespacho[productoId] || 0;
                       
                       return (
@@ -5543,7 +5626,7 @@ export default function CalendarioProduccionPage() {
                                   </p>
                                   {producto.cantidadDespachada > 0 && (
                                     <p className="text-xs text-emerald-600 font-medium">
-                                      ✓ Ya despachado: {producto.cantidadDespachada} L
+                                      ✓ Ya despachado: {producto.cantidadDespachada} {producto.unidad || 'L'}
                                     </p>
                                   )}
                                 </div>
@@ -5551,57 +5634,81 @@ export default function CalendarioProduccionPage() {
                             </div>
                             
                             {/* Info de cantidades */}
-                            <div className="flex items-center gap-2 text-sm">
+                            <div className="flex items-center gap-2 text-sm flex-wrap">
                               <div className="text-center px-2 py-1 bg-blue-100 rounded-lg">
                                 <p className="text-xs text-blue-600">Pedido</p>
-                                <p className="font-bold text-blue-800">{producto.cantidadPedida} L</p>
+                                <p className="font-bold text-blue-800">{producto.cantidadPedida} {producto.unidad || 'L'}</p>
                               </div>
                               {producto.cantidadDespachada > 0 && (
                                 <div className="text-center px-2 py-1 bg-emerald-100 rounded-lg">
                                   <p className="text-xs text-emerald-600">Despachado</p>
-                                  <p className="font-bold text-emerald-800">{producto.cantidadDespachada} L</p>
+                                  <p className="font-bold text-emerald-800">{producto.cantidadDespachada} {producto.unidad || 'L'}</p>
                                 </div>
                               )}
                               <div className="text-center px-2 py-1 bg-amber-100 rounded-lg">
                                 <p className="text-xs text-amber-600">Pendiente</p>
-                                <p className="font-bold text-amber-800">{producto.pendientePorDespachar || producto.cantidadPedida} L</p>
+                                <p className="font-bold text-amber-800">{producto.pendientePorDespachar || producto.cantidadPedida} {producto.unidad || 'L'}</p>
                               </div>
-                              <div className="text-center px-2 py-1 bg-green-100 rounded-lg">
-                                <p className="text-xs text-green-600">Stock</p>
-                                <p className="font-bold text-green-800">{maxCantidad} L</p>
+                              {/* Stock del pedido */}
+                              <div className="text-center px-2 py-1 bg-indigo-100 rounded-lg border border-indigo-200">
+                                <p className="text-xs text-indigo-600">📋 Stock Pedido</p>
+                                <p className="font-bold text-indigo-800">{stockPedido} {producto.unidad || 'L'}</p>
+                              </div>
+                              {/* Stock general */}
+                              <div className={`text-center px-2 py-1 rounded-lg border ${stockGeneral > 0 ? 'bg-teal-100 border-teal-200' : 'bg-gray-100 border-gray-200'}`}>
+                                <p className={`text-xs ${stockGeneral > 0 ? 'text-teal-600' : 'text-gray-400'}`}>🏭 Stock General</p>
+                                <p className={`font-bold ${stockGeneral > 0 ? 'text-teal-800' : 'text-gray-400'}`}>{stockGeneral} {producto.unidad || 'L'}</p>
                               </div>
                             </div>
                             
-                            {/* Input de cantidad */}
+                            {/* Input de cantidad - stockPedido es mínimo obligatorio */}
                             <div className="flex items-center gap-2">
                               <div className="flex flex-col items-center">
                                 <label className="text-xs text-gray-600 mb-1">Despachar</label>
                                 <div className="flex items-center gap-1">
                                   <button
-                                    onClick={() => handleCantidadChange(productoId, cantidadActual - 10, maxCantidad)}
+                                    onClick={() => handleCantidadChange(productoId, cantidadActual - 10, maxCantidad, stockPedido)}
                                     className="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 text-black font-bold transition-colors"
-                                    disabled={cantidadActual <= 1}
+                                    disabled={cantidadActual <= stockPedido}
                                   >
                                     -
                                   </button>
                                   <input
                                     type="number"
-                                    min="0"
+                                    min={stockPedido}
                                     max={maxCantidad}
                                     value={cantidadActual}
-                                    onChange={(e) => handleCantidadChange(productoId, parseFloat(e.target.value) || 1, maxCantidad)}
+                                    onChange={(e) => handleCantidadChange(productoId, parseFloat(e.target.value) || stockPedido, maxCantidad, stockPedido)}
                                     className="w-24 px-3 py-2 text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 font-bold text-lg text-black placeholder-black"
                                   />
                                   <button
-                                    onClick={() => handleCantidadChange(productoId, cantidadActual + 10, maxCantidad)}
+                                    onClick={() => handleCantidadChange(productoId, cantidadActual + 10, maxCantidad, stockPedido)}
                                     className="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 text-black font-bold transition-colors"
                                     disabled={cantidadActual >= maxCantidad}
                                   >
                                     +
                                   </button>
-                                  <span className="text-gray-600 font-medium ml-1">L</span>
+                                  <span className="text-gray-600 font-medium ml-1">{producto.unidad || 'L'}</span>
                                 </div>
-                                <p className="text-xs text-gray-400 mt-1">Máx: {maxCantidad} L</p>
+                                <p className="text-xs text-gray-400 mt-1">Mín: {stockPedido} {producto.unidad || 'L'} · Máx: {maxCantidad} {producto.unidad || 'L'}</p>
+                                {/* Desglose de origen del despacho */}
+                                {cantidadActual > 0 && (
+                                  <div className="mt-1.5 text-[10px] space-y-0.5 w-full">
+                                    {stockPedido > 0 && (
+                                      <p className="text-indigo-700 font-semibold flex items-center gap-1">
+                                        🔒 {stockPedido} {producto.unidad || 'L'} del pedido <span className="text-indigo-400 font-normal">(obligatorio)</span>
+                                      </p>
+                                    )}
+                                    {cantidadActual > stockPedido && stockGeneral > 0 && (
+                                      <p className="text-teal-600 flex items-center gap-1">
+                                        🏭 {Math.min(cantidadActual - stockPedido, stockGeneral)} {producto.unidad || 'L'} de general <span className="text-teal-400">(ajustable)</span>
+                                      </p>
+                                    )}
+                                    {stockGeneral > 0 && cantidadActual <= stockPedido && (
+                                      <p className="text-teal-400 italic">+ {stockGeneral} {producto.unidad || 'L'} disponible de general</p>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             
@@ -5717,39 +5824,51 @@ export default function CalendarioProduccionPage() {
                 {productosExcluidos.size > 0 && (
                   <div className="mt-6">
                     <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">
-                      🚫 Productos Excluidos del Despacho
-                      <span className="text-xs font-normal text-gray-400">
-                        (Haz clic en + para volver a incluir)
-                      </span>
+                      🚫 Productos No Incluidos
                     </h4>
                     <div className="space-y-2">
                       {verificacionStock.productos
                         .filter((producto: any) => productosExcluidos.has(producto.productoId || producto.idProductoCore))
                         .map((producto: any, idx: number) => {
                           const productoId = producto.productoId || producto.idProductoCore;
+                          const yaDespachadoCompleto = producto.despachado || (producto.pendientePorDespachar !== undefined && producto.pendientePorDespachar <= 0);
                           return (
                             <div
                               key={idx}
-                              className="flex items-center justify-between p-3 bg-gray-100 border border-gray-200 rounded-lg opacity-60"
+                              className={`flex items-center justify-between p-3 rounded-lg border ${
+                                yaDespachadoCompleto 
+                                  ? 'bg-emerald-50 border-emerald-200' 
+                                  : 'bg-gray-100 border-gray-200 opacity-60'
+                              }`}
                             >
                               <div className="flex items-center gap-2">
-                                <span className="text-xl">❌</span>
+                                <span className="text-xl">{yaDespachadoCompleto ? '✅' : '❌'}</span>
                                 <div>
-                                  <p className="font-medium text-gray-700">{producto.productoNombre}</p>
-                                  <p className="text-xs text-gray-500">
-                                    Pedido: {producto.cantidadPedida} L | Stock: {producto.stockDisponible} L
+                                  <p className={`font-medium ${yaDespachadoCompleto ? 'text-emerald-800' : 'text-gray-700'}`}>
+                                    {producto.productoNombre}
                                   </p>
+                                  {yaDespachadoCompleto ? (
+                                    <p className="text-xs text-emerald-600 font-medium">
+                                      ✓ Completamente despachado ({producto.cantidadDespachada} / {producto.cantidadPedida} L)
+                                    </p>
+                                  ) : (
+                                    <p className="text-xs text-gray-500">
+                                      Pedido: {producto.cantidadPedida} L | Stock: {producto.stockTotal || ((producto.stockDisponible || 0) + (producto.stockGeneral || 0))} L
+                                    </p>
+                                  )}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => handleIncluirProducto(productoId, producto.stockDisponible, producto.cantidadPedida)}
-                                className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg transition-colors text-sm font-medium"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Incluir
-                              </button>
+                              {!yaDespachadoCompleto && (
+                                <button
+                                  onClick={() => handleIncluirProducto(productoId, producto.stockTotal || ((producto.stockDisponible || 0) + (producto.stockGeneral || 0)), producto.cantidadPedida, producto.stockDisponible || 0)}
+                                  className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg transition-colors text-sm font-medium"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                  Incluir
+                                </button>
+                              )}
                             </div>
                           );
                         })}
