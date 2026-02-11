@@ -175,6 +175,38 @@ export default function AlmacenamientoPage() {
     return total + (lote.fields['Cantidad Actual Bolsas'] || 0);
   }, 0);
 
+  const buildResumenPorMicroorganismo = (lotesFuente: LoteAlmacenamiento[]) => {
+    const acumulado = new Map<string, { bolsas: number; litros: number }>();
+
+    lotesFuente.forEach(lote => {
+      const microorganismo = lote.fields['Microorganismo (from Microorganismos)']?.[0] || 'Sin especificar';
+      const bolsas = lote.fields['Cantidad Actual Bolsas'] || 0;
+      const litros = microorganismo.includes('+') ? 0 : bolsas;
+
+      const actual = acumulado.get(microorganismo) || { bolsas: 0, litros: 0 };
+      acumulado.set(microorganismo, {
+        bolsas: actual.bolsas + bolsas,
+        litros: actual.litros + litros
+      });
+    });
+
+    return Array.from(acumulado.entries()).map(([microorganismo, datos]) => ({
+      microorganismo,
+      bolsas: datos.bolsas,
+      litros: datos.litros
+    }));
+  };
+
+  const resumenIncubacion = useMemo(
+    () => buildResumenPorMicroorganismo(lotesIncubacion),
+    [lotesIncubacion]
+  );
+
+  const resumenRefrigeracion = useMemo(
+    () => buildResumenPorMicroorganismo(lotesRefrigeracion),
+    [lotesRefrigeracion]
+  );
+
   console.log('📊 FILTROS RESULTADO:');
   console.log('  - Total lotes:', lotes.length);
   console.log('  - Lotes filtrados por microorganismo:', lotesFiltrados.length);
@@ -185,6 +217,7 @@ export default function AlmacenamientoPage() {
   useEffect(() => {
     // Cargar resumen de inventario al montar el componente
     fetchResumenInventario();
+    fetchResumenHongosEstado();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -803,6 +836,80 @@ export default function AlmacenamientoPage() {
             )}
           </div>
 
+          {/* Resumen de Hongos por Estado */}
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                🍄 Bolsas en Incubación y Refrigeración
+              </h2>
+              <button
+                onClick={fetchResumenHongosEstado}
+                disabled={resumenHongosEstado.loading}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-all disabled:opacity-50"
+              >
+                {resumenHongosEstado.loading ? '⏳ Actualizando...' : '🔄 Actualizar'}
+              </button>
+            </div>
+
+            {resumenHongosEstado.loading ? (
+              <div className="text-center py-6">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
+                <p className="text-gray-600">Cargando resumen...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-700">Incubación</p>
+                      <p className="text-2xl font-bold text-green-800">{resumenHongosEstado.incubacionBolsas} bolsas</p>
+                      <p className="text-sm text-green-600">{resumenHongosEstado.incubacionLotes} lotes</p>
+                    </div>
+                    <div className="bg-green-100 p-3 rounded-full">
+                      <span className="text-2xl">🌡️</span>
+                    </div>
+                  </div>
+                  {resumenHongosEstado.incubacionPorMicro.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-green-200 space-y-2">
+                      {resumenHongosEstado.incubacionPorMicro.map((item) => (
+                        <div key={item.micro} className="flex items-center justify-between text-sm text-green-800">
+                          <span className="font-medium">{item.micro}</span>
+                          <span>
+                            {item.bolsas} bolsas • {item.lotes} lotes
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-700">Refrigeración</p>
+                      <p className="text-2xl font-bold text-blue-800">{resumenHongosEstado.refrigeracionBolsas} bolsas</p>
+                      <p className="text-sm text-blue-600">{resumenHongosEstado.refrigeracionLotes} lotes</p>
+                    </div>
+                    <div className="bg-blue-100 p-3 rounded-full">
+                      <span className="text-2xl">❄️</span>
+                    </div>
+                  </div>
+                  {resumenHongosEstado.refrigeracionPorMicro.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-blue-200 space-y-2">
+                      {resumenHongosEstado.refrigeracionPorMicro.map((item) => (
+                        <div key={item.micro} className="flex items-center justify-between text-sm text-blue-800">
+                          <span className="font-medium">{item.micro}</span>
+                          <span>
+                            {item.bolsas} bolsas • {item.lotes} lotes
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Opciones de Tipo */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
@@ -913,6 +1020,16 @@ export default function AlmacenamientoPage() {
   }>({
     hongos: [],
     bacterias: [],
+    loading: false
+  });
+
+  const [resumenHongosEstado, setResumenHongosEstado] = useState({
+    incubacionBolsas: 0,
+    refrigeracionBolsas: 0,
+    incubacionLotes: 0,
+    refrigeracionLotes: 0,
+    incubacionPorMicro: [] as Array<{ micro: string; bolsas: number; lotes: number }>,
+    refrigeracionPorMicro: [] as Array<{ micro: string; bolsas: number; lotes: number }>,
     loading: false
   });
 
@@ -1284,136 +1401,101 @@ export default function AlmacenamientoPage() {
     setResumenInventario(prev => ({ ...prev, loading: true }));
     
     try {
-      // Obtener datos de hongos (inoculación)
-      console.log('📡 RESUMEN: Obteniendo datos de hongos...');
-      const responseHongos = await fetch('/api/inoculacion');
-      const dataHongos = await responseHongos.json();
-      
-      // Obtener datos de bacterias (fermentación)
-      console.log('📡 RESUMEN: Obteniendo datos de bacterias...');
-      const responseBacterias = await fetch('/api/fermentacion');
-      const dataBacterias = await responseBacterias.json();
-      
-      // Procesar hongos disponibles
-      let resumenHongos: Array<{microorganismo: string, bolsas: number, litros: number}> = [];
-      if (dataHongos.success && dataHongos.records) {
-        console.log('📊 RESUMEN: Procesando hongos...', dataHongos.records.length, 'registros');
-        
-        const hongosDisponibles = dataHongos.records.filter((lote: LoteAlmacenamiento) => {
-          console.log('🔍 RESUMEN: Evaluando lote hongo:', {
-            id: lote.id,
-            estado: lote.fields['Estado Lote'],
-            totalBolsas: lote.fields['Cantidad Actual Bolsas'],
-            microorganismo: lote.fields['Microorganismo (from Microorganismos)']
-          });
-          return lote.fields['Estado Lote'] === 'Refrigeración' && (lote.fields['Cantidad Actual Bolsas'] || 0) > 0;
-        });
-        
-        console.log('✅ RESUMEN: Hongos disponibles filtrados:', hongosDisponibles.length);
-        
-        // Agrupar por microorganismo
-        const agrupacionHongos: { [key: string]: { bolsas: number, litros: number } } = {};
-        hongosDisponibles.forEach((lote: LoteAlmacenamiento) => {
-          const microorganismo = lote.fields['Microorganismo (from Microorganismos)']?.[0] || 'Sin especificar';
-          const bolsas = lote.fields['Cantidad Actual Bolsas'] || 0;
-          
-          console.log('📦 RESUMEN: Procesando hongo:', {
-            microorganismo,
-            bolsas,
-            loteId: lote.id
-          });
-          
-          if (!agrupacionHongos[microorganismo]) {
-            agrupacionHongos[microorganismo] = { bolsas: 0, litros: 0 };
-          }
-          agrupacionHongos[microorganismo].bolsas += bolsas;
-          
-          // Solo agregar a litros si NO contiene "+" (microorganismos con + son solo bolsas)
-          if (!microorganismo.includes('+')) {
-            agrupacionHongos[microorganismo].litros += bolsas; // 1 bolsa = 1 litro aproximadamente
-          }
-        });
-        
-        resumenHongos = Object.entries(agrupacionHongos).map(([microorganismo, datos]) => ({
-          microorganismo,
-          bolsas: datos.bolsas,
-          litros: datos.litros
-        }));
-        
-        console.log('📊 RESUMEN: Hongos agrupados:', resumenHongos);
-      } else {
-        console.log('❌ RESUMEN: No se pudieron obtener datos de hongos:', dataHongos);
+      console.log('📡 RESUMEN: Obteniendo datos desde Sirius Inventario Core...');
+      const response = await fetch('/api/almacenamiento/resumen');
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        console.log('❌ RESUMEN: Error obteniendo datos:', data);
+        setResumenInventario(prev => ({ ...prev, loading: false }));
+        return;
       }
-      
-      // Procesar bacterias disponibles
-      let resumenBacterias: Array<{microorganismo: string, litros: number}> = [];
-      if (dataBacterias.success && dataBacterias.records) {
-        console.log('📊 RESUMEN: Procesando bacterias...', dataBacterias.records.length, 'registros');
-        
-        // Incluir tanto bacterias disponibles como las en fermentación que tengan litros > 0
-        const bacteriasConLitros = dataBacterias.records.filter((lote: FermentacionRecord) => {
-          console.log('🔍 RESUMEN: Evaluando lote bacteria:', {
-            id: lote.id,
-            estado: lote.fields.Estado,
-            totalLitros: lote.fields['Total Litros'],
-            cantidadLitros: lote.fields['Cantidad Litros'],
-            microorganismo: lote.fields['Microorganismo']
-          });
-          // Mostrar lotes que tengan litros disponibles, sin importar el estado específico
-          return (lote.fields['Total Litros'] || 0) > 0 || (lote.fields['Cantidad Litros'] || 0) > 0;
-        });
-        
-        console.log('✅ RESUMEN: Bacterias con litros filtradas:', bacteriasConLitros.length);
-        
-        // Agrupar por microorganismo
-        const agrupacionBacterias: { [key: string]: { litros: number } } = {};
-        bacteriasConLitros.forEach((lote: FermentacionRecord) => {
-          // Verificar si el campo Microorganismo existe y es un array
-          let microorganismo = 'Sin especificar';
-          if (lote.fields['Microorganismo'] && Array.isArray(lote.fields['Microorganismo'])) {
-            microorganismo = lote.fields['Microorganismo'][0] || 'Sin especificar';
-          }
-          
-          // Usar Total Litros si existe, sino usar Cantidad Litros
-          const litros = lote.fields['Total Litros'] || lote.fields['Cantidad Litros'] || 0;
-          
-          console.log('📦 RESUMEN: Procesando bacteria:', {
-            microorganismo,
-            litros,
-            loteId: lote.id,
-            estado: lote.fields.Estado
-          });
-          
-          if (!agrupacionBacterias[microorganismo]) {
-            agrupacionBacterias[microorganismo] = { litros: 0 };
-          }
-          agrupacionBacterias[microorganismo].litros += litros;
-        });
-        
-        resumenBacterias = Object.entries(agrupacionBacterias).map(([microorganismo, datos]) => ({
-          microorganismo,
-          litros: datos.litros
-        }));
-        
-        console.log('📊 RESUMEN: Bacterias agrupadas:', resumenBacterias);
-      } else {
-        console.log('❌ RESUMEN: No se pudieron obtener datos de bacterias:', dataBacterias);
-      }
-      
+
       console.log('✅ RESUMEN: Datos procesados:', {
-        hongos: resumenHongos.length,
-        bacterias: resumenBacterias.length
+        hongos: data.hongos?.length || 0,
+        bacterias: data.bacterias?.length || 0
       });
-      
+
       setResumenInventario({
-        hongos: resumenHongos,
-        bacterias: resumenBacterias,
+        hongos: data.hongos || [],
+        bacterias: data.bacterias || [],
         loading: false
       });
       
     } catch (error) {
       console.error('❌ RESUMEN: Error obteniendo resumen:', error);
       setResumenInventario(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const fetchResumenHongosEstado = async () => {
+    setResumenHongosEstado(prev => ({ ...prev, loading: true }));
+
+    try {
+      const response = await fetch('/api/inoculacion');
+      const data = await response.json();
+
+      if (!response.ok || !data.success || !Array.isArray(data.records)) {
+        setResumenHongosEstado(prev => ({ ...prev, loading: false }));
+        return;
+      }
+
+      const lotesIncubacionLocal = data.records.filter((lote: LoteAlmacenamiento) => {
+        const estado = lote.fields['Estado Lote'];
+        return estado === 'Incubacion' || estado === 'Incubación';
+      });
+
+      const lotesRefrigeracionLocal = data.records.filter((lote: LoteAlmacenamiento) => {
+        const estado = lote.fields['Estado Lote'];
+        return estado === 'Refrigeración' || estado === 'Refrigerado';
+      });
+
+      const incMap = new Map<string, { bolsas: number; lotes: number }>();
+      const refMap = new Map<string, { bolsas: number; lotes: number }>();
+
+      const acumular = (
+        target: Map<string, { bolsas: number; lotes: number }>,
+        lote: LoteAlmacenamiento
+      ) => {
+        const micro = lote.fields['Microorganismo (from Microorganismos)']?.[0] || 'Sin especificar';
+        const bolsas = lote.fields['Cantidad Actual Bolsas'] || 0;
+        const actual = target.get(micro) || { bolsas: 0, lotes: 0 };
+        target.set(micro, {
+          bolsas: actual.bolsas + bolsas,
+          lotes: actual.lotes + 1
+        });
+      };
+
+      lotesIncubacionLocal.forEach((lote: LoteAlmacenamiento) => acumular(incMap, lote));
+      lotesRefrigeracionLocal.forEach((lote: LoteAlmacenamiento) => acumular(refMap, lote));
+
+      const incubacionBolsas = Array.from(incMap.values()).reduce((sum, item) => sum + item.bolsas, 0);
+      const refrigeracionBolsas = Array.from(refMap.values()).reduce((sum, item) => sum + item.bolsas, 0);
+
+      const incubacionPorMicro = Array.from(incMap.entries()).map(([micro, datos]) => ({
+        micro,
+        bolsas: datos.bolsas,
+        lotes: datos.lotes
+      }));
+
+      const refrigeracionPorMicro = Array.from(refMap.entries()).map(([micro, datos]) => ({
+        micro,
+        bolsas: datos.bolsas,
+        lotes: datos.lotes
+      }));
+
+      setResumenHongosEstado({
+        incubacionBolsas,
+        refrigeracionBolsas,
+        incubacionLotes: lotesIncubacionLocal.length,
+        refrigeracionLotes: lotesRefrigeracionLocal.length,
+        incubacionPorMicro,
+        refrigeracionPorMicro,
+        loading: false
+      });
+    } catch (error) {
+      console.error('❌ RESUMEN HONGOS ESTADO: Error obteniendo resumen:', error);
+      setResumenHongosEstado(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -2112,6 +2194,26 @@ export default function AlmacenamientoPage() {
                   </div>
                   
                   <div className="p-6">
+                    {resumenIncubacion.length > 0 && (
+                      <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-lg">🧬</span>
+                          <h4 className="font-semibold text-green-800">Resumen por microorganismo</h4>
+                        </div>
+                        <div className="space-y-2">
+                          {resumenIncubacion.map((item) => (
+                            <div key={item.microorganismo} className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white rounded-md px-3 py-2 border border-green-100">
+                              <span className="font-medium text-gray-800">{item.microorganismo}</span>
+                              <div className="flex gap-4 text-sm text-gray-600">
+                                <span>📦 {item.bolsas} bolsas</span>
+                                {item.litros > 0 && <span>🧪 {item.litros} litros</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {lotesIncubacion.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <div className="text-4xl mb-4">📭</div>
@@ -2143,6 +2245,26 @@ export default function AlmacenamientoPage() {
                   </div>
                   
                   <div className="p-6">
+                    {resumenRefrigeracion.length > 0 && (
+                      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-lg">🧬</span>
+                          <h4 className="font-semibold text-blue-800">Resumen por microorganismo</h4>
+                        </div>
+                        <div className="space-y-2">
+                          {resumenRefrigeracion.map((item) => (
+                            <div key={item.microorganismo} className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white rounded-md px-3 py-2 border border-blue-100">
+                              <span className="font-medium text-gray-800">{item.microorganismo}</span>
+                              <div className="flex gap-4 text-sm text-gray-600">
+                                <span>📦 {item.bolsas} bolsas</span>
+                                {item.litros > 0 && <span>🧪 {item.litros} litros</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {lotesRefrigeracion.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <div className="text-4xl mb-4">📭</div>
