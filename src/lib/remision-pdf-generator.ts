@@ -214,7 +214,7 @@ export async function generarRemisionPDF(datos: DatosRemisionPDF): Promise<Uint8
   const remLabel = 'REMISION DE DESPACHO';
   textRight(page, remLabel, regular, 7.5, PAGE_WIDTH - MARGIN, y + 68, rgb(0.55, 0.58, 0.62));
 
-  const numStr = 'No. ' + datos.numeracion.toString().padStart(4, '0');
+  const numStr = 'No. ' + datos.idRemision.split('-').pop();
   textRight(page, numStr, bold, 28, PAGE_WIDTH - MARGIN, y + 30, SIRIUS_GREEN);
 
   const idStr = datos.idRemision;
@@ -227,9 +227,6 @@ export async function generarRemisionPDF(datos: DatosRemisionPDF): Promise<Uint8
   ensureSpace(120);
 
   // Light background card
-  const infoBoxH = 108;
-  borderRect(page, MARGIN, y - infoBoxH, CONTENT_W, infoBoxH, BORDER_MAIN, 0.75, BG_PAPER);
-
   const col1X = MARGIN + 18;
   const col2X = MARGIN + CONTENT_W / 2 + 10;
   const labelSz = 7;
@@ -240,21 +237,23 @@ export async function generarRemisionPDF(datos: DatosRemisionPDF): Promise<Uint8
     { label: 'CLIENTE', value: sanitize(datos.cliente) },
     { label: 'FECHA DE REMISION', value: sanitize(formatDateES(datos.fechaRemision)) },
     { label: 'PEDIDO RELACIONADO', value: sanitize(datos.idPedido) },
-    { label: 'RESPONSABLE DE ENTREGA', value: sanitize(datos.responsableEntrega || 'No especificado') },
   ];
 
   const rightFields = [
     { label: 'CODIGO CLIENTE', value: sanitize(datos.idCliente) },
     { label: 'HORA DE GENERACION', value: sanitize(horaGen) },
     { label: 'AREA DE ORIGEN', value: sanitize(datos.areaOrigen) },
-    { label: 'ID REMISION', value: sanitize(datos.idRemision) },
   ];
+
+  const rowCount = leftFields.length;
+  const infoBoxH = 20 + (rowCount - 1) * rowStep + 16;
+  borderRect(page, MARGIN, y - infoBoxH, CONTENT_W, infoBoxH, BORDER_MAIN, 0.75, BG_PAPER);
 
   // Vertical divider
   const divX = MARGIN + CONTENT_W / 2;
   line(page, divX, y - 10, divX, y - infoBoxH + 10, BORDER_LIGHT, 0.5);
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < rowCount; i++) {
     const rowY = y - 20 - i * rowStep;
 
     // Left column
@@ -274,7 +273,7 @@ export async function generarRemisionPDF(datos: DatosRemisionPDF): Promise<Uint8
     });
 
     // Row separator (except last)
-    if (i < 3) {
+    if (i < rowCount - 1) {
       line(page, MARGIN + 12, rowY - 19, MARGIN + CONTENT_W - 12, rowY - 19, BORDER_LIGHT, 0.3);
     }
   }
@@ -282,33 +281,32 @@ export async function generarRemisionPDF(datos: DatosRemisionPDF): Promise<Uint8
   y -= infoBoxH;
 
   // ═══════════════════════════════════════════════════════════
-  //  TRANSPORTE — Transportista / Receptor cards
+  //  TRANSPORTE — Transportista / Responsable de Entrega cards
   // ═══════════════════════════════════════════════════════════
-  const hasTransport = datos.transportista || datos.receptor;
+  const hasTransport = datos.transportista || datos.responsableEntrega;
   if (hasTransport) {
     y -= 16;
     ensureSpace(65);
 
     // Section label
-    page.drawText('TRANSPORTE Y RECEPCION', {
+    page.drawText('TRANSPORTE Y ENTREGA', {
       x: MARGIN, y: y, size: 7, font: bold, color: TEXT_MUTED
     });
     y -= 8;
 
     const cardH = 44;
     const gap = 10;
-    const halfW = datos.transportista && datos.receptor
-      ? (CONTENT_W - gap) / 2
-      : CONTENT_W;
+    const showBoth = Boolean(datos.transportista && datos.responsableEntrega);
+    const halfW = showBoth ? (CONTENT_W - gap) / 2 : CONTENT_W;
 
-    // Transportista card
+    y -= cardH;
+
+    // Transportista card (left)
     if (datos.transportista) {
       const cx = MARGIN;
-      const cw = datos.receptor ? halfW : CONTENT_W;
-      y -= cardH;
+      const cw = showBoth ? halfW : CONTENT_W;
 
       borderRect(page, cx, y, cw, cardH, BORDER_MAIN, 0.5, BG_PAPER);
-      // Green left accent
       rect(page, cx, y, 3, cardH, SIRIUS_GREEN);
 
       page.drawText('TRANSPORTISTA', {
@@ -332,48 +330,23 @@ export async function generarRemisionPDF(datos: DatosRemisionPDF): Promise<Uint8
           x: cx + cw - fW - 10, y: y + 6, size: 7, font: italic, color: SIRIUS_GREEN
         });
       }
+    }
 
-      // Receptor card (side by side or below)
-      if (datos.receptor) {
-        const rx = MARGIN + halfW + gap;
-        borderRect(page, rx, y, halfW, cardH, BORDER_MAIN, 0.5, BG_PAPER);
-        rect(page, rx, y, 3, cardH, SIRIUS_GREEN);
+    // Responsable de entrega card (right or full width)
+    if (datos.responsableEntrega) {
+      const rx = showBoth ? MARGIN + halfW + gap : MARGIN;
+      const rw = showBoth ? halfW : CONTENT_W;
 
-        page.drawText('RECEPTOR', {
-          x: rx + 14, y: y + cardH - 14, size: 6.5, font: bold, color: TEXT_MUTED
-        });
+      borderRect(page, rx, y, rw, cardH, BORDER_MAIN, 0.5, BG_PAPER);
+      rect(page, rx, y, 3, cardH, SIRIUS_GREEN);
 
-        const rName = sanitize(datos.receptor.nombre);
-        page.drawText(truncate(rName, bold, 10, halfW - 30), {
-          x: rx + 14, y: y + cardH - 28, size: 10, font: bold, color: TEXT_PRIMARY
-        });
-
-        const rCC = `C.C. ${sanitize(datos.receptor.cedula)}`;
-        page.drawText(rCC, {
-          x: rx + 14, y: y + 6, size: 7.5, font: regular, color: TEXT_SECONDARY
-        });
-
-        if (datos.receptor.fechaFirma) {
-          const rTxt = sanitize(`Recibido el ${formatDateES(datos.receptor.fechaFirma)}`);
-          const rW = italic.widthOfTextAtSize(rTxt, 7);
-          page.drawText(rTxt, {
-            x: rx + halfW - rW - 10, y: y + 6, size: 7, font: italic, color: SIRIUS_GREEN
-          });
-        }
-      }
-    } else if (datos.receptor) {
-      y -= cardH;
-      borderRect(page, MARGIN, y, CONTENT_W, cardH, BORDER_MAIN, 0.5, BG_PAPER);
-      rect(page, MARGIN, y, 3, cardH, SIRIUS_GREEN);
-
-      page.drawText('RECEPTOR', {
-        x: MARGIN + 14, y: y + cardH - 14, size: 6.5, font: bold, color: TEXT_MUTED
+      page.drawText('RESPONSABLE DE ENTREGA', {
+        x: rx + 14, y: y + cardH - 14, size: 6.5, font: bold, color: TEXT_MUTED
       });
-      page.drawText(truncate(sanitize(datos.receptor.nombre), bold, 10, CONTENT_W - 30), {
-        x: MARGIN + 14, y: y + cardH - 28, size: 10, font: bold, color: TEXT_PRIMARY
-      });
-      page.drawText(`C.C. ${sanitize(datos.receptor.cedula)}`, {
-        x: MARGIN + 14, y: y + 6, size: 7.5, font: regular, color: TEXT_SECONDARY
+
+      const rName = sanitize(datos.responsableEntrega);
+      page.drawText(truncate(rName, bold, 10, rw - 30), {
+        x: rx + 14, y: y + cardH - 28, size: 10, font: bold, color: TEXT_PRIMARY
       });
     }
   }

@@ -1112,7 +1112,7 @@ export default function CalendarioProduccionPage() {
       
       if (data.success && data.clientes) {
         const clientesFormateados = data.clientes.map((c: any) => ({
-          id: c.idCliente || c.id,
+          id: c.id,
           nombre: c.nombre,
           contacto: c.telefono || c.email
         }));
@@ -1155,7 +1155,7 @@ export default function CalendarioProduccionPage() {
           if (clientesData.success && clientesData.clientes) {
             const map: Record<string, string> = {};
             clientesData.clientes.forEach((c: any) => {
-              map[c.idCliente] = c.nombre;
+              map[c.id] = c.nombre;
             });
             setClientesMap(map);
           }
@@ -2826,7 +2826,10 @@ export default function CalendarioProduccionPage() {
                       </div>
                       
                       <h4 className="font-medium text-gray-900 mb-2">
-                        🏢 {nombreCliente}
+                        🏢 {pedido.clienteId && nombreCliente 
+                          ? `${pedido.clienteId} - ${nombreCliente}` 
+                          : nombreCliente || pedido.clienteId || 'Cliente sin asignar'
+                        }
                       </h4>
                       
                       {/* Barra de progreso de stock */}
@@ -5023,11 +5026,11 @@ export default function CalendarioProduccionPage() {
                     <span className="text-xs font-medium text-indigo-600 uppercase tracking-wide">Cliente</span>
                   </div>
                   <p className="text-lg font-bold text-gray-900 truncate">
-                    {selectedPedidoDetalle.nombreCliente || 'No especificado'}
+                    {selectedPedidoDetalle.clienteId || 'No especificado'}
                   </p>
-                  {selectedPedidoDetalle.clienteId && (
-                    <p className="text-xs text-gray-500 mt-1 font-mono">
-                      {selectedPedidoDetalle.clienteId}
+                  {selectedPedidoDetalle.nombreCliente && (
+                    <p className="text-xs text-indigo-600 mt-1 font-medium">
+                      {selectedPedidoDetalle.nombreCliente}
                     </p>
                   )}
                 </div>
