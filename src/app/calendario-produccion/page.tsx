@@ -679,6 +679,7 @@ export default function CalendarioProduccionPage() {
   const [remisionesPedido, setRemisionesPedido] = useState<RemisionData[]>([]);
   const [loadingRemision, setLoadingRemision] = useState(false);
   const [showRemisionModal, setShowRemisionModal] = useState(false);
+  const [enviandoRemision, setEnviandoRemision] = useState<string | null>(null); // ID de remisión que se está enviando por correo
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -5439,6 +5440,63 @@ export default function CalendarioProduccionPage() {
                         >
                           <span>🔗</span>
                           <span>Copiar Link</span>
+                        </button>
+                        <button
+                          disabled={enviandoRemision === remision.id}
+                          onClick={async () => {
+                            setEnviandoRemision(remision.id);
+                            try {
+                              const urlRemision = getRemisionFirmaUrl(remision.id);
+                              const res = await fetch('/api/remisiones/notificar', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  idCliente: remision.idCliente,
+                                  idRemision: remision.idRemision,
+                                  remisionId: remision.id,
+                                  nombreCliente: selectedPedidoDetalle?.nombreCliente || remision.idCliente,
+                                  productos: remision.productos.map(p => ({
+                                    nombre: p.nombre,
+                                    cantidad: p.cantidad,
+                                    unidad: p.unidad || 'L'
+                                  })),
+                                  cantidadTotal: remision.totalCantidad,
+                                  esDespachoCompleto: remisionesPedido.length === 1,
+                                  idPedido: remision.idPedido,
+                                  urlRemision,
+                                }),
+                              });
+                              const data = await res.json();
+                              if (data.success && data.emailsEnviados > 0) {
+                                alert(`✅ Correo enviado a ${data.emailsEnviados} destinatario(s)`);
+                              } else if (data.success) {
+                                alert('⚠️ No se encontraron correos de notificación para este cliente');
+                              } else {
+                                alert(`❌ Error: ${data.error || 'No se pudo enviar el correo'}`);
+                              }
+                            } catch (err) {
+                              console.error('Error enviando notificación:', err);
+                              alert('❌ Error enviando el correo de notificación');
+                            } finally {
+                              setEnviandoRemision(null);
+                            }
+                          }}
+                          className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-semibold rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {enviandoRemision === remision.id ? (
+                            <>
+                              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>Enviando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>📧</span>
+                              <span>Enviar Remisión</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>

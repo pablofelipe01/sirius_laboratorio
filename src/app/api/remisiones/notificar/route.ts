@@ -198,17 +198,24 @@ export async function POST(request: NextRequest) {
     // ====================================================================
     // PASO 4: Enviar UN solo correo con todos los destinatarios
     // Usa to: array para no repetir envíos
+    // Agrega CC a los correos corporativos fijos (desde variables de entorno)
     // ====================================================================
     const emailsArray = Array.from(emailsUnicos);
+    const emailsCorporativosFijos = (process.env.REMISION_EMAIL_CC || '')
+      .split(',')
+      .map(email => email.trim())
+      .filter(email => email);
 
     try {
       await enviarCorreo({
         to: emailsArray,
+        cc: emailsCorporativosFijos,
         subject: `📋 Remisión ${idRemision} - ${tipoDespacho} | Pedido ${idPedido || ''} - ${nombreCliente || idCliente}`,
         body: htmlBody,
       });
 
       console.log(`✅ Correo enviado exitosamente a ${emailsArray.length} destinatario(s): ${emailsArray.join(', ')}`);
+      console.log(`📋 CC enviado a: ${emailsCorporativosFijos.join(', ')}`);
 
       return NextResponse.json({
         success: true,
