@@ -7,6 +7,7 @@ import Footer from '@/components/Footer';
 
 interface Responsable {
   id: string;
+  idCore: string;
   nombre: string;
 }
 
@@ -531,11 +532,11 @@ export default function BitacoraLaboratorioPage() {
                       <select
                         onChange={(e) => {
                           const selectedOption = e.target.options[e.target.selectedIndex];
-                          const responsableId = e.target.value;
+                          const responsableIdCore = selectedOption.dataset.idcore || '';
                           const responsableNombre = selectedOption.text;
-                          
-                          if (responsableId) {
-                            agregarResponsable(responsableId, responsableNombre);
+
+                          if (e.target.value && responsableIdCore) {
+                            agregarResponsable(responsableIdCore, responsableNombre);
                             e.target.value = '';
                           }
                         }}
@@ -546,9 +547,9 @@ export default function BitacoraLaboratorioPage() {
                           {loadingResponsables ? 'Cargando responsables...' : 'Seleccione un miembro del equipo'}
                         </option>
                         {responsables
-                          .filter(responsable => !equipoSeleccionadoId.includes(responsable.id))
+                          .filter(responsable => !equipoSeleccionadoId.includes(responsable.idCore))
                           .map((responsable) => (
-                            <option key={responsable.id} value={responsable.id}>
+                            <option key={responsable.idCore} value={responsable.idCore} data-idcore={responsable.idCore}>
                               {responsable.nombre}
                             </option>
                           ))}

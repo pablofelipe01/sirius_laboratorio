@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         [process.env.AIRTABLE_FIELD_BITACORA_REALIZA_REGISTRO!]: body.realizaRegistro,
         [process.env.AIRTABLE_FIELD_BITACORA_TRANSCRIPCION_AUDIO!]: body.transcripcionAudio,
         [process.env.AIRTABLE_FIELD_BITACORA_INFORME_EJECUTIVO!]: body.informeEjecutivo,
-        [process.env.AIRTABLE_FIELD_BITACORA_EQUIPO_LABORATORIO!]: body.equipoLaboratorioId
+        [process.env.AIRTABLE_FIELD_BITACORA_ID_RESPONSABLE_CORE!]: body.equipoLaboratorioId.join(', ')
       }
     };
 
