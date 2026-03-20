@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import LoteSelector from '@/components/LoteSelector';
 import { ModalPedido } from '@/components/ModalPedido';
+import DashboardSeguimientoInline from '@/components/DashboardSeguimientoInline';
 import { QRCodeSVG } from 'qrcode.react';
 
 // Interfaces
@@ -576,7 +577,7 @@ export default function CalendarioProduccionPage() {
   const [loadingDetailedEvent, setLoadingDetailedEvent] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [vistaActual, setVistaActual] = useState<'mes' | 'semana' | 'lista' | 'paquetes'>('mes');
+  const [vistaActual, setVistaActual] = useState<'mes' | 'semana' | 'lista' | 'paquetes' | 'seguimiento'>('mes');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPaquetesModal, setShowPaquetesModal] = useState(false);
   const [showSeguimientoModal, setShowSeguimientoModal] = useState(false);
@@ -2705,6 +2706,16 @@ export default function CalendarioProduccionPage() {
               </button>
               
               <button
+                onClick={() => setVistaActual(vistaActual === 'seguimiento' ? 'mes' : 'seguimiento')}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                {vistaActual === 'seguimiento' ? 'Ver Calendario' : 'Seguimiento de Aplicaciones'}
+              </button>
+
+              <button
                 onClick={() => setVistaActual(vistaActual === 'mes' ? 'lista' : 'mes')}
                 className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 focus:ring-4 focus:ring-gray-500/20 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center"
               >
@@ -3247,6 +3258,13 @@ export default function CalendarioProduccionPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Vista Seguimiento de Aplicaciones */}
+          {vistaActual === 'seguimiento' && (
+            <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100 rounded-xl shadow-lg p-8">
+              <DashboardSeguimientoInline />
             </div>
           )}
 
@@ -6028,7 +6046,7 @@ export default function CalendarioProduccionPage() {
           </div>
         </div>
       )}
-      
+
       <Footer />
     </>
   );

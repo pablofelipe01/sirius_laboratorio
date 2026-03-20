@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash(npm run *)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(git *)",
+      "Bash(git status)",
+      "Bash(git log --oneline)",
+      "Bash(git diff)",
+      "Grep",
+      "Glob"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Bash(git revert *)"
+    ]
+  },
+  "model": "claude-sonnet-4-5",
+  "memory": "project"
+}
