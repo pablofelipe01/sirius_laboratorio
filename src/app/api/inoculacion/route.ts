@@ -218,6 +218,21 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ No se pudo generar código de lote: falta fecha o abreviatura del microorganismo');
     }
     
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🛡️ Validación: Codigo Lote es obligatorio y no puede ser "N/A"
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (!codigoLote || codigoLote.trim() === '' || codigoLote === 'N/A') {
+      console.error('❌ Validación fallida: Codigo Lote vacío o inválido', {
+        codigoLote,
+        abreviatura,
+        inoculationDate: data.inoculationDate,
+        microorganismAbreviatura: data.microorganismAbreviatura,
+      });
+      return NextResponse.json({
+        error: 'El campo Codigo Lote es obligatorio y debe ser un código de lote válido. Verifique que el microorganismo tiene una abreviatura configurada.',
+      }, { status: 400 });
+    }
+    
     // Preparar IDs Core como string separado por comas (para referencia)
     const responsablesIdsCore = (data.responsablesIdsCore || []).join(', ');
     

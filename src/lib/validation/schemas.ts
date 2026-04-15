@@ -43,8 +43,8 @@ export const InoculationSchema = z.object({
     .min(1, 'ID del microorganismo es requerido'),
   
   microorganismAbreviatura: z.string()
-    .optional()
-    .default(''), // Abreviatura del producto (ej: "BV", "MT", "TR")
+    .min(1, 'La abreviatura del microorganismo es requerida para generar el código de lote')
+    .max(10, 'Abreviatura demasiado larga'), // Abreviatura del producto (ej: "BV", "MT", "TR")
   
   inoculationDate: z.string()
     .min(1, 'La fecha de inoculación es requerida')

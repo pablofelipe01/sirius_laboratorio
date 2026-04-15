@@ -410,6 +410,21 @@ const MushroomInoculationForm = () => {
       return;
     }
 
+    // Validación: verificar que el código de lote se pueda generar
+    // El código de lote requiere fecha + abreviatura del microorganismo
+    const abreviaturaParaLote = formData.microorganismAbreviatura || 
+      (formData.cepasSeleccionadas[0]?.abreviatura) || '';
+    if (!abreviaturaParaLote) {
+      setErrorMessage('❌ Error: El microorganismo seleccionado no tiene abreviatura configurada. No se puede generar el código de lote. Contacte al administrador.');
+      setSubmitStatus('error');
+      return;
+    }
+    if (!formData.inoculationDate) {
+      setErrorMessage('❌ Error: Debe seleccionar una fecha de inoculación.');
+      setSubmitStatus('error');
+      return;
+    }
+
     // Calcular insumos necesarios basado en la cantidad total de bolsas
     const totalBolsas = formData.bagQuantity;
     const insumosNecesarios = await calcularInsumos(totalBolsas);
@@ -961,9 +976,9 @@ const MushroomInoculationForm = () => {
             <div className="flex justify-center pt-6">
               <button
                 type="submit"
-                disabled={isSubmitting || loadingMicroorganisms || loadingResponsables || formData.cepasSeleccionadas.length === 0}
+                disabled={isSubmitting || loadingMicroorganisms || loadingResponsables || formData.cepasSeleccionadas.length === 0 || !formData.microorganismAbreviatura}
                 className={`px-10 py-4 rounded-xl font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 ${
-                  isSubmitting || loadingMicroorganisms || loadingResponsables || formData.cepasSeleccionadas.length === 0
+                  isSubmitting || loadingMicroorganisms || loadingResponsables || formData.cepasSeleccionadas.length === 0 || !formData.microorganismAbreviatura
                     ? 'bg-gray-400 cursor-not-allowed text-white'
                     : 'bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-800 text-white'
                 }`}
