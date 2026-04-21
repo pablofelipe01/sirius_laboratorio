@@ -244,6 +244,7 @@ export async function POST(request: NextRequest) {
       [FIELD_REALIZA_REGISTRO]: data.registradoPor, // Text
       'ID Producto Core': codigoProductoCore || '', // Código del producto (ej: SIRIUS-PRODUCT-0004)
       'Codigo Lote': codigoLote,
+      'Microorganismos': data.microorganismId ? [data.microorganismId] : [], // Linked record
     };
     
     // Solo agregar responsables si encontramos IDs válidos en DataLab
