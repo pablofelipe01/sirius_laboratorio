@@ -1,12 +1,41 @@
 /**
  * Configuración centralizada de tablas de Airtable
  * Mantiene todos los IDs de tablas en un lugar para fácil mantenimiento
+ *
+ * 🌐 API KEY GLOBAL: Si existe AIRTABLE_API_KEY_GLOBAL, se usa para TODAS las
+ * bases. Las AIRTABLE_API_KEY_SIRIUS_* quedan como respaldo y solo aplican
+ * cuando la global no está configurada. Ver AIRTABLE_CONFIG.md.
  */
+
+// 🔑 API Key Global — un PAT con acceso a las 7 bases del proyecto
+const GLOBAL_API_KEY = process.env.AIRTABLE_API_KEY_GLOBAL;
+
+/**
+ * Obtiene la API key para una base.
+ *
+ * La global tiene PRIORIDAD sobre las específicas: es un PAT con acceso a las 7
+ * bases, así que una key específica revocada ya no puede tumbar el arranque.
+ * Las específicas quedan solo como respaldo si la global no está configurada.
+ *
+ * Nota: no se puede validar una key por su formato — una key revocada conserva
+ * el prefijo `pat`/`key` y solo falla con 401 al llamar a la API.
+ */
+const getApiKey = (specificKey?: string, baseName = 'Base'): string => {
+  if (GLOBAL_API_KEY) {
+    return GLOBAL_API_KEY;
+  }
+
+  if (specificKey) {
+    console.warn(`⚠️ [${baseName}] Sin API key global, usando la key específica de la base`);
+    return specificKey;
+  }
+
+  throw new Error(`No se encontró API key de Airtable para ${baseName} (ni global ni específica)`);
+};
 
 // Validación de variables de entorno requeridas
 const requiredEnvVars = [
   'AIRTABLE_BASE_ID',
-  'AIRTABLE_API_KEY',
   'AIRTABLE_TABLE_INOCULACION',
   'AIRTABLE_TABLE_SALIDA_INOCULACION',
   'AIRTABLE_TABLE_SALIDA_CEPAS',
@@ -40,7 +69,7 @@ if (missingOptional.length > 0) {
 
 export const AIRTABLE_CONFIG = {
   BASE_ID: process.env.AIRTABLE_BASE_ID!,
-  API_KEY: process.env.AIRTABLE_API_KEY!,
+  API_KEY: getApiKey(process.env.AIRTABLE_API_KEY, 'DataLab'),
   
   TABLES: {
     INOCULACION: process.env.AIRTABLE_TABLE_INOCULACION!,
@@ -67,7 +96,7 @@ export const AIRTABLE_CONFIG = {
 // Configuración específica para Sirius Product Core
 export const SIRIUS_PRODUCT_CORE_CONFIG = {
   BASE_ID: process.env.AIRTABLE_BASE_ID_SIRIUS_PRODUCT_CORE!,
-  API_KEY: process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE!,
+  API_KEY: getApiKey(process.env.AIRTABLE_API_KEY_SIRIUS_PRODUCT_CORE),
   
   TABLES: {
     PRODUCTOS: process.env.AIRTABLE_TABLE_PRODUCTOS!,
@@ -83,7 +112,7 @@ export const SIRIUS_PRODUCT_CORE_CONFIG = {
 // ============================================================================
 export const SIRIUS_CLIENT_CORE_CONFIG = {
   BASE_ID: process.env.AIRTABLE_BASE_ID_SIRIUS_CLIENTES_CORE!,
-  API_KEY: process.env.AIRTABLE_API_KEY_SIRIUS_CLIENTES_CORE!,
+  API_KEY: getApiKey(process.env.AIRTABLE_API_KEY_SIRIUS_CLIENTES_CORE),
   
   TABLES: {
     CLIENTES: process.env.AIRTABLE_TABLE_CLIENTES_CORE!,
@@ -110,7 +139,7 @@ export const SIRIUS_CLIENT_CORE_CONFIG = {
 // ============================================================================
 export const SIRIUS_PEDIDOS_CORE_CONFIG = {
   BASE_ID: process.env.AIRTABLE_BASE_ID_SIRIUS_PEDIDOS_CORE!,
-  API_KEY: process.env.AIRTABLE_API_KEY_SIRIUS_PEDIDOS_CORE!,
+  API_KEY: getApiKey(process.env.AIRTABLE_API_KEY_SIRIUS_PEDIDOS_CORE),
   
   TABLES: {
     PEDIDOS: process.env.AIRTABLE_TABLE_PEDIDOS_CORE!,
@@ -182,7 +211,7 @@ export type EstadoPedido = typeof SIRIUS_PEDIDOS_CORE_CONFIG.ESTADOS_PEDIDO[numb
 // ============================================================================
 export const SIRIUS_REMISIONES_CORE_CONFIG = {
   BASE_ID: process.env.AIRTABLE_BASE_ID_SIRIUS_REMISIONES_CORE!,
-  API_KEY: process.env.AIRTABLE_API_KEY_SIRIUS_REMISIONES_CORE!,
+  API_KEY: getApiKey(process.env.AIRTABLE_API_KEY_SIRIUS_REMISIONES_CORE),
   
   TABLES: {
     REMISIONES: process.env.AIRTABLE_TABLE_REMISIONES!,
@@ -277,7 +306,7 @@ export type TipoUsuarioPersona = typeof SIRIUS_REMISIONES_CORE_CONFIG.TIPOS_USUA
 // ============================================================================
 export const SIRIUS_INVENTARIO_CONFIG = {
   BASE_ID: process.env.AIRTABLE_BASE_SIRIUS_INVENTARIO!,
-  API_KEY: process.env.AIRTABLE_API_KEY_SIRIUS_INVENTARIO!,
+  API_KEY: getApiKey(process.env.AIRTABLE_API_KEY_SIRIUS_INVENTARIO),
   
   TABLES: {
     MOVIMIENTOS_INVENTARIO: process.env.AIRTABLE_TABLE_MOVIMIENTOS_INVENTARIO!,
@@ -325,6 +354,24 @@ export const SIRIUS_INVENTARIO_CONFIG = {
 
 // Tipo para los tipos de movimiento
 export type TipoMovimiento = typeof SIRIUS_INVENTARIO_CONFIG.TIPOS_MOVIMIENTO[number];
+
+// ============================================================================
+// Configuración para Sirius Nómina Core
+// Sistema de gestión de personal y autenticación
+// ============================================================================
+export const SIRIUS_NOMINA_CORE_CONFIG = {
+  BASE_ID: process.env.AIRTABLE_BASE_ID_SIRIUS_NOMINA_CORE!,
+  API_KEY: getApiKey(process.env.AIRTABLE_API_KEY_SIRIUS_NOMINA_CORE, 'Nomina Core'),
+
+  TABLES: {
+    PERSONAL: process.env.AIRTABLE_TABLE_NOMINA_PERSONAL!,
+    AREAS: process.env.AIRTABLE_TABLE_NOMINA_AREAS!,
+    SISTEMAS_APLICACIONES: process.env.AIRTABLE_TABLE_NOMINA_SISTEMAS_APLICACIONES!,
+  },
+
+  // ID de la aplicación DataLab
+  DATALAB_APP_CODE: 'SIRIUS-APP-0001',
+} as const;
 
 // Helper para construir URLs de la API
 export const buildAirtableUrl = (tableId: string, recordId?: string, baseId?: string) => {
@@ -383,4 +430,20 @@ export const getSiriusRemisionesCoreHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
+// Helper específico para Sirius Nómina Core
+export const buildSiriusNominaCoreUrl = (tableId: string, recordId?: string) => {
+  return buildAirtableUrl(tableId, recordId, SIRIUS_NOMINA_CORE_CONFIG.BASE_ID);
+};
+
+// Headers específicos para Sirius Nómina Core
+export const getSiriusNominaCoreHeaders = () => ({
+  'Authorization': `Bearer ${SIRIUS_NOMINA_CORE_CONFIG.API_KEY}`,
+  'Content-Type': 'application/json',
+});
+
 console.log('✅ Configuración de Airtable cargada correctamente');
+console.log(
+  GLOBAL_API_KEY
+    ? '🌐 Usando API key global de Airtable para todas las bases'
+    : '⚠️ Sin API key global — cada base usa su key específica'
+);

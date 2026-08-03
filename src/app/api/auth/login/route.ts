@@ -3,34 +3,16 @@ import Airtable from 'airtable';
 import { LoginSchema, SetPasswordSchema, validateData } from '@/lib/validation/schemas';
 import { hashPassword, verifyPassword } from '@/lib/auth/password';
 import { signToken } from '@/lib/auth/jwt';
+import { SIRIUS_NOMINA_CORE_CONFIG } from '@/lib/constants/airtable';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🔐 SIRIUS NOMINA CORE - Sistema de autenticación con tabla Personal
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Validar configuración requerida para Sirius Nomina Core
-const NOMINA_API_KEY = process.env.AIRTABLE_API_KEY_SIRIUS_NOMINA_CORE;
-const NOMINA_BASE_ID = process.env.AIRTABLE_BASE_ID_SIRIUS_NOMINA_CORE;
-const PERSONAL_TABLE_ID = process.env.AIRTABLE_TABLE_NOMINA_PERSONAL;
-const SISTEMAS_TABLE_ID = process.env.AIRTABLE_TABLE_NOMINA_SISTEMAS_APLICACIONES;
-
-// ID de la aplicación DataLab - Solo usuarios con acceso a esta app pueden ingresar
-const DATALAB_APP_CODE = 'SIRIUS-APP-0001';
-
-if (!NOMINA_API_KEY || !NOMINA_BASE_ID || !PERSONAL_TABLE_ID || !SISTEMAS_TABLE_ID) {
-  console.error('❌ Missing Sirius Nomina Core environment variables:', {
-    hasApiKey: !!NOMINA_API_KEY,
-    hasBaseId: !!NOMINA_BASE_ID,
-    hasTableId: !!PERSONAL_TABLE_ID,
-    hasSistemasTableId: !!SISTEMAS_TABLE_ID
-  });
-  throw new Error('Variables de entorno de Sirius Nomina Core son requeridas');
-}
-
-// Configurar Airtable para Sirius Nomina Core
+// Configurar Airtable para Sirius Nomina Core usando configuración centralizada
 const nominaBase = new Airtable({
-  apiKey: NOMINA_API_KEY
-}).base(NOMINA_BASE_ID);
+  apiKey: SIRIUS_NOMINA_CORE_CONFIG.API_KEY
+}).base(SIRIUS_NOMINA_CORE_CONFIG.BASE_ID);
 
 // Login endpoint - POST /api/auth/login
 export async function POST(request: NextRequest) {
@@ -66,7 +48,7 @@ export async function POST(request: NextRequest) {
     const data = validation.data!;
 
     // Buscar usuario por Numero Documento en tabla Personal
-    const records = await nominaBase(PERSONAL_TABLE_ID!)
+    const records = await nominaBase(SIRIUS_NOMINA_CORE_CONFIG.TABLES.PERSONAL)
       .select({
         filterByFormula: `{Numero Documento} = "${data.cedula}"`,
         maxRecords: 1
@@ -106,15 +88,15 @@ export async function POST(request: NextRequest) {
     
     if (accesosIds && accesosIds.length > 0) {
       // Buscar en la tabla Sistemas y Aplicaciones si alguno de los accesos corresponde a DataLab
-      const sistemasRecords = await nominaBase(SISTEMAS_TABLE_ID!)
+      const sistemasRecords = await nominaBase(SIRIUS_NOMINA_CORE_CONFIG.TABLES.SISTEMAS_APLICACIONES)
         .select({
           filterByFormula: `OR(${accesosIds.map(id => `RECORD_ID() = "${id}"`).join(',')})`,
           fields: ['Codigo App', 'Nombre sistema/aplicación']
         })
         .firstPage();
 
-      hasDataLabAccess = sistemasRecords.some(record => 
-        record.get('Codigo App') === DATALAB_APP_CODE
+      hasDataLabAccess = sistemasRecords.some(record =>
+        record.get('Codigo App') === SIRIUS_NOMINA_CORE_CONFIG.DATALAB_APP_CODE
       );
 
       console.log('🔍 Checking DataLab access:', {
@@ -141,7 +123,7 @@ export async function POST(request: NextRequest) {
       const { hash, salt, hashedPassword } = await hashPassword(data.password!);
 
       // Actualizar registro con nueva contraseña
-      await nominaBase(PERSONAL_TABLE_ID!).update([
+      await nominaBase(SIRIUS_NOMINA_CORE_CONFIG.TABLES.PERSONAL).update([
         {
           id: userRecord.id,
           fields: {

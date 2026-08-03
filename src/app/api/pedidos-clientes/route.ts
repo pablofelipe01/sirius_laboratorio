@@ -11,6 +11,82 @@ import {
 } from '@/lib/constants/airtable';
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Trae TODOS los registros de una URL de Airtable siguiendo la paginación.
+ *
+ * La API REST de Airtable devuelve máximo 100 registros por página y expone un
+ * `offset` para pedir la siguiente. Sin este bucle, cualquier tabla con más de
+ * 100 filas se lee incompleta y los registros que quedan fuera de la primera
+ * página desaparecen silenciosamente (no hay error).
+ */
+async function fetchAllAirtableRecords<T>(
+  baseUrl: string,
+  headers: Record<string, string>,
+  etiqueta: string
+): Promise<T[]> {
+  const registros: T[] = [];
+  let offset: string | undefined;
+
+  do {
+    const url = new URL(baseUrl);
+    if (offset) {
+      url.searchParams.set('offset', offset);
+    }
+
+    const response = await fetch(url.toString(), { method: 'GET', headers });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Error de Airtable (${etiqueta}):`, errorText);
+      throw new Error(`Error de Airtable (${etiqueta}): ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    registros.push(...(data.records || []));
+    offset = data.offset;
+  } while (offset);
+
+  console.log(`📄 ${etiqueta}: ${registros.length} registros leídos (paginación completa)`);
+  return registros;
+}
+
+/**
+ * Escapa un valor para interpolarlo dentro de una fórmula de Airtable.
+ * Sin esto, un valor con apóstrofo rompe la fórmula (o la altera).
+ */
+function escaparFormula(valor: string): string {
+  return valor.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+/**
+ * Trae registros concretos de Airtable por sus record IDs.
+ *
+ * Se consulta en lotes porque `filterByFormula` viaja en la query string y un
+ * OR() con demasiados IDs desbordaría el límite de longitud de la URL.
+ */
+async function fetchAirtableRecordsByIds<T>(
+  tableUrl: string,
+  headers: Record<string, string>,
+  ids: string[],
+  etiqueta: string,
+  tamanoLote = 50
+): Promise<T[]> {
+  const registros: T[] = [];
+
+  for (let i = 0; i < ids.length; i += tamanoLote) {
+    const lote = ids.slice(i, i + tamanoLote);
+    const formula = `OR(${lote.map(id => `RECORD_ID()='${id}'`).join(',')})`;
+    const url = `${tableUrl}?filterByFormula=${encodeURIComponent(formula)}`;
+    registros.push(...(await fetchAllAirtableRecords<T>(url, headers, `${etiqueta} lote ${i / tamanoLote + 1}`)));
+  }
+
+  return registros;
+}
+
+// ============================================================================
 // Interfaces para el sistema de pedidos
 // ============================================================================
 
@@ -95,24 +171,66 @@ export async function GET(request: NextRequest) {
     const clienteId = searchParams.get('clienteId');
     const estado = searchParams.get('estado');
     const incluirDetalles = searchParams.get('incluirDetalles') === 'true';
+    // Excluir cancelados en el servidor: si se filtra en el cliente, las
+    // páginas quedan de tamaños distintos (12 pedidos → 9 visibles).
+    const excluirCancelados = searchParams.get('excluirCancelados') === 'true';
+    // Rango por mes (vista de calendario): 1-12, no 0-11 como en JS.
+    const year = parseInt(searchParams.get('year') || '', 10);
+    const month = parseInt(searchParams.get('month') || '', 10);
+    const filtrarPorMes = Number.isFinite(year) && Number.isFinite(month) && month >= 1 && month <= 12;
+
+    // Paginación opt-in: sin `page` el endpoint devuelve todo (compatibilidad
+    // con los llamadores existentes, p. ej. la vista de calendario).
+    const paginar = searchParams.has('page');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const pageSize = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get('pageSize') || '20', 10) || 20)
+    );
 
     // Construir URL con filtros opcionales
     let url = buildSiriusPedidosCoreUrl(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.PEDIDOS);
     const params = new URLSearchParams();
 
-    // Filtro por cliente
+    // Las condiciones se acumulan y se combinan en UN solo filterByFormula.
+    // Antes se hacía `params.append('filterByFormula', ...)` dos veces cuando
+    // venían `clienteId` y `estado` juntos, y Airtable ignoraba una de las dos.
+    const condiciones: string[] = [];
+
     if (clienteId) {
-      params.append('filterByFormula', `{ID Cliente Core} = '${clienteId}'`);
+      condiciones.push(`{ID Cliente Core} = '${escaparFormula(clienteId)}'`);
     }
 
-    // Filtro por estado
     if (estado) {
-      const estadoFormula = `{Estado} = '${estado}'`;
-      if (clienteId) {
-        params.append('filterByFormula', `AND({ID Cliente Core} = '${clienteId}', ${estadoFormula})`);
-      } else {
-        params.append('filterByFormula', estadoFormula);
-      }
+      condiciones.push(`{Estado} = '${escaparFormula(estado)}'`);
+    }
+
+    if (excluirCancelados) {
+      condiciones.push(`{Estado} != 'Cancelado'`);
+    }
+
+    if (filtrarPorMes) {
+      // La rejilla del calendario son 42 celdas: incluye días del mes anterior
+      // y del siguiente, así que hay que traer los tres meses o los pedidos de
+      // esas celdas de relleno desaparecerían.
+      //
+      // Se compara con DATETIME_FORMAT en vez de un rango con IS_AFTER/IS_BEFORE
+      // porque el rango se colaba el último día del mes previo cuando la fecha
+      // trae hora. Y se usa UTC deliberadamente, igual que getPedidosForDate en
+      // el cliente (`fechaPedido.split('T')[0]`), para que ambos coincidan.
+      const meses = [-1, 0, 1].map(delta => {
+        const d = new Date(Date.UTC(year, month - 1 + delta, 1));
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      });
+      condiciones.push(
+        `OR(${meses.map(m => `DATETIME_FORMAT({Fecha de Pedido}, 'YYYY-MM') = '${m}'`).join(',')})`
+      );
+    }
+
+    if (condiciones.length === 1) {
+      params.append('filterByFormula', condiciones[0]);
+    } else if (condiciones.length > 1) {
+      params.append('filterByFormula', `AND(${condiciones.join(',')})`);
     }
 
     // Ordenar por fecha descendente (más recientes primero)
@@ -125,22 +243,14 @@ export async function GET(request: NextRequest) {
 
     console.log('🔗 URL Pedidos:', url);
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getSiriusPedidosCoreHeaders(),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Error de Airtable:', errorText);
-      throw new Error(`Error de Airtable: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const pedidos: PedidoAirtable[] = data.records || [];
+    const pedidos = await fetchAllAirtableRecords<PedidoAirtable>(
+      url,
+      getSiriusPedidosCoreHeaders(),
+      'Pedidos'
+    );
 
     // Formatear pedidos
-    const pedidosFormateados: PedidoFormateado[] = pedidos.map(pedido => ({
+    const pedidosTodos: PedidoFormateado[] = pedidos.map(pedido => ({
       id: pedido.id,
       idPedidoCore: pedido.fields['ID Pedido Core'] || '',
       idNumerico: pedido.fields['ID'] || 0,
@@ -154,6 +264,21 @@ export async function GET(request: NextRequest) {
       createdTime: pedido.createdTime,
     }));
 
+    // Recortar a la página pedida. El recorte va ANTES de leer los detalles,
+    // así el costo de esa lectura depende del tamaño de página y no del
+    // tamaño total de la tabla.
+    const totalPedidos = pedidosTodos.length;
+    const totalPages = Math.max(1, Math.ceil(totalPedidos / pageSize));
+    const pedidosFormateados = paginar
+      ? pedidosTodos.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize)
+      : pedidosTodos;
+
+    if (paginar) {
+      console.log(
+        `📑 Paginación: página ${page}/${totalPages} · ${pedidosFormateados.length} de ${totalPedidos} pedidos`
+      );
+    }
+
     // Si se solicitan detalles, obtenerlos
     const detallesMap: Record<string, DetallePedidoFormateado[]> = {};
     const productosMap: Record<string, { id: string; codigoProducto: string; nombre: string }> = {};
@@ -165,74 +290,72 @@ export async function GET(request: NextRequest) {
       )];
 
       if (todosDetallesIds.length > 0) {
-        // Obtener detalles
+        // Leer SOLO los detalles de los pedidos devueltos. Antes se leía la
+        // tabla completa, así que el costo crecía con el histórico entero.
         const detallesUrl = buildSiriusPedidosCoreUrl(SIRIUS_PEDIDOS_CORE_CONFIG.TABLES.DETALLES_PEDIDO);
-        const detallesResponse = await fetch(detallesUrl, {
-          method: 'GET',
-          headers: getSiriusPedidosCoreHeaders(),
-        });
+        const detalles = await fetchAirtableRecordsByIds<DetallePedidoAirtable>(
+          detallesUrl,
+          getSiriusPedidosCoreHeaders(),
+          todosDetallesIds,
+          'Detalles del Pedido'
+        );
 
-        if (detallesResponse.ok) {
-          const detallesData = await detallesResponse.json();
-          const detalles: DetallePedidoAirtable[] = detallesData.records || [];
-
-          // Agrupar detalles por pedido y obtener IDs de productos
-          const todosIdsProductosCore: string[] = [];
+        // Agrupar detalles por pedido y obtener IDs de productos
+        const todosIdsProductosCore: string[] = [];
+        
+        detalles.forEach(detalle => {
+          const idProductoCore = detalle.fields['ID Producto Core'] || '';
+          if (idProductoCore && !todosIdsProductosCore.includes(idProductoCore)) {
+            todosIdsProductosCore.push(idProductoCore);
+          }
           
-          detalles.forEach(detalle => {
-            const idProductoCore = detalle.fields['ID Producto Core'] || '';
-            if (idProductoCore && !todosIdsProductosCore.includes(idProductoCore)) {
-              todosIdsProductosCore.push(idProductoCore);
+          const pedidoIds = detalle.fields['Pedido'] || [];
+          pedidoIds.forEach(pedidoId => {
+            if (!detallesMap[pedidoId]) {
+              detallesMap[pedidoId] = [];
             }
-            
-            const pedidoIds = detalle.fields['Pedido'] || [];
-            pedidoIds.forEach(pedidoId => {
-              if (!detallesMap[pedidoId]) {
-                detallesMap[pedidoId] = [];
-              }
-              detallesMap[pedidoId].push({
-                id: detalle.id,
-                detalleNumero: detalle.fields['Detalle del Pedido'] || 0,
-                pedidoId: pedidoId,
-                idProductoCore: idProductoCore, // Usar el código del producto directamente
-                cantidad: detalle.fields['Cantidad Pedido'] || 0,
-                precioUnitario: detalle.fields['Precio unitario en el momento del pedido'] || 0,
-                notas: detalle.fields['Notas del detalle'] || '',
-                productoListo: detalle.fields['Producto Listo'] === true, // Campo checkbox
-              });
+            detallesMap[pedidoId].push({
+              id: detalle.id,
+              detalleNumero: detalle.fields['Detalle del Pedido'] || 0,
+              pedidoId: pedidoId,
+              idProductoCore: idProductoCore, // Usar el código del producto directamente
+              cantidad: detalle.fields['Cantidad Pedido'] || 0,
+              precioUnitario: detalle.fields['Precio unitario en el momento del pedido'] || 0,
+              notas: detalle.fields['Notas del detalle'] || '',
+              productoListo: detalle.fields['Producto Listo'] === true, // Campo checkbox
             });
           });
+        });
+        
+        // Buscar nombres de productos en Sirius Product Core
+        if (todosIdsProductosCore.length > 0) {
+          const filterFormula = `OR(${todosIdsProductosCore.map(id => `{Codigo Producto}='${id}'`).join(',')})`;
+          const productCoreUrl = `${buildSiriusProductCoreUrl(SIRIUS_PRODUCT_CORE_CONFIG.TABLES.PRODUCTOS)}?filterByFormula=${encodeURIComponent(filterFormula)}`;
           
-          // Buscar nombres de productos en Sirius Product Core
-          if (todosIdsProductosCore.length > 0) {
-            const filterFormula = `OR(${todosIdsProductosCore.map(id => `{Codigo Producto}='${id}'`).join(',')})`;
-            const productCoreUrl = `${buildSiriusProductCoreUrl(SIRIUS_PRODUCT_CORE_CONFIG.TABLES.PRODUCTOS)}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+          console.log('🔍 Buscando nombres de productos en Sirius Product Core para IDs:', todosIdsProductosCore);
+          
+          const productCoreResponse = await fetch(productCoreUrl, {
+            method: 'GET',
+            headers: getSiriusProductCoreHeaders(),
+          });
+          
+          if (productCoreResponse.ok) {
+            const productCoreData = await productCoreResponse.json();
+            const productosCore = productCoreData.records || [];
             
-            console.log('🔍 Buscando nombres de productos en Sirius Product Core para IDs:', todosIdsProductosCore);
-            
-            const productCoreResponse = await fetch(productCoreUrl, {
-              method: 'GET',
-              headers: getSiriusProductCoreHeaders(),
+            productosCore.forEach((pc: any) => {
+              const codigoProducto = pc.fields['Codigo Producto'];
+              const nombreComercial = pc.fields['Nombre Comercial'] || pc.fields['Nombre'];
+              if (codigoProducto && nombreComercial) {
+                productosMap[codigoProducto] = {
+                  id: pc.id,
+                  codigoProducto: codigoProducto,
+                  nombre: nombreComercial
+                };
+              }
             });
             
-            if (productCoreResponse.ok) {
-              const productCoreData = await productCoreResponse.json();
-              const productosCore = productCoreData.records || [];
-              
-              productosCore.forEach((pc: any) => {
-                const codigoProducto = pc.fields['Codigo Producto'];
-                const nombreComercial = pc.fields['Nombre Comercial'] || pc.fields['Nombre'];
-                if (codigoProducto && nombreComercial) {
-                  productosMap[codigoProducto] = {
-                    id: pc.id,
-                    codigoProducto: codigoProducto,
-                    nombre: nombreComercial
-                  };
-                }
-              });
-              
-              console.log('✅ Nombres de productos obtenidos:', Object.keys(productosMap));
-            }
+            console.log('✅ Nombres de productos obtenidos:', Object.keys(productosMap));
           }
         }
       }
@@ -244,6 +367,16 @@ export async function GET(request: NextRequest) {
       detalles: incluirDetalles ? detallesMap : undefined,
       productos: incluirDetalles ? productosMap : undefined,
       total: pedidosFormateados.length,
+      // `total` se mantiene como el nº de pedidos devueltos por compatibilidad;
+      // el conteo global va en `paginacion.total`.
+      paginacion: {
+        page: paginar ? page : 1,
+        pageSize: paginar ? pageSize : totalPedidos,
+        total: totalPedidos,
+        totalPages: paginar ? totalPages : 1,
+        hasMore: paginar ? page < totalPages : false,
+        paginado: paginar,
+      },
       mensaje: 'Pedidos obtenidos exitosamente desde Airtable'
     });
 

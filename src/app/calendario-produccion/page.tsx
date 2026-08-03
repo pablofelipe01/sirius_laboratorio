@@ -557,6 +557,33 @@ const aplicacionesPorAno = {
   'prevencion-pestalotiopsis': 2
 };
 
+/**
+ * Números de página a mostrar, colapsando el resto con elipsis.
+ * Siempre incluye la primera, la última y las vecinas de la actual, para que la
+ * barra no crezca sin límite cuando haya muchas páginas.
+ */
+const getPaginasVisibles = (actual: number, total: number): Array<number | '…'> => {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const paginas = new Set<number>([1, total, actual]);
+  if (actual - 1 > 1) paginas.add(actual - 1);
+  if (actual + 1 < total) paginas.add(actual + 1);
+  // Relleno para que la barra no cambie de ancho al moverse por los extremos
+  if (actual <= 3) [2, 3, 4].forEach(p => p < total && paginas.add(p));
+  if (actual >= total - 2) [total - 3, total - 2, total - 1].forEach(p => p > 1 && paginas.add(p));
+
+  const ordenadas = [...paginas].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+
+  const resultado: Array<number | '…'> = [];
+  ordenadas.forEach((p, i) => {
+    if (i > 0 && p - ordenadas[i - 1] > 1) resultado.push('…');
+    resultado.push(p);
+  });
+  return resultado;
+};
+
 const estadosEvento = [
   { value: 'planificado', label: 'Presupuestada', color: 'bg-yellow-100 text-yellow-800' },
   { value: 'en-proceso', label: 'Confirmada', color: 'bg-blue-100 text-blue-800' },
@@ -620,6 +647,14 @@ export default function CalendarioProduccionPage() {
   const [pedidosProductos, setPedidosProductos] = useState<Record<string, any>>({});
   const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
   const [loadingPedidos, setLoadingPedidos] = useState(false);
+  // Paginación del grid de pedidos pendientes
+  const [pedidosPage, setPedidosPage] = useState(1);
+  const [pedidosPageSize, setPedidosPageSize] = useState(12);
+  const [pedidosPaginacion, setPedidosPaginacion] = useState<{
+    page: number; pageSize: number; total: number; totalPages: number; hasMore: boolean;
+  } | null>(null);
+  // Pedidos del mes visible del calendario (fuente independiente del grid)
+  const [pedidosDelMes, setPedidosDelMes] = useState<any[]>([]);
   const [selectedPedidoDetalle, setSelectedPedidoDetalle] = useState<any | null>(null);
   const [showPedidoDetalleModal, setShowPedidoDetalleModal] = useState(false);
   
@@ -907,8 +942,21 @@ export default function CalendarioProduccionPage() {
     fetchEventos();
     fetchClientes();
     fetchMicroorganismos();
-    fetchPedidosPendientes(); // Cargar pedidos pendientes al iniciar
+    // Los pedidos NO se cargan aquí: lo hace el efecto de paginación de abajo,
+    // que también corre al montar. Llamarlo en ambos sitios duplicaba la carga.
   }, []);
+
+  // Grid de pedidos: recarga al cambiar de página o de tamaño de página
+  useEffect(() => {
+    fetchPedidosPendientes(pedidosPage, pedidosPageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidosPage, pedidosPageSize]);
+
+  // Calendario: recarga los pedidos al cambiar de mes visible
+  useEffect(() => {
+    fetchPedidosDelMes(currentMonth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMonth]);
 
   // Inicializar microorganismos predeterminados al cargar el componente
   useEffect(() => {
@@ -1124,70 +1172,124 @@ export default function CalendarioProduccionPage() {
     }
   };
 
-  // Cargar pedidos pendientes
-  const fetchPedidosPendientes = async () => {
+  // Cargar una página de pedidos pendientes.
+  // Solo se traen los pedidos de la página visible: la verificación de stock
+  // cuesta ~6 s por cada 10 pedidos, así que pedirlos todos bloqueaba la vista
+  // casi un minuto. El calendario se alimenta aparte, con fetchPedidosDelMes.
+  const fetchPedidosPendientes = async (pagina = pedidosPage, tamano = pedidosPageSize) => {
     setLoadingPedidos(true);
     try {
-      // Obtener todos los pedidos con detalles incluidos
-      const response = await fetch('/api/pedidos-clientes?incluirDetalles=true');
+      const params = new URLSearchParams({
+        incluirDetalles: 'true',
+        excluirCancelados: 'true', // se filtra en el servidor: si no, las páginas quedan desiguales
+        page: String(pagina),
+        pageSize: String(tamano),
+      });
+      const response = await fetch(`/api/pedidos-clientes?${params.toString()}`);
       const data = await response.json();
-      
+
       if (data.success && data.pedidos) {
-        // Filtrar pedidos activos (incluir Completado para ver info al día, excluir solo Cancelados)
-        const pendientes = data.pedidos.filter((p: any) => 
-          p.estado !== 'Cancelado'
-        );
+        const pendientes = data.pedidos;
         setPedidosPendientes(pendientes);
-        
-        // Guardar detalles y productos
-        if (data.detalles) {
-          setPedidosDetalles(data.detalles);
-        }
-        if (data.productos) {
-          setPedidosProductos(data.productos);
-        }
-        
-        // Obtener nombres de clientes
-        const clienteIds = [...new Set(pendientes.map((p: any) => p.clienteId).filter(Boolean))];
-        if (clienteIds.length > 0) {
+        setPedidosPaginacion(data.paginacion || null);
+
+        // Se MEZCLA en vez de reemplazar porque estos mapas los comparte el
+        // calendario (getProductosPedido), que muestra pedidos de meses enteros
+        // y no solo los de la página visible del grid.
+        setPedidosDetalles(prev => ({ ...prev, ...(data.detalles || {}) }));
+        setPedidosProductos(prev => ({ ...prev, ...(data.productos || {}) }));
+
+        // Nombres de clientes: se cachean entre páginas, solo se pide si falta alguno
+        const clienteIds = [...new Set(pendientes.map((p: any) => p.clienteId).filter(Boolean))] as string[];
+        const faltanClientes = clienteIds.some(id => !clientesMap[id]);
+        if (faltanClientes) {
           const clientesResponse = await fetch('/api/clientes-core');
           const clientesData = await clientesResponse.json();
-          
+
           if (clientesData.success && clientesData.clientes) {
             const map: Record<string, string> = {};
             clientesData.clientes.forEach((c: any) => {
               map[c.id] = c.nombre;
             });
-            setClientesMap(map);
+            setClientesMap(prev => ({ ...prev, ...map }));
           }
         }
-        
-        console.log('📦 Pedidos pendientes cargados:', pendientes.length, 'de', data.pedidos.length, 'totales');
-        console.log('📅 Fechas de pedidos:', pendientes.map((p: any) => ({ id: p.idPedidoCore, fecha: p.fechaPedido })));
-        
-        // OPTIMIZACIÓN: Cargar progreso de todos los pedidos en batch
-        if (pendientes.length > 0) {
-          const pedidoIds = pendientes.map((p: any) => p.id).filter(Boolean);
-          if (pedidoIds.length > 0) {
-            // Cargar en chunks de 10 para no sobrecargar
-            const chunks = [];
-            for (let i = 0; i < pedidoIds.length; i += 10) {
-              chunks.push(pedidoIds.slice(i, i + 10));
-            }
-            
-            // Cargar chunks en paralelo
-            await Promise.all(chunks.map(chunk => calcularProgresoStockBatch(chunk)));
-          }
+
+        console.log(
+          `📦 Pedidos página ${data.paginacion?.page}/${data.paginacion?.totalPages}:`,
+          pendientes.length, 'de', data.paginacion?.total, 'totales'
+        );
+
+        // Verificar stock solo de esta página, en lotes de 10 (límite de la API).
+        // Los lotes van en SECUENCIA a propósito: cada pedido dispara varias
+        // consultas a Airtable y en paralelo se choca con el límite de 5 req/s
+        // por base (429). Lanzarlos a la vez no acelera, solo falla.
+        const pedidoIds = pendientes.map((p: any) => p.id).filter(Boolean);
+        for (let i = 0; i < pedidoIds.length; i += 10) {
+          await calcularProgresoStockBatch(pedidoIds.slice(i, i + 10));
         }
       } else {
         console.log('⚠️ No se obtuvieron pedidos:', data);
         setPedidosPendientes([]);
+        setPedidosPaginacion(null);
       }
     } catch (error) {
       console.error('❌ Error fetching pedidos pendientes:', error);
       setPedidosPendientes([]);
+      setPedidosPaginacion(null);
     } finally {
       setLoadingPedidos(false);
+    }
+  };
+
+  // Cargar los pedidos que el calendario necesita para ubicar por fecha.
+  // Trae mes anterior + actual + siguiente porque la rejilla son 42 celdas e
+  // incluye días de los meses vecinos.
+  //
+  // Pide detalles porque la celda muestra los productos en el tooltip vía
+  // getProductosPedido; sin esto, los pedidos que no estén en la página visible
+  // del grid saldrían "sin productos".
+  const fetchPedidosDelMes = async (fecha: Date) => {
+    try {
+      const params = new URLSearchParams({
+        year: String(fecha.getFullYear()),
+        month: String(fecha.getMonth() + 1),
+        excluirCancelados: 'true',
+        incluirDetalles: 'true',
+      });
+      const response = await fetch(`/api/pedidos-clientes?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.success && data.pedidos) {
+        setPedidosDelMes(data.pedidos);
+        setPedidosDetalles(prev => ({ ...prev, ...(data.detalles || {}) }));
+        setPedidosProductos(prev => ({ ...prev, ...(data.productos || {}) }));
+        console.log(`📅 Pedidos del mes ${params.get('year')}-${params.get('month')}:`, data.pedidos.length);
+      } else {
+        setPedidosDelMes([]);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching pedidos del mes:', error);
+      setPedidosDelMes([]);
+    }
+  };
+
+  // Recarga la página actual del grid + los pedidos del calendario.
+  const recargarPedidos = () => {
+    fetchPedidosPendientes(pedidosPage, pedidosPageSize);
+    fetchPedidosDelMes(currentMonth);
+  };
+
+  // Recarga volviendo a la página 1. Se usa tras crear un pedido: el orden es
+  // por fecha descendente, así que el nuevo aparece al principio.
+  const recargarPedidosDesdeInicio = () => {
+    fetchPedidosDelMes(currentMonth);
+    if (pedidosPage === 1) {
+      fetchPedidosPendientes(1, pedidosPageSize);
+    } else {
+      // Cambiar de página ya dispara el efecto que recarga; llamar además a
+      // fetchPedidosPendientes aquí provocaría una petición duplicada.
+      setPedidosPage(1);
     }
   };
 
@@ -1238,7 +1340,7 @@ export default function CalendarioProduccionPage() {
       
       if (data.success) {
         console.log('✅ Pedido guardado exitosamente');
-        fetchPedidosPendientes(); // Recargar pedidos pendientes
+        recargarPedidosDesdeInicio(); // El pedido nuevo queda en la página 1
         setShowPedidoModal(false);
       } else {
         console.error('❌ Error guardando pedido:', data.error);
@@ -1524,8 +1626,8 @@ export default function CalendarioProduccionPage() {
         setShowPedidoDetalleModal(false);
         setSelectedPedidoDetalle(null);
         
-        // Recargar pedidos pendientes
-        fetchPedidosPendientes();
+        // Recargar pedidos pendientes (se mantiene la página actual)
+        recargarPedidos();
       } else {
         console.error('❌ Error generando remisión:', data.error);
         alert('Error generando remisión: ' + data.error);
@@ -1728,7 +1830,11 @@ export default function CalendarioProduccionPage() {
             };
           }
         });
-        setProgresosPedidos(progresosMap);
+        // Merge, no reemplazo: la API acepta 10 pedidos por request, así que
+        // una página se resuelve en varios lotes. Con `setProgresosPedidos(map)`
+        // cada lote borraba el anterior y las tarjetas restantes se quedaban
+        // colgadas en "Calculando...".
+        setProgresosPedidos(prev => ({ ...prev, ...progresosMap }));
       }
     } catch (error) {
       console.error('Error calculando progreso batch:', error);
@@ -2528,14 +2634,24 @@ export default function CalendarioProduccionPage() {
     return filteredEventos.filter(e => e.fecha === dateStr);
   };
 
+  // Índice fecha -> pedidos del mes visible.
+  // Antes se filtraba la lista completa dentro del .map() de las 42 celdas
+  // (O(42×N) en cada render); ahora se construye una sola vez por mes.
+  const pedidosPorFecha = useMemo(() => {
+    const indice: Record<string, any[]> = {};
+    pedidosDelMes.forEach(p => {
+      const fecha = p.fechaPedido?.split('T')[0] || '';
+      if (!fecha) return;
+      if (!indice[fecha]) indice[fecha] = [];
+      indice[fecha].push(p);
+    });
+    return indice;
+  }, [pedidosDelMes]);
+
   // Obtener pedidos para una fecha específica
   const getPedidosForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    return pedidosPendientes.filter(p => {
-      // Normalizar la fecha del pedido (puede venir como ISO datetime o solo fecha)
-      const pedidoDateStr = p.fechaPedido?.split('T')[0] || '';
-      return pedidoDateStr === dateStr;
-    });
+    return pedidosPorFecha[dateStr] || [];
   };
 
   const formatDate = (dateStr: string) => {
@@ -2694,7 +2810,7 @@ export default function CalendarioProduccionPage() {
               <button
                 onClick={() => {
                   fetchClientesPedidos();
-                  fetchPedidosPendientes();
+                  recargarPedidos();
                   setShowPedidoModal(true);
                 }}
                 className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 focus:ring-4 focus:ring-indigo-500/20 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center"
@@ -2733,14 +2849,15 @@ export default function CalendarioProduccionPage() {
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <span className="text-2xl">📦</span>
                 Pedidos Pendientes de Programación
-                {pedidosPendientes.length > 0 && (
+                {/* El contador muestra el TOTAL del servidor, no los de la página */}
+                {(pedidosPaginacion?.total ?? pedidosPendientes.length) > 0 && (
                   <span className="ml-2 px-2 py-1 bg-indigo-100 text-indigo-700 text-sm rounded-full">
-                    {pedidosPendientes.length}
+                    {pedidosPaginacion?.total ?? pedidosPendientes.length}
                   </span>
                 )}
               </h3>
               <button
-                onClick={() => fetchPedidosPendientes()}
+                onClick={() => recargarPedidos()}
                 className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
               >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2925,6 +3042,77 @@ export default function CalendarioProduccionPage() {
                 </button>
               </div>
             ) : null}
+
+            {/* Controles de paginación */}
+            {pedidosPaginacion && pedidosPaginacion.total > 0 && (
+              <div className="mt-5 pt-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3 text-sm text-gray-600">
+                  <span>
+                    Mostrando{' '}
+                    <span className="font-semibold text-gray-900">
+                      {(pedidosPaginacion.page - 1) * pedidosPaginacion.pageSize + 1}
+                      {'-'}
+                      {Math.min(pedidosPaginacion.page * pedidosPaginacion.pageSize, pedidosPaginacion.total)}
+                    </span>{' '}
+                    de <span className="font-semibold text-gray-900">{pedidosPaginacion.total}</span>
+                  </span>
+                  <label className="flex items-center gap-1">
+                    <span className="hidden sm:inline">por página:</span>
+                    <select
+                      value={pedidosPageSize}
+                      onChange={(e) => {
+                        setPedidosPage(1); // cambiar el tamaño invalida la página actual
+                        setPedidosPageSize(Number(e.target.value));
+                      }}
+                      disabled={loadingPedidos}
+                      className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-50"
+                    >
+                      {[6, 12, 24, 48].map(n => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPedidosPage(p => Math.max(1, p - 1))}
+                    disabled={pedidosPaginacion.page <= 1 || loadingPedidos}
+                    className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    ‹ Ant
+                  </button>
+
+                  {getPaginasVisibles(pedidosPaginacion.page, pedidosPaginacion.totalPages).map((p, i) =>
+                    p === '…' ? (
+                      <span key={`gap-${i}`} className="px-2 text-gray-400 select-none">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPedidosPage(p as number)}
+                        disabled={loadingPedidos}
+                        aria-current={p === pedidosPaginacion.page ? 'page' : undefined}
+                        className={`min-w-[2rem] px-2 py-1.5 text-sm rounded-md border transition-colors disabled:cursor-not-allowed ${
+                          p === pedidosPaginacion.page
+                            ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
+                            : 'border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    onClick={() => setPedidosPage(p => Math.min(pedidosPaginacion.totalPages, p + 1))}
+                    disabled={!pedidosPaginacion.hasMore || loadingPedidos}
+                    className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Sig ›
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Loading Pedidos Indicator */}
