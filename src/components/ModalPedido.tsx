@@ -442,7 +442,7 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
       formDataAudio.append('model', 'whisper-1');
       formDataAudio.append('language', 'es');
       
-      const response = await fetch('/api/transcribe', {
+      const response = await fetch('/api/audio-transcribe', {
         method: 'POST',
         body: formDataAudio,
       });

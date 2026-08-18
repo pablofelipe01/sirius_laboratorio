@@ -489,7 +489,7 @@ export default function SIRIUS3DInterface() {
       formData.append('audio', audioBlob, 'recording.wav');
       
       // Enviar audio a la API de transcripción
-      const transcriptionResponse = await fetch('/api/transcribe', {
+      const transcriptionResponse = await fetch('/api/audio-transcribe', {
         method: 'POST',
         body: formData,
       });

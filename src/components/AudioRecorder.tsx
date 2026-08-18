@@ -107,7 +107,7 @@ const AudioRecorder = ({ onTranscriptionComplete, currentText, onTextChange }: A
       // Obtener token de autorización del localStorage
       const token = localStorage.getItem('token');
       
-      const response = await fetch('/api/transcribe', {
+      const response = await fetch('/api/audio-transcribe', {
         method: 'POST',
         headers: {
           'authorization': `Bearer ${token}`,

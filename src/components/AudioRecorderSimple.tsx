@@ -87,9 +87,9 @@ const AudioRecorderSimple = ({ onTranscriptionComplete, currentText, onTextChang
       formData.append('language', 'es');
       formData.append('response_format', 'text');
       
-      console.log('📡 AUDIO: Enviando a /api/transcribe...');
+      console.log('📡 AUDIO: Enviando a /api/audio-transcribe...');
       
-      const response = await fetch('/api/transcribe', {
+      const response = await fetch('/api/audio-transcribe', {
         method: 'POST',
         body: formData,
       });

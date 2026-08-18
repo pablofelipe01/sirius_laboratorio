@@ -373,6 +373,38 @@ export const SIRIUS_NOMINA_CORE_CONFIG = {
   DATALAB_APP_CODE: 'SIRIUS-APP-0001',
 } as const;
 
+/**
+ * Novedades Nomina — permisos, vacaciones y novedades del colaborador.
+ *
+ * Las escribe @sirius/solicitudes, no DataLab: aqui solo viven las credenciales y
+ * los nombres de tabla, que se le pasan al paquete desde
+ * src/lib/solicitudes/airtable.ts. Es la misma base que usan Gestion del Ser y
+ * PiroliApp, asi que los nombres de tabla son los de esa base.
+ */
+export const SIRIUS_NOVEDADES_NOMINA_CONFIG = {
+  BASE_ID: process.env.AIRTABLE_BASE_ID_NOVEDADES_NOMINA!,
+  /**
+   * ⚠️ Aqui la key ESPECIFICA tiene prioridad sobre la global, al contrario que en
+   * las demas bases. La PAT global de DataLab no incluye Novedades Nomina: con ella
+   * Airtable responde 403 en todas sus tablas. Pasar por `getApiKey()` —que
+   * prefiere la global— dejaria el modulo de solicitudes sin acceso.
+   *
+   * Si algun dia se le agrega esa base a la PAT global, esta linea puede volver a
+   * `getApiKey(...)` y la key especifica sobra.
+   */
+  API_KEY:
+    process.env.AIRTABLE_API_KEY_NOVEDADES_NOMINA ||
+    getApiKey(undefined, 'Novedades Nomina'),
+
+  TABLES: {
+    PERMISO: process.env.AIRTABLE_TABLE_SOLICITUD_PERMISO,
+    VACACIONES: process.env.AIRTABLE_TABLE_SOLICITUD_VACACIONES,
+    NOVEDADES: process.env.AIRTABLE_TABLE_NOVEDADES_NOMINA,
+    // Saldo del beneficio de dia siriano.
+    DIAS_SIRIANOS: process.env.AIRTABLE_TABLE_DIAS_SIRIANOS,
+  },
+} as const;
+
 // Helper para construir URLs de la API
 export const buildAirtableUrl = (tableId: string, recordId?: string, baseId?: string) => {
   const base = baseId || AIRTABLE_CONFIG.BASE_ID;

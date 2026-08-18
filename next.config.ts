@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // @sirius/solicitudes se distribuye en TypeScript, sin build: lo transpila la
+  // app que lo consume. Sin esta línea Next intenta ejecutar sus .ts tal cual.
+  transpilePackages: ["@sirius/solicitudes"],
   compiler: {
     // Remover console.log en producción
     removeConsole: process.env.NODE_ENV === "production" ? {

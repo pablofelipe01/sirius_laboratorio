@@ -84,6 +84,9 @@ src/
 ├── contexts/
 │   └── AuthContext.tsx             # Context para autenticación
 │
+├── solicitudes/                    # (en app/) Permisos, vacaciones y novedades —
+│                                   # los componentes son de @sirius/solicitudes
+│
 ├── lib/                            # Lógica de negocio
 │   ├── auth.ts                     # signJWT(), verifyJWT(), hashPassword(), verifyPassword()
 │   ├── s3.ts                       # Subida archivos AWS S3
@@ -228,15 +231,72 @@ Los campos calculados en Airtable (`Abreviatura Hongo`, `Abreviatura`, `Microorg
 - `MushroomInoculationForm.tsx`: Se pasa `abreviaturaSeleccionada={formData.microorganismAbreviatura}` al `CepaSelector`.
 - `CepaSelector.tsx`: En `handleAgregarCepa`, la abreviatura usa fallback: `rawAbreviatura || abreviaturaSeleccionada || ''`, cubriendo cepas antiguas sin linked record.
 
+## Solicitudes de Nómina — el paquete `@sirius/solicitudes`
+
+`/solicitudes` y `/api/solicitudes/**` **no son código de DataLab**: los trae el
+paquete `@sirius/solicitudes`, el mismo módulo que usan Gestión del Ser y
+PiroliApp. Se instala desde el tarball versionado en `vendor/`, se distribuye en
+TypeScript sin build (de ahí `transpilePackages` en `next.config.ts`) y sus
+primitivas visuales entran por `globals.css` con un `@source` — Tailwind no
+escanea `node_modules`, y sin él los formularios salen sin estilos.
+
+| Lo que DataLab le inyecta | Archivo |
+|---|---|
+| Sesión (`idCore`, nombre, cédula) | `src/lib/solicitudes/auth.ts` |
+| Base y tablas de Airtable | `src/lib/solicitudes/airtable.ts` |
+| Almacenamiento de firma y PDF | `src/lib/solicitudes/infra.ts` |
+| Cromado (foto, Navbar, Footer) | `src/components/SolicitudesShell.tsx` |
+| Perfil del colaborador | `src/app/api/me/route.ts` |
+| Servir el documento con control de acceso | `src/app/api/documentos/permiso/[id]/route.ts` |
+
+⚠️ **No lo aliases en `tsconfig.json` ni copies su `src/` al repo.** Se resuelve
+por el `exports` de su package.json, como cualquier dependencia. Una copia local
+se queda atrás en silencio: en PiroliApp llegó a estar doce archivos desactualizada.
+
+Cuatro cosas que no se pueden aflojar:
+
+**La PAT global NO sirve para Novedades Nómina.** `AIRTABLE_API_KEY_GLOBAL` no
+incluye esa base: con ella Airtable responde 403 en todas sus tablas. Por eso
+`SIRIUS_NOVEDADES_NOMINA_CONFIG` es la única config donde la key **específica**
+(`AIRTABLE_API_KEY_NOVEDADES_NOMINA`) tiene prioridad sobre la global, al revés
+que el resto. Si algún día se agrega esa base a la PAT global, se puede volver a
+`getApiKey(...)`.
+
+**La firma y el PDF van al bucket de nómina, no al de DataLab.** La
+`Firma_S3_Key` y la `PDF_Autorizacion_S3_Key` que quedan en Airtable las resuelve
+Gestión del Ser contra `S3_BUCKET_FIRMAS` para servir el documento. Escribirlas en
+el bucket de remisiones dejaría el permiso radicado y su respaldo inaccesible, sin
+error visible en ninguna de las apps.
+
+**El día siriano está encendido**, y eso arrastra dos requisitos. Ese permiso nace
+autorizado: su único respaldo es el PDF que se emite al radicarlo. El documento lo
+genera el paquete (`@sirius/solicitudes/dia-siriano`), pero necesita
+**`FIRMA_GESTION_SER_BASE64`** en el entorno del despliegue —una firma manuscrita,
+que no va al repositorio ni a los tests, que usan el trazo sintético del paquete— y
+un endpoint que sirva el PDF. Sin cualquiera de los dos, el handler responde 400
+antes de registrar nada, que es mejor que un permiso concedido sin respaldo.
+
+**`/api/documentos/permiso/[id]` sirve solo al dueño.** El PDF lleva el motivo del
+permiso —a menudo médico—, la cédula y la firma manuscrita, así que tener sesión no
+basta. La regla es completa para DataLab: esta app no autoriza solicitudes ni tiene
+jefaturas con potestad sobre ellas (eso vive en Gestión del Ser, que además abre el
+documento a quien autorizó). Al denegar responde **404, no 403**: un 403 confirmaría
+que el registro existe. El cliente nunca nombra el archivo y el PDF se transmite por
+el route — una URL firmada sale del perímetro y funciona sin sesión mientras viva.
+
 ## Verificación de Cambios
 
 Después de cada cambio:
 ```bash
 npx tsc --noEmit     # Type-check todo
-npm run lint         # ESLint strict
+npx eslint src       # ESLint strict
 npm run build        # Build exitoso
-npx vitest run       # Tests pasan (si existen)
+npx vitest run       # Tests pasan
 ```
+
+⚠️ `npm run lint` está roto: Next 16 retiró `next lint` y el script intenta usarlo
+como directorio (`no such directory: .../lint`). Usa `npx eslint` mientras no se
+migre con `npx @next/codemod@canary next-lint-to-eslint-cli .`.
 
 ## Testing
 
@@ -247,5 +307,5 @@ npx vitest run       # Tests pasan (si existen)
 
 ---
 
-**Última actualización**: 2026-05-08
+**Última actualización**: 2026-08-14 — se integró @sirius/solicitudes
 **Mantenido por**: DataLab Development Team
