@@ -355,6 +355,93 @@ export const SIRIUS_INVENTARIO_CONFIG = {
 // Tipo para los tipos de movimiento
 export type TipoMovimiento = typeof SIRIUS_INVENTARIO_CONFIG.TIPOS_MOVIMIENTO[number];
 
+/**
+ * Sirius Insumos Core — inventario central de insumos.
+ *
+ * Es la fuente de verdad del catálogo y del stock para TODAS las áreas
+ * (laboratorio, pirólisis, bodega…), no solo DataLab. De ahí las dos reglas que
+ * no se pueden aflojar al escribir contra esta base:
+ *
+ * 1. Toda consulta de DataLab filtra por `Areas Consumidoras = LABORATORIO`.
+ *    Sin ese filtro la pantalla de inventario mostraría los EPP de SG-SST y los
+ *    rodamientos de pirólisis.
+ * 2. El stock NO se escribe. `Stock Insumos.stock_actual` es una fórmula sobre
+ *    los movimientos; para cambiarlo se crea un movimiento de Entrada o Salida.
+ *    Un PATCH al stock no hace nada, o peor, desvincula movimientos.
+ */
+export const SIRIUS_INSUMOS_CORE_CONFIG = {
+  BASE_ID: process.env.AIRTABLE_BASE_ID_SIRIUS_INSUMOS_CORE!,
+  API_KEY: getApiKey(process.env.AIRTABLE_API_KEY_SIRIUS_INSUMOS_CORE, 'Insumos Core'),
+
+  TABLES: {
+    INSUMO: process.env.AIRTABLE_TABLE_INSUMOS_CORE!,
+    CATEGORIA_INSUMO: process.env.AIRTABLE_TABLE_CATEGORIA_INSUMO!,
+    MOVIMIENTOS_INSUMOS: process.env.AIRTABLE_TABLE_MOVIMIENTOS_INSUMOS!,
+    STOCK_INSUMOS: process.env.AIRTABLE_TABLE_STOCK_INSUMOS!,
+    UNIDADES_MEDIDA: process.env.AIRTABLE_TABLE_UNIDADES_MEDIDA!,
+  },
+
+  FIELDS_INSUMO: {
+    CODIGO: 'fldeUCMzp6tJ6dZ8f',          // Fórmula: "SIRIUS-INS-0001"
+    NOMBRE: 'fldlN1KUUwvUMTNnL',
+    UNIDAD_MEDIDA: 'fldLqx2lI9JVuxBq1',   // Texto: "Gramo", "Unidad"…
+    STOCK_MINIMO: 'fldMpMULElLJsFXh5',
+    ESTADO: 'fldiCicFKdQOSe4fP',          // Activo | Inactivo | Stock
+    FICHA_TECNICA: 'fldxdUz1sFtXIsdrz',
+    ID_AREA_ORIGEN: 'fld9OhYxSPiyKk1Rv',
+    CATEGORIA: 'fldZTFz5K59GmqTHI',       // Link a Categoria Insumo
+    UNIDAD_BASE: 'fldfgSdE4cnZbBPkS',     // Link a Unidades de Medida
+    AREAS_CONSUMIDORAS: 'fldUVxX3q6P6E62Sl',
+    STOCK_INSUMOS: 'fldMY0QQJck78B1QQ',   // Link a Stock Insumos
+    MOVIMIENTOS: 'fld1tfJCZaKkvywAr',     // Link a Movimientos Insumos
+  },
+
+  FIELDS_MOVIMIENTO: {
+    CODIGO: 'fldjCqMWMmanTv81b',          // Fórmula: "MOV-INS-0001"
+    NAME: 'fldvwtPxOU4fngeFf',
+    CANTIDAD: 'fldNqXz0y9hIzCl3h',
+    TIPO: 'fldR73QCuG50qKs19',            // Entrada | Salida | Ajuste
+    FECHA_MOVIMIENTO: 'fld3oY6plYhoRY8LW',
+    INSUMO: 'fldhoQTHQ8R3TjaTO',          // Link a Insumo
+    STOCK_INSUMOS: 'fldSllxbnU1oQZyns',   // Link a Stock Insumos
+    ID_RESPONSABLE: 'fldFNuAsLQeaOWrTm',
+    ID_AREA_ORIGEN: 'fldEIxRDq2uWaJ2kr',
+    ID_AREA_DESTINO: 'fldQN68Eo1tke7Bsz',
+    // Añadidos para el inventario de laboratorio (2026-09)
+    FECHA_VENCIMIENTO: 'fldsFiS7zwfdDi0TH',
+    LOTE: 'fld7QaRmTJyhkjl5K',
+    ENTRADA_ORIGEN: 'fldBuxsaFE0JawKWj',  // Auto-link: Salida -> Entrada consumida
+    SALIDAS_DEL_LOTE: 'fld8mbWaAFKz4qQud', // Inverso de ENTRADA_ORIGEN
+  },
+
+  FIELDS_STOCK: {
+    ID_STOCK: 'fldn5yWn6Jp90vlEF',
+    STOCK_ACTUAL: 'fldwjNFIqaiWqxGWt',    // Fórmula: entradas - salidas
+    INSUMO: 'fldd4FXvfUD58HkA4',
+    MOVIMIENTOS: 'fldq9IX3Bv1kxRfIU',
+  },
+
+  FIELDS_CATEGORIA: {
+    CODIGO: 'fldZ9Z5hd0Lyjjqzz',
+    TIPO_INSUMO: 'flda3RXqbJvQxlTQS',
+    DESCRIPCION: 'fld8NUeBl1OoKhVHq',
+  },
+
+  FIELDS_UNIDAD: {
+    NOMBRE: 'fldbtznmIqWbn9513',
+    SIMBOLO: 'fldJtFjcECqTqnFTT',
+    TIPO: 'fldrqhYtgFRkrdpKV',
+    FACTOR_A_BASE: 'fldxwCGs8Mx9Y2Ozm',
+  },
+
+  /** El área de DataLab dentro de Areas Consumidoras. */
+  AREA_LABORATORIO: 'LABORATORIO',
+
+  TIPOS_MOVIMIENTO: ['Entrada', 'Salida', 'Ajuste'] as const,
+} as const;
+
+export type TipoMovimientoInsumo = typeof SIRIUS_INSUMOS_CORE_CONFIG.TIPOS_MOVIMIENTO[number];
+
 // ============================================================================
 // Configuración para Sirius Nómina Core
 // Sistema de gestión de personal y autenticación
@@ -459,6 +546,17 @@ export const buildSiriusRemisionesCoreUrl = (tableId: string, recordId?: string)
 // Headers específicos para Sirius Remisiones Core
 export const getSiriusRemisionesCoreHeaders = () => ({
   'Authorization': `Bearer ${SIRIUS_REMISIONES_CORE_CONFIG.API_KEY}`,
+  'Content-Type': 'application/json',
+});
+
+// Helper específico para Sirius Insumos Core
+export const buildSiriusInsumosCoreUrl = (tableId: string, recordId?: string) => {
+  return buildAirtableUrl(tableId, recordId, SIRIUS_INSUMOS_CORE_CONFIG.BASE_ID);
+};
+
+// Headers específicos para Sirius Insumos Core
+export const getSiriusInsumosCoreHeaders = () => ({
+  'Authorization': `Bearer ${SIRIUS_INSUMOS_CORE_CONFIG.API_KEY}`,
   'Content-Type': 'application/json',
 });
 

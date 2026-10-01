@@ -12,19 +12,74 @@ interface Insumo {
     ID?: string;
     nombre?: string;
     categoria_insumo?: string;
+    categoriaId?: string | null;
     unidad_medida?: string;
     'Unidad Ingresa Insumo'?: string;
     'Cantidad Presentacion Insumo'?: number;
     descripcion?: string;
     'Rango Minimo Stock'?: number;
     estado?: string;
+    'Estado Insumo'?: string;
     'Total Cantidad Producto'?: number;
     'Total Actual Insumos'?: number;
-    'cantidad Entrada Insumos'?: number[];
-    'Cantidad Salida Insumos'?: number[];
-    'ID_Entrada Insumos'?: string[];
-    'Salida Insumos'?: string[];
   };
+}
+
+/** Categoría de Sirius Insumos Core, tal como la sirve /api/insumos-catalogo. */
+interface CategoriaCore {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+}
+
+interface UnidadCore {
+  id: string;
+  nombre: string;
+  simbolo: string;
+  tipo: string;
+  factorABase: number;
+}
+
+/**
+ * Un lote es un movimiento de Entrada de Core con lo que aún queda de él.
+ * Sustituye a los registros de la tabla `Entrada Insumos` de DataLab.
+ */
+interface LoteInsumo {
+  id: string;
+  codigo: string;
+  cantidadIngresada: number;
+  cantidadDisponible: number;
+  fechaMovimiento: string | null;
+  fechaVencimiento: string | null;
+  lote: string | null;
+  estadoVencimiento: 'vencido' | 'proximo' | 'vigente' | 'sin_fecha';
+}
+
+function formatearFecha(fecha: string | null): string {
+  if (!fecha) return 'Sin fecha';
+  // Las fechas de Core llegan como YYYY-MM-DD; sin la hora, el navegador las
+  // interpreta en UTC y en Colombia se ven un día antes.
+  const d = new Date(`${fecha}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? fecha : d.toLocaleDateString('es-CO');
+}
+
+function etiquetaVencimiento(lote: LoteInsumo): string {
+  switch (lote.estadoVencimiento) {
+    case 'vencido': return `⛔ Vencido ${formatearFecha(lote.fechaVencimiento)}`;
+    case 'proximo': return `⚠️ Vence ${formatearFecha(lote.fechaVencimiento)}`;
+    case 'vigente': return `✅ Vence ${formatearFecha(lote.fechaVencimiento)}`;
+    default: return '➖ Sin vencimiento';
+  }
+}
+
+function colorVencimiento(estado: LoteInsumo['estadoVencimiento']): string {
+  switch (estado) {
+    case 'vencido': return 'text-red-700';
+    case 'proximo': return 'text-yellow-700';
+    case 'vigente': return 'text-green-700';
+    default: return 'text-gray-700';
+  }
 }
 
 const StockInsumosPage = () => {
@@ -34,7 +89,7 @@ const StockInsumosPage = () => {
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [filtroCategoria, setFiltroCategoria] = useState<string>('todos');
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('ver-todas');
   const [searchText, setSearchText] = useState('');
   
   // Estados para formularios
@@ -46,7 +101,7 @@ const StockInsumosPage = () => {
   const [newInsumoData, setNewInsumoData] = useState({
     insumos: [{
       nombre: '',
-      categoria_insumo: 'Materiales y Suministros Generales',
+      categoria_insumo: '',
       unidad_medida: '',
       descripcion: '',
       cantidadPresentacion: '',
@@ -83,54 +138,58 @@ const StockInsumosPage = () => {
   const [searchInsumoDescontar, setSearchInsumoDescontar] = useState<{[key: number]: string}>({});
   const [dropdownOpenDescontar, setDropdownOpenDescontar] = useState<{[key: number]: boolean}>({});
 
-  // Nuevo estado para manejar las entradas disponibles
-  const [entradasDisponibles, setEntradasDisponibles] = useState<{[key: number]: any[]}>({});
+  // Lotes disponibles por fila del formulario de descontar
+  const [entradasDisponibles, setEntradasDisponibles] = useState<{[key: number]: LoteInsumo[]}>({});
   const [loadingEntradas, setLoadingEntradas] = useState<{[key: number]: boolean}>({});
 
   // Cantidades específicas por insumo (ya no se usa, eliminar)
   // const [cantidadesPorInsumo, setCantidadesPorInsumo] = useState<{[key: string]: number}>({});
 
-  // Categorías disponibles basadas en los datos reales de Airtable
-  // Categorías exactas de Airtable
-  const categorias = [
-    "Materiales y Suministros Generales",
-    "Reactivos y Químicos", 
-    "Equipo de Protección Personal",
-    "Productos de Limpieza y Desinfección",
-    "Equipos y Herramientas",
-    "Material de Laboratorio",
-    "Contenedores y Almacenamiento",
-    "Equipos de Laboratorio"
-  ];
+  // Categorías y unidades vienen de Sirius Insumos Core, que es quien valida al
+  // escribir: una categoría inventada aquí hacía fallar el POST.
+  const [categoriasCore, setCategoriasCore] = useState<CategoriaCore[]>([]);
+  const [unidadesCore, setUnidadesCore] = useState<UnidadCore[]>([]);
+  const [catalogoError, setCatalogoError] = useState('');
 
-  // Categorías que se muestran por defecto (elementos básicos de laboratorio y EPPs)
-  const categoriasBasicas = [
-    "Materiales y Suministros Generales", 
-    "Equipo de Protección Personal"
-  ];
-
-  // Unidades de medida dinámicas extraídas de los insumos existentes en Airtable
-  const unidadesMedida = useMemo(() => {
-    const unidadesSet = new Set<string>();
-    insumos.forEach(insumo => {
-      const unidad = insumo.fields['Unidad Ingresa Insumo'] || insumo.fields.unidad_medida;
-      if (unidad && typeof unidad === 'string' && unidad.trim()) {
-        unidadesSet.add(unidad.trim());
-      }
-    });
-    // Convertir a array y ordenar alfabéticamente
-    return Array.from(unidadesSet).sort();
-  }, [insumos]);
-
-  // Mantener "UNIDAD" como opción por defecto si no hay insumos
-  const unidadesDisponibles = unidadesMedida.length > 0 ? unidadesMedida : ["UNIDAD"];
+  const categorias = useMemo(() => categoriasCore.map(c => c.nombre), [categoriasCore]);
 
   // Cargar datos al iniciar
   useEffect(() => {
     fetchInsumos();
+    fetchCatalogo();
   }, []);
 
-  // Función para cargar entradas disponibles de un insumo específico
+  /** Lo que queda del lote elegido en esa fila del formulario, o null si no hay lote. */
+  const disponibleDelLote = (index: number, loteId: string): number | null => {
+    if (!loteId) return null;
+    const lote = (entradasDisponibles[index] || []).find(l => l.id === loteId);
+    return lote ? lote.cantidadDisponible : null;
+  };
+
+  const fetchCatalogo = async () => {
+    try {
+      const response = await fetch('/api/insumos-catalogo');
+      const data = await response.json();
+
+      if (data.success) {
+        setCategoriasCore(data.categorias || []);
+        setUnidadesCore(data.unidades || []);
+        setCatalogoError('');
+      } else {
+        setCatalogoError(data.error || 'No se pudo cargar el catálogo de Insumos Core');
+      }
+    } catch (error) {
+      console.error('Error al cargar el catálogo:', error);
+      setCatalogoError('No se pudo cargar el catálogo de Insumos Core');
+    }
+  };
+
+  /**
+   * Lotes disponibles de un insumo.
+   *
+   * En Core el lote es un movimiento de Entrada, no un registro de una tabla
+   * aparte. Vienen ordenados por vencimiento: el primero es el que toca gastar.
+   */
   const fetchEntradasDisponibles = async (insumoId: string, index: number) => {
     if (!insumoId) {
       setEntradasDisponibles(prev => ({ ...prev, [index]: [] }));
@@ -140,17 +199,17 @@ const StockInsumosPage = () => {
     setLoadingEntradas(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch(`/api/entrada-insumos?insumoId=${insumoId}&disponibles=true`);
+      const response = await fetch(`/api/insumos-lotes?insumoId=${insumoId}`);
       const data = await response.json();
 
       if (data.success) {
-        setEntradasDisponibles(prev => ({ ...prev, [index]: data.entradas || [] }));
+        setEntradasDisponibles(prev => ({ ...prev, [index]: data.lotes || [] }));
       } else {
-        console.error('Error al cargar entradas:', data.error);
+        console.error('Error al cargar lotes:', data.error);
         setEntradasDisponibles(prev => ({ ...prev, [index]: [] }));
       }
     } catch (error) {
-      console.error('Error al cargar entradas disponibles:', error);
+      console.error('Error al cargar lotes disponibles:', error);
       setEntradasDisponibles(prev => ({ ...prev, [index]: [] }));
     } finally {
       setLoadingEntradas(prev => ({ ...prev, [index]: false }));
@@ -192,91 +251,60 @@ const StockInsumosPage = () => {
     setSubmitStatus('idle');
 
     try {
-      // Validar que hay al menos un insumo válido
+      // Core no modela presentaciones, así que ya no se exige ese campo: basta
+      // nombre, categoría y unidad. La cantidad inicial es opcional — un insumo
+      // puede entrar al catálogo con stock cero y recibir material después.
       const insumosValidos = newInsumoData.insumos.filter(
-        insumo => insumo.nombre.trim() !== '' && 
-                  insumo.cantidadPresentacion && 
-                  Number(insumo.cantidadPresentacion) > 0 &&
-                  insumo.cantidadInicial && 
-                  Number(insumo.cantidadInicial) >= 1
+        insumo => insumo.nombre.trim() !== '' && insumo.categoria_insumo && insumo.unidad_medida
       );
-      
+
       if (insumosValidos.length === 0) {
-        alert('Debe agregar al menos un insumo con nombre, cantidad de presentación y cantidad inicial válidos (mínimo 1).');
+        alert('Cada insumo necesita al menos nombre, categoría y unidad de medida.');
         setIsSubmitting(false);
         return;
       }
 
-      console.log('📝 STOCK-INSUMOS: Creando insumos con datos:', insumosValidos);
-      console.log('👤 STOCK-INSUMOS: Usuario que registra:', user?.nombre || 'Usuario no identificado');
-      
-      // Crear cada insumo individualmente
       let successCount = 0;
       let errorCount = 0;
-      
+      const fallos: string[] = [];
+
       for (const insumo of insumosValidos) {
         try {
-          // PASO 1: Crear el insumo en la tabla Insumos Laboratorio
-          console.log(`🔸 Creando insumo: ${insumo.nombre}`);
-          const insumoResponse = await fetch('/api/stock-insumos', {
+          // Una sola llamada: el endpoint crea el insumo en Core y, si viene
+          // cantidad inicial, su movimiento de Entrada. Antes eran dos fetch y
+          // un fallo en el segundo dejaba el insumo sin stock y sin aviso claro.
+          const response = await fetch('/api/stock-insumos', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               nombre: insumo.nombre,
               categoria_insumo: insumo.categoria_insumo,
               unidad_medida: insumo.unidad_medida,
-              cantidadPresentacion: Number(insumo.cantidadPresentacion),
               descripcion: insumo.descripcion || '',
-              realizaRegistro: user?.nombre || 'Usuario no identificado'
+              cantidadInicial: Number(insumo.cantidadInicial) || 0,
+              fechaVencimiento: insumo.fechaVencimiento || null,
+              realizaRegistro: user?.nombre || 'Usuario no identificado',
             }),
           });
 
-          const insumoData = await insumoResponse.json();
-          console.log(`📋 Response insumo ${insumo.nombre}:`, insumoData);
+          const data = await response.json();
 
-          if (insumoData.success && insumoData.insumo?.id) {
-            // PASO 2: Crear la entrada inicial en la tabla Entrada Insumos
-            console.log(`🔸 Creando entrada inicial para insumo ID: ${insumoData.insumo.id}`);
-            console.log(`👤 Entrada registrada por: ${user?.nombre || 'Usuario no identificado'}`);
-            const entradaResponse = await fetch('/api/entrada-insumos', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                records: [{
-                  fields: {
-                    'Insumos Laboratorio': [insumoData.insumo.id],
-                    'Cantidad Ingresa Insumo': Number(insumo.cantidadInicial),
-                    'Realiza Registro': user?.nombre || 'Usuario no identificado',
-                    ...(insumo.fechaVencimiento && { 'fecha_vencimiento': insumo.fechaVencimiento })
-                  }
-                }]
-              }),
-            });
-
-            const entradaData = await entradaResponse.json();
-            console.log(`📋 Response entrada ${insumo.nombre}:`, entradaData);
-
-            if (entradaData.success) {
-              successCount++;
-              console.log(`✅ Insumo ${insumo.nombre} creado exitosamente con entrada inicial`);
-            } else {
-              errorCount++;
-              console.error(`❌ Error al crear entrada para ${insumo.nombre}:`, entradaData.error);
-              // El insumo se creó pero la entrada falló
-              alert(`Insumo ${insumo.nombre} creado, pero error al registrar entrada inicial: ${entradaData.error}`);
-            }
+          if (data.success) {
+            successCount++;
           } else {
             errorCount++;
-            console.error(`❌ Error al crear insumo ${insumo.nombre}:`, insumoData.error);
+            fallos.push(`${insumo.nombre}: ${data.details || data.error}`);
+            console.error(`❌ Error al crear ${insumo.nombre}:`, data);
           }
         } catch (error) {
           errorCount++;
+          fallos.push(`${insumo.nombre}: no se pudo contactar el servidor`);
           console.error(`❌ Error de red para ${insumo.nombre}:`, error);
         }
+      }
+
+      if (fallos.length > 0) {
+        alert(`No se pudieron crear ${fallos.length} insumo(s):\n\n${fallos.join('\n')}`);
       }
 
       if (successCount > 0) {
@@ -284,8 +312,8 @@ const StockInsumosPage = () => {
         setNewInsumoData({
           insumos: [{
             nombre: '',
-            categoria_insumo: 'Materiales y Suministros Generales',
-            unidad_medida: 'UNIDAD',
+            categoria_insumo: '',
+            unidad_medida: '',
             descripcion: '',
             cantidadPresentacion: '',
             cantidadInicial: '',
@@ -336,23 +364,24 @@ const StockInsumosPage = () => {
       return;
     }
 
-    // Validar que todas las entradas seleccionadas están disponibles
+    // Validar contra lo que queda de cada lote. El servidor lo vuelve a
+    // comprobar antes de escribir, porque el stock pudo moverse mientras el
+    // formulario estaba abierto.
     for (let i = 0; i < insumosValidos.length; i++) {
       const insumo = insumosValidos[i];
       const index = descontarData.insumos.findIndex(item => item.insumoId === insumo.insumoId && item.entradaId === insumo.entradaId);
-      const entradas = entradasDisponibles[index] || [];
-      const entradaSeleccionada = entradas.find(entrada => entrada.id === insumo.entradaId);
-      
-      if (!entradaSeleccionada) {
-        alert(`La entrada seleccionada para el insumo no está disponible. Por favor, seleccione otra entrada.`);
+      const lotes = entradasDisponibles[index] || [];
+      const loteSeleccionado = lotes.find(lote => lote.id === insumo.entradaId);
+
+      if (!loteSeleccionado) {
+        alert('El lote seleccionado ya no está disponible. Elija otro lote.');
         return;
       }
-      
-      const stockDisponible = entradaSeleccionada.fields['Total Cantidad Granel Actual'] || 0;
+
       const cantidadSolicitada = Number(insumo.cantidadSalidaUnidades);
-      
-      if (cantidadSolicitada > stockDisponible) {
-        alert(`La cantidad solicitada (${cantidadSolicitada}) excede el stock disponible (${stockDisponible}) para la entrada seleccionada.`);
+
+      if (cantidadSolicitada > loteSeleccionado.cantidadDisponible) {
+        alert(`La cantidad solicitada (${cantidadSolicitada}) excede lo que queda del lote ${loteSeleccionado.codigo} (${loteSeleccionado.cantidadDisponible}).`);
         return;
       }
     }
@@ -371,27 +400,25 @@ const StockInsumosPage = () => {
     setSubmitStatus('idle');
 
     try {
-      console.log('📤 STOCK-INSUMOS: Sacando insumos del inventario:', insumosValidos);
-      
-      // Crear registros en la tabla Salida Insumos de Airtable
+      // Cada salida es un movimiento en Core que apunta al lote del que sale.
+      // El stock del insumo se recalcula solo a partir de los movimientos.
       for (const insumoItem of insumosValidos) {
-        const response = await fetch('/api/salida-insumos', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+        const response = await fetch('/api/stock-insumos', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            'Insumos Laboratorio': [insumoItem.insumoId], // Link al insumo
-            'Entrada': [insumoItem.entradaId], // Link a la entrada específica
-            'Cantidad Salida Unidades': Number(insumoItem.cantidadSalidaUnidades), // Cantidad a sacar
-            'Fecha Evento': new Date().toISOString().split('T')[0], // Fecha actual
-            'Realiza Registro': user?.nombre || 'Usuario no identificado' // Usuario actual
+            id: insumoItem.insumoId,
+            operacion: 'descontar',
+            loteId: insumoItem.entradaId,
+            cantidad: Number(insumoItem.cantidadSalidaUnidades),
+            realizaRegistro: user?.nombre || 'Usuario no identificado',
+            motivo: `Salida laboratorio — ${user?.nombre || 'sin identificar'}`,
           }),
         });
 
         const data = await response.json();
         if (!data.success) {
-          throw new Error(data.error || `Error al procesar insumo ${insumoItem.insumoId}`);
+          throw new Error(data.details || data.error || 'Error al registrar la salida');
         }
       }
 
@@ -411,6 +438,7 @@ const StockInsumosPage = () => {
       fetchInsumos(); // Recargar la lista
     } catch (error) {
       setSubmitStatus('error');
+      setError(error instanceof Error ? error.message : 'Error al sacar insumos del inventario');
       console.error('Error al sacar insumos del inventario:', error);
     } finally {
       setIsSubmitting(false);
@@ -453,47 +481,53 @@ const StockInsumosPage = () => {
     setSubmitStatus('idle');
 
     try {
-      console.log('📥 STOCK-INSUMOS: Recibiendo pedido:', recibirData);
-      console.log('📥 STOCK-INSUMOS: Usuario actual:', user);
-      
-      const response = await fetch('/api/entrada-insumos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          records: insumosValidos.map(insumo => ({
-            fields: {
-              'Insumos Laboratorio': [insumo.insumoId],
-              'Cantidad Ingresa Insumo': Number(insumo.cantidadIngresaUnidades),
-              'Realiza Registro': user?.nombre || 'Usuario no identificado',
-              ...(insumo.fechaVencimiento && { 'fecha_vencimiento': insumo.fechaVencimiento })
-            }
-          }))
-        }),
-      });
+      // Cada insumo recibido es un movimiento de Entrada, y cada uno es su
+      // propio lote: por eso la fecha de vencimiento va en el movimiento y no
+      // en el insumo — dos frascos del mismo reactivo caducan distinto.
+      const fallos: string[] = [];
 
-      const data = await response.json();
-      if (data.success) {
-        setSubmitStatus('success');
-        setRecibirData({ 
-          insumos: [{
-            insumoId: '',
-            cantidadIngresaUnidades: '',
-            fechaVencimiento: ''
-          }]
+      for (const insumo of insumosValidos) {
+        const nombre = insumos.find(i => i.id === insumo.insumoId)?.fields.nombre || insumo.insumoId;
+
+        const response = await fetch('/api/stock-insumos', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: insumo.insumoId,
+            operacion: 'recibir',
+            cantidad: Number(insumo.cantidadIngresaUnidades),
+            fechaVencimiento: insumo.fechaVencimiento || null,
+            realizaRegistro: user?.nombre || 'Usuario no identificado',
+            observaciones: `Recepción de pedido — ${user?.nombre || 'sin identificar'}`,
+          }),
         });
-        setSearchInsumo({});
-        setDropdownOpen({});
-        setShowRecibirPedidoForm(false);
-        fetchInsumos(); // Recargar la lista
-      } else {
-        console.error('Error al recibir pedido:', data.error);
-        setSubmitStatus('error');
+
+        const data = await response.json();
+        if (!data.success) {
+          fallos.push(`${nombre}: ${data.details || data.error}`);
+        }
       }
+
+      if (fallos.length > 0) {
+        throw new Error(fallos.join('\n'));
+      }
+
+      setSubmitStatus('success');
+      setRecibirData({
+        insumos: [{
+          insumoId: '',
+          cantidadIngresaUnidades: '',
+          fechaVencimiento: ''
+        }]
+      });
+      setSearchInsumo({});
+      setDropdownOpen({});
+      setShowRecibirPedidoForm(false);
+      fetchInsumos(); // Recargar la lista
     } catch (error) {
       setSubmitStatus('error');
-      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Error al recibir el pedido');
+      console.error('Error al recibir pedido:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -560,19 +594,11 @@ const StockInsumosPage = () => {
 
   // Filtrar insumos por categoría y búsqueda
   const insumosFiltrados = insumos.filter(insumo => {
-    // Filtro por categoría
-    let pasaFiltroCategoria = true;
-    
-    if (filtroCategoria === 'todos') {
-      // Si es "todos", mostrar solo categorías básicas por defecto
-      pasaFiltroCategoria = categoriasBasicas.includes(insumo.fields.categoria_insumo || '');
-    } else if (filtroCategoria === 'ver-todas') {
-      // Si es "ver-todas", mostrar todos los insumos
-      pasaFiltroCategoria = true;
-    } else {
-      // Si hay una categoría específica seleccionada, mostrar solo esa
-      pasaFiltroCategoria = insumo.fields.categoria_insumo === filtroCategoria;
-    }
+    // Core ya sirve solo lo del laboratorio (Areas Consumidoras), así que "ver
+    // todas" muestra el inventario completo del área y no hace falta una lista
+    // de categorías básicas que esconda el resto.
+    const pasaFiltroCategoria =
+      filtroCategoria === 'ver-todas' || insumo.fields.categoria_insumo === filtroCategoria;
     
     // Filtro por búsqueda de texto
     const pasaFiltroBusqueda = !searchText || 
@@ -736,11 +762,24 @@ const StockInsumosPage = () => {
 
             {/* Error State */}
             {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 whitespace-pre-line">
                 ❌ {error}
-                <button 
-                  onClick={fetchInsumos}
+                <button
+                  onClick={() => { setError(''); fetchInsumos(); }}
                   className="ml-4 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+
+            {/* Sin catálogo no se puede crear un insumo: Core valida categoría y unidad. */}
+            {catalogoError && (
+              <div className="bg-amber-100 border border-amber-400 text-amber-800 px-4 py-3 rounded-lg mb-6">
+                ⚠️ {catalogoError}. No se podrán crear insumos nuevos hasta que se restablezca.
+                <button
+                  onClick={fetchCatalogo}
+                  className="ml-4 bg-amber-600 text-white px-3 py-1 rounded text-sm hover:bg-amber-700"
                 >
                   Reintentar
                 </button>
@@ -756,9 +795,9 @@ const StockInsumosPage = () => {
                     <div>
                       <h2 className="text-2xl font-bold">Inventario de Insumos ({insumosFiltrados.length})</h2>
                       <p className="opacity-90">
-                        {filtroCategoria === 'todos' ? 'Insumos básicos de laboratorio' : 
-                         filtroCategoria === 'ver-todas' ? 'Todos los insumos' : 
-                         `Categoría: ${filtroCategoria}`}
+                        {filtroCategoria === 'ver-todas'
+                          ? 'Todo el inventario del laboratorio'
+                          : `Categoría: ${filtroCategoria}`}
                       </p>
                     </div>
                   </div>
@@ -944,7 +983,7 @@ const StockInsumosPage = () => {
                         ...newInsumoData,
                         insumos: [...newInsumoData.insumos, {
                           nombre: '',
-                          categoria_insumo: 'Materiales y Suministros Generales',
+                          categoria_insumo: '',
                           unidad_medida: '',
                           descripcion: '',
                           cantidadPresentacion: '',
@@ -1033,6 +1072,7 @@ const StockInsumosPage = () => {
                             }}
                             className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white appearance-none cursor-pointer placeholder-gray-500 text-gray-700"
                           >
+                            <option value="" className="text-gray-500">Seleccionar categoría...</option>
                             {categorias.map(categoria => (
                               <option key={categoria} value={categoria} className="text-gray-700">{categoria}</option>
                             ))}
@@ -1059,8 +1099,10 @@ const StockInsumosPage = () => {
                             className="w-full px-3 py-2 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white appearance-none cursor-pointer text-gray-700"
                           >
                             <option value="" className="text-gray-500">Seleccionar unidad...</option>
-                            {unidadesDisponibles.map(unidad => (
-                              <option key={unidad} value={unidad} className="text-gray-700">{unidad}</option>
+                            {unidadesCore.map(unidad => (
+                              <option key={unidad.id} value={unidad.nombre} className="text-gray-700">
+                                {unidad.nombre} ({unidad.simbolo})
+                              </option>
                             ))}
                           </select>
                         </div>
@@ -1496,59 +1538,45 @@ const StockInsumosPage = () => {
                               className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700"
                               required
                             >
-                              <option value="">Seleccionar entrada</option>
-                              {(entradasDisponibles[index] || []).map(entrada => {
-                                const fechaIngreso = entrada.fields.fecha_ingreso ? new Date(entrada.fields.fecha_ingreso).toLocaleDateString() : 'Sin fecha';
-                                const fechaVencimiento = entrada.fields.fecha_vencimiento ? new Date(entrada.fields.fecha_vencimiento).toLocaleDateString() : 'No aplica';
-                                const stockDisponible = entrada.fields['Total Cantidad Granel Actual'] || 0;
-                                const estadoVencimiento = entrada.fields.estado_vencimiento_producto || 'Sin estado';
-                                
-                                return (
-                                  <option key={entrada.id} value={entrada.id}>
-                                    📅 {fechaIngreso} | 📊 {stockDisponible} disponible | 📆 Vence: {fechaVencimiento} | {estadoVencimiento}
-                                  </option>
-                                );
-                              })}
+                              <option value="">Seleccionar lote</option>
+                              {(entradasDisponibles[index] || []).map(lote => (
+                                <option key={lote.id} value={lote.id}>
+                                  {`${etiquetaVencimiento(lote)} · ${lote.cantidadDisponible} disponible · ingresó ${formatearFecha(lote.fechaMovimiento)}`}
+                                </option>
+                              ))}
                             </select>
                           )}
                           
-                          {/* Mostrar información detallada de la entrada seleccionada */}
+                          {/* Detalle del lote seleccionado */}
                           {insumo.entradaId && entradasDisponibles[index] && (
                             <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                               {(() => {
-                                const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
-                                if (!entradaSeleccionada) return null;
-                                
-                                const fechaIngreso = entradaSeleccionada.fields.fecha_ingreso ? new Date(entradaSeleccionada.fields.fecha_ingreso).toLocaleDateString() : 'Sin fecha';
-                                const fechaVencimiento = entradaSeleccionada.fields.fecha_vencimiento ? new Date(entradaSeleccionada.fields.fecha_vencimiento).toLocaleDateString() : 'No aplica';
-                                const stockDisponible = entradaSeleccionada.fields['Total Cantidad Granel Actual'] || 0;
-                                const estadoVencimiento = entradaSeleccionada.fields.estado_vencimiento_producto || 'Sin estado';
-                                
-                                const getEstadoColor = (estado: string) => {
-                                  if (estado.includes('Producto vigente')) return 'text-green-700';
-                                  if (estado.includes('Próximo a vencer')) return 'text-yellow-700';
-                                  if (estado.includes('Urgente utilizar')) return 'text-orange-700';
-                                  if (estado.includes('Producto vencido')) return 'text-red-700';
-                                  return 'text-gray-700';
-                                };
-                                
+                                const loteSeleccionado = entradasDisponibles[index].find(l => l.id === insumo.entradaId);
+                                if (!loteSeleccionado) return null;
+
                                 return (
                                   <div className="space-y-2">
                                     <p className="text-sm text-blue-800 flex items-center space-x-2">
+                                      <span>🧾</span>
+                                      <span><strong>Lote:</strong> {loteSeleccionado.lote || loteSeleccionado.codigo}</span>
+                                    </p>
+                                    <p className="text-sm text-blue-800 flex items-center space-x-2">
                                       <span>📅</span>
-                                      <span><strong>Fecha de ingreso:</strong> {fechaIngreso}</span>
+                                      <span><strong>Ingresó:</strong> {formatearFecha(loteSeleccionado.fechaMovimiento)}</span>
                                     </p>
                                     <p className="text-sm text-blue-800 flex items-center space-x-2">
                                       <span>📊</span>
-                                      <span><strong>Stock disponible:</strong> {stockDisponible} unidades</span>
+                                      <span>
+                                        <strong>Queda de este lote:</strong> {loteSeleccionado.cantidadDisponible} de {loteSeleccionado.cantidadIngresada}
+                                      </span>
                                     </p>
                                     <p className="text-sm text-blue-800 flex items-center space-x-2">
                                       <span>📆</span>
-                                      <span><strong>Fecha de vencimiento:</strong> {fechaVencimiento}</span>
+                                      <span><strong>Vence:</strong> {formatearFecha(loteSeleccionado.fechaVencimiento)}</span>
                                     </p>
-                                    <p className={`text-sm flex items-center space-x-2 ${getEstadoColor(estadoVencimiento)}`}>
+                                    <p className={`text-sm flex items-center space-x-2 ${colorVencimiento(loteSeleccionado.estadoVencimiento)}`}>
                                       <span>⚠️</span>
-                                      <span><strong>Estado:</strong> {estadoVencimiento}</span>
+                                      <span><strong>Estado:</strong> {etiquetaVencimiento(loteSeleccionado)}</span>
                                     </p>
                                   </div>
                                 );
@@ -1576,41 +1604,27 @@ const StockInsumosPage = () => {
                           type="number"
                           step="0.01"
                           min="0.01"
-                          max={(() => {
-                            if (!insumo.entradaId || !entradasDisponibles[index]) return undefined;
-                            const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
-                            return entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || undefined;
-                          })()}
+                          max={disponibleDelLote(index, insumo.entradaId) ?? undefined}
                           value={insumo.cantidadSalidaUnidades}
                           onChange={(e) => {
                             const valorIngresado = Number(e.target.value);
                             let valorFinal = e.target.value;
-                            
-                            // Validar que no exceda el stock disponible
-                            if (insumo.entradaId && entradasDisponibles[index]) {
-                              const entradaSeleccionada = entradasDisponibles[index].find(ent => ent.id === insumo.entradaId);
-                              const stockDisponible = entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || 0;
-                              
-                              if (valorIngresado > stockDisponible) {
-                                valorFinal = stockDisponible.toString();
-                                // Mostrar alerta cuando se intente exceder el límite
-                                alert(`No puedes sacar más de ${stockDisponible} unidades. Esa es la cantidad disponible en esta entrada.`);
-                              }
+
+                            const disponible = disponibleDelLote(index, insumo.entradaId);
+                            if (disponible !== null && valorIngresado > disponible) {
+                              valorFinal = disponible.toString();
+                              alert(`Este lote solo tiene ${disponible} disponible.`);
                             }
-                            
+
                             const nuevosInsumos = [...descontarData.insumos];
                             nuevosInsumos[index].cantidadSalidaUnidades = valorFinal;
                             setDescontarData({ ...descontarData, insumos: nuevosInsumos });
                           }}
                           className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-gray-700 placeholder:text-gray-700 placeholder:font-semibold"
                           placeholder={
-                            insumo.entradaId && entradasDisponibles[index]
-                              ? (() => {
-                                  const entradaSeleccionada = entradasDisponibles[index].find(e => e.id === insumo.entradaId);
-                                  const stockDisponible = entradaSeleccionada?.fields['Total Cantidad Granel Actual'] || 0;
-                                  return `Ingrese cantidad en unidades (máximo ${stockDisponible})`;
-                                })()
-                              : "Ingrese cantidad en unidades"
+                            disponibleDelLote(index, insumo.entradaId) !== null
+                              ? `Cantidad a sacar (máximo ${disponibleDelLote(index, insumo.entradaId)})`
+                              : 'Primero elija un lote'
                           }
                           required
                         />

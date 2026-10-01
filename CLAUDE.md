@@ -298,6 +298,60 @@ npx vitest run       # Tests pasan
 como directorio (`no such directory: .../lint`). Usa `npx eslint` mientras no se
 migre con `npx @next/codemod@canary next-lint-to-eslint-cli .`.
 
+## Autoentrega de EPP (`/epp`) — DataLab como cliente de SG-SST
+
+Cuando alguien del laboratorio toma unos guantes, el EPP **sale de la bodega de
+SST**, no del inventario del laboratorio. Por eso el catálogo, el descuento del
+inventario y el acta viven en SG-SST, y DataLab solo los consume:
+
+```
+/epp                          pantalla: catálogo, cantidad, talla, motivo, firma
+  └ /api/epp/catalogo    ──►  SG-SST  GET  /api/insumos/epp
+  └ /api/epp/autoentrega ──►  SG-SST  POST /api/entregas-epp/autoentrega
+        └ src/lib/epp/sgsst.ts   cliente HTTP (server-only)
+```
+
+**DataLab no escribe nada de EPP en Airtable.** No conoce la base de SG-SST ni
+sus field IDs. Si duplicáramos esa lógica, las dos copias se separarían en la
+primera corrección que se haga de un solo lado — es la misma razón por la que
+`@sirius/solicitudes` no se copia al repo.
+
+⚠️ **La identidad la pone el servidor, nunca el cliente.** `idEmpleado` y cédula
+salen de la cookie de sesión vía `resolvePayload()`; el cuerpo del request ni
+los mira. SG-SST además vuelve a contrastar la cédula contra Nómina Core, así
+que un error de esta app tampoco alcanzaría para firmar por un tercero.
+
+⚠️ **El middleware de DataLab no cubre `/api/`** — su matcher lo excluye
+explícitamente. Las rutas de `/api/epp/*` verifican la sesión por su cuenta;
+sin eso quedarían abiertas, y con ellas el token de servicio que llevan dentro.
+La página `/epp` sí la protege el middleware, y además revalida en el servidor.
+
+**Variables**: `SGSST_API_URL` y `SERVICE_TOKEN_DATALAB` (el mismo valor que
+SG-SST tiene en su propia `SERVICE_TOKEN_DATALAB`). Sin ellas el módulo
+responde 503 con un mensaje que dice qué falta, y el resto de DataLab sigue
+igual.
+
+**El stock que se ve puede quedar viejo** mientras el usuario llena el
+formulario. SG-SST lo revalida antes de escribir y responde 409 con el detalle
+de lo que faltó; la pantalla muestra ese detalle y recarga el catálogo.
+
+### Diseño descartado: el acta en la base de DataLab (Sep 2026)
+
+En la base de DataLab existen `Entregas EPP` (`tblMoF2rEbPFldnsK`), `Detalle
+Entrega EPP` y `Tokens Entrega EPP`, de un diseño alterno donde el acta vivía
+aquí y solo el inventario era compartido. **Se descartó y quedaron vacías.**
+
+El motivo: el informe mensual de gestión SST, el generador de actas PDF/Excel,
+`Historial EPP Empleado` (vida útil y reposición) y los 18 indicadores legales
+leen las tablas de SG-SST. Con el acta en DataLab, las entregas de EPP quedaban
+partidas en dos bases y los registros del coordinador de SST no verían lo
+entregado en el laboratorio.
+
+Si alguien se topa con esas tablas, con las carpetas vacías en
+`src/app/api/epp/entregas/` y `src/app/inventario-epp/`, o con las variables
+`AIRTABLE_TABLE_ENTREGAS_EPP` y compañía: son residuo de ese diseño, no algo
+pendiente de conectar. Se pueden borrar.
+
 ## Testing
 
 - Framework: Vitest
@@ -307,5 +361,5 @@ migre con `npx @next/codemod@canary next-lint-to-eslint-cli .`.
 
 ---
 
-**Última actualización**: 2026-08-14 — se integró @sirius/solicitudes
+**Última actualización**: 2026-09-01 — autoentrega de EPP contra SG-SST
 **Mantenido por**: DataLab Development Team

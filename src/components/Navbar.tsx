@@ -199,6 +199,10 @@ const Navbar: React.FC = () => {
                       { href: "/calendario-produccion", label: "Calendario de Producción", emoji: "📅", color: "bg-pink-50" },
                       // Permisos, vacaciones y novedades del colaborador — @sirius/solicitudes.
                       { href: "/solicitudes", label: "Solicitudes de Nómina", emoji: "🙋", color: "bg-violet-50" },
+                      // Autoentrega: el EPP sale de la bodega de SST y el acta se
+                      // radica en SG-SST. Va junto a Stock Insumos porque es donde
+                      // se busca, aunque no toque el inventario del laboratorio.
+                      { href: "/epp", label: "Retiro de EPP", emoji: "🧤", color: "bg-sky-50" },
                     ]}
                   />
 
@@ -524,6 +528,18 @@ const Navbar: React.FC = () => {
                         >
                           <span className="text-xl">🙋</span>
                           <span className="font-medium">Solicitudes de Nómina</span>
+                          <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+
+                        <Link
+                          href="/epp"
+                          onClick={closeMobileMenu}
+                          className="flex items-center gap-3 w-full text-left px-3 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-sky-50 hover:text-sky-700 dark:text-gray-200 dark:hover:bg-sky-900/30 dark:hover:text-sky-400"
+                        >
+                          <span className="text-xl">🧤</span>
+                          <span className="font-medium">Retiro de EPP</span>
                           <svg className="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
