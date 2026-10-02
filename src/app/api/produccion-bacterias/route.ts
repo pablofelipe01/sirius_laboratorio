@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { buscarInsumoLaboratorioPorNombre } from '@/lib/insumos/core';
 
 // Fórmula de ingredientes para Bacillus thuringiensis (cargada desde variables de entorno)
 const BACILLUS_FORMULA: { [key: string]: number } = {
@@ -8,86 +9,44 @@ const BACILLUS_FORMULA: { [key: string]: number } = {
   'Levadura': Number(process.env.BACILLUS_LEVADURA_PER_LITER) || 0.01
 };
 
+// La fórmula pide gramos, pero Core cuenta algunos insumos por unidad. Para
+// convertir hay que saber cuánto pesa cada unidad (confirmado: Dipel de 500 g).
+const GRAMOS_POR_UNIDAD_CORE: { [key: string]: number } = {
+  'Dipel': 500,
+};
+
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_TABLE_MICROORGANISMOS = process.env.AIRTABLE_TABLE_MICROORGANISMOS;
 
-// Función para buscar insumos por nombre en la tabla de Insumos Laboratorio
+/**
+ * Busca los insumos de la fórmula en Sirius Insumos Core (área LABORATORIO).
+ *
+ * El id devuelto es el recId de Core, que es lo que espera
+ * /api/salida-insumos-auto. `presentacion` queda en 1: Core no modela
+ * presentaciones; la conversión de unidades la hace el descuento.
+ */
 async function buscarInsumosPorNombre(nombresInsumos: string[]) {
-  try {
-    const AIRTABLE_TABLE_INSUMOS = process.env.AIRTABLE_TABLE_INSUMOS_LABORATORIO;
-    
-    if (!AIRTABLE_TABLE_INSUMOS) {
-      console.error('❌ BUSCAR INSUMOS: AIRTABLE_TABLE_INSUMOS_LABORATORIO no configurado');
-      return [];
-    }
+  const insumosEncontrados = [];
 
-    console.log('🔍 [PROD-DEBUG] ===== FUNCIÓN BUSCAR INSUMOS POR NOMBRE =====');
-    console.log('🔍 [PROD-DEBUG] Insumos a buscar:', nombresInsumos);
-    console.log('🔍 [PROD-DEBUG] Cantidad de insumos:', nombresInsumos.length);
-    console.log('🗄️ [PROD-DEBUG] AIRTABLE_TABLE_INSUMOS:', AIRTABLE_TABLE_INSUMOS);
-
-    const insumosEncontrados = [];
-
-    for (const nombreInsumo of nombresInsumos) {
-      console.log(`🔎 [PROD-DEBUG] Buscando insumo: "${nombreInsumo}"`);
-      
-      // Crear filtro para buscar el insumo por nombre (case insensitive)
-      const filterFormula = `SEARCH(UPPER("${nombreInsumo}"), UPPER({nombre}))`;
-      const encodedFilter = encodeURIComponent(filterFormula);
-      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_INSUMOS}?filterByFormula=${encodedFilter}`;
-      
-      console.log(`🌐 [PROD-DEBUG] URL de búsqueda: ${url}`);
-      console.log(`📋 [PROD-DEBUG] Filter formula: ${filterFormula}`);
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
+  for (const nombreInsumo of nombresInsumos) {
+    try {
+      const insumo = await buscarInsumoLaboratorioPorNombre(nombreInsumo);
+      insumosEncontrados.push({
+        id: insumo?.id ?? null,
+        nombre: insumo?.nombre ?? nombreInsumo,
+        nombreBuscado: nombreInsumo,
+        encontrado: Boolean(insumo),
+        presentacion: 1,
       });
-
-      console.log(`📡 [PROD-DEBUG] Response status para ${nombreInsumo}:`, response.status);
-      console.log(`✅ [PROD-DEBUG] Response ok para ${nombreInsumo}:`, response.ok);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`📋 [PROD-DEBUG] Datos recibidos para ${nombreInsumo}:`, JSON.stringify(data, null, 2));
-        console.log(`📊 [PROD-DEBUG] Cantidad de registros encontrados: ${data.records?.length || 0}`);
-        
-        if (data.records && data.records.length > 0) {
-          const insumo = data.records[0]; // Tomar el primer resultado
-          console.log(`📦 [PROD-DEBUG] Primer insumo encontrado:`, JSON.stringify(insumo, null, 2));
-          
-          const insumoData = {
-            id: insumo.id,
-            nombre: insumo.fields.nombre || nombreInsumo,
-            nombreBuscado: nombreInsumo,
-            encontrado: true,
-            presentacion: insumo.fields['Cantidad Presentacion Insumo'] || 1 // Obtener la presentación
-          };
-          
-          insumosEncontrados.push(insumoData);
-          console.log(`✅ [PROD-DEBUG] INSUMO ENCONTRADO: ${nombreInsumo} -> ID: ${insumo.id}, Presentación: ${insumo.fields['Cantidad Presentacion Insumo'] || 1}`);
-          console.log(`📦 [PROD-DEBUG] Objeto insumo agregado:`, JSON.stringify(insumoData, null, 2));
-        } else {
-          insumosEncontrados.push({
-            id: null,
-            nombre: nombreInsumo,
-            nombreBuscado: nombreInsumo,
-            encontrado: false,
-            presentacion: 1
-          });
-          console.log(`❌ INSUMO NO ENCONTRADO: ${nombreInsumo}`);
-        }
-      }
+      if (!insumo) console.warn(`⚠️ [PROD] Insumo "${nombreInsumo}" no existe en Insumos Core (LABORATORIO)`);
+    } catch (error) {
+      console.error(`❌ [PROD] Error buscando "${nombreInsumo}" en Insumos Core:`, error);
+      insumosEncontrados.push({ id: null, nombre: nombreInsumo, nombreBuscado: nombreInsumo, encontrado: false, presentacion: 1 });
     }
-
-    return insumosEncontrados;
-  } catch (error) {
-    console.error('❌ ERROR AL BUSCAR INSUMOS:', error);
-    return [];
   }
+
+  return insumosEncontrados;
 }
 
 // Función para buscar microorganismos por nombre para SiriusBacter
@@ -1136,10 +1095,14 @@ export async function POST(request: Request) {
         const salidaInsumosData = insumosParaSalida.map(insumo => {
           const registroSalida = {
             fecha: fechaInicioDate.toISOString().split('T')[0], // Solo fecha, no tiempo
-            cantidad: insumo.cantidadTotal, // cantidad total en gramos
+            cantidadSalida: insumo.cantidadTotal, // En gramos; el servidor convierte a la unidad de Core
             unidad: 'gr',
+            gramosPorUnidad: GRAMOS_POR_UNIDAD_CORE[insumo.nombreBuscado],
             insumoId: insumo.id,
-            equivalenciaGramos: insumo.presentacion || 1, // Usar la presentación real del insumo
+            // Si a un insumo le falta el dato para convertir desde gramos, se
+            // omite con aviso en vez de deshacer la fermentación entera. La
+            // falta de stock sí la frena.
+            opcional: true,
             fermentacionId: createdRecord.id,
             userName: realizaRegistro || 'Sistema',
             nombreEvento: `Fermentación ${microorganismoInfo?.Microorganismo} - ${cantidadLitros}L`

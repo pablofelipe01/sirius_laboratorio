@@ -43,8 +43,10 @@ src/
 │   │   ├── bitacora-laboratorio/   # Eventos y logs
 │   │   ├── calendario-produccion/  # Planificación producción
 │   │   ├── seguimiento-diario/     # Reportes diarios
-│   │   ├── entrada-insumos/        # Registro insumos
-│   │   ├── salida-insumos/         # Salida/consumo insumos
+│   │   ├── stock-insumos/          # Inventario (lee/escribe Sirius Insumos Core)
+│   │   ├── insumos-catalogo/       # Categorías y unidades de Core
+│   │   ├── insumos-lotes/          # Lotes de un insumo y lo que queda de cada uno
+│   │   ├── salida-insumos-auto/    # Descuento por fórmula (inoculación, cepas, fermentación)
 │   │   ├── equipo/                 # Gestión equipos laboratorio
 │   │   ├── formulas/               # Cálculos fórmulas químicas
 │   │   ├── descartes/              # Registro descartes
@@ -352,6 +354,65 @@ Si alguien se topa con esas tablas, con las carpetas vacías en
 `AIRTABLE_TABLE_ENTREGAS_EPP` y compañía: son residuo de ese diseño, no algo
 pendiente de conectar. Se pueden borrar.
 
+## Inventario de insumos — Sirius Insumos Core
+
+El inventario del laboratorio ya **no vive en la base DataLab**. Catálogo, lotes
+y stock están en Sirius Insumos Core (`apprg0G6wP4h1Dgxb`), compartida con
+pirólisis y SG-SST. Todo el acceso pasa por `src/lib/insumos/core.ts`.
+
+| Quién | Qué hace contra Core |
+|---|---|
+| `/stock-insumos` | Lista, crea, recibe y descuenta (por lote) |
+| `MushroomInoculationForm`, `CepasForm` | Descuentan su fórmula vía `/api/salida-insumos-auto` |
+| `produccion-bacterias` | Busca los insumos de *Bacillus* por nombre y descuenta igual |
+| `lote-complete` | Trazabilidad: junta el histórico de DataLab con los consumos de Core |
+
+Cuatro reglas que no se pueden aflojar:
+
+**El stock no se escribe.** `Stock Insumos.stock_actual` es una fórmula sobre
+los movimientos. Para cambiarlo se crea un movimiento de Entrada o Salida. Un
+PATCH al registro de stock no suma nada; peor, si se reescribe su lista de
+movimientos con un valor mal leído, los desvincula y el stock cae a cero.
+
+**Siempre filtrar por `Areas Consumidoras = LABORATORIO`.** Core es de toda la
+empresa: sin ese filtro la pantalla muestra los EPP de SG-SST y los rodamientos
+de pirólisis.
+
+**Leer con `returnFieldsByFieldId=true`.** Sin él Airtable responde los campos por
+nombre y cualquier lectura por fieldId sale vacía, sin error. Y `ARRAYJOIN` de un
+campo link devuelve el campo primario de los vinculados, no su recId: para
+seguir un vínculo hay que leer los ids desde el registro que lo contiene.
+
+**Las fórmulas hablan en la unidad de la receta; Core en la del conteo.** La
+conversión vive en el servidor (`convertirCantidad`, con los factores de la
+tabla `Unidades de Medida`). Entre masa y conteo hace falta declarar
+`gramosPorUnidad` — el cloranfenicol se cuenta en pastillas de 250 mg. Si un
+insumo cambia de unidad en Core, el descuento falla con un mensaje claro en vez
+de descontar mil veces de más.
+
+Lo que modela Core y DataLab no tenía:
+
+- **Un lote es un movimiento de Entrada**, con `Fecha Vencimiento` y `Lote`.
+  Una Salida apunta al lote del que sale por `Entrada Origen`; lo que queda de un
+  lote es su cantidad menos esas salidas.
+- **El descuento automático es FIFO por vencimiento y no toca lotes vencidos.**
+  Es todo o nada: valida todos los insumos antes de escribir, y si una escritura
+  falla a medias borra lo que alcanzó a crear, porque quien llama deshace su
+  propio registro al ver el error.
+- **`ID Produccion Destino`** de cada Salida guarda el recId de la inoculación,
+  cepa o fermentación de DataLab. Es la llave de la trazabilidad del lote.
+
+Las fórmulas por bolsa están en `src/lib/insumos/formulas-produccion.ts`, con
+los insumos identificados por código `SIRIUS-INS-XXXX` y no por recId: el código
+sobrevive si el registro se recrea. Las de *Bacillus* siguen en variables de
+entorno y se buscan por nombre; los gramos por unidad de los que Core cuenta
+por unidad (Dipel = 500 g) están en `GRAMOS_POR_UNIDAD_CORE` de
+`produccion-bacterias`.
+
+Las tablas `Insumos Laboratorio`, `Entrada Insumos` y `Salida Insumos` de la base
+DataLab quedan **solo como histórico**: `lote-complete` las lee para los lotes
+anteriores a la migración. Nada escribe en ellas.
+
 ## Testing
 
 - Framework: Vitest
@@ -361,5 +422,5 @@ pendiente de conectar. Se pueden borrar.
 
 ---
 
-**Última actualización**: 2026-09-01 — autoentrega de EPP contra SG-SST
+**Última actualización**: 2026-10-02 — inventario de insumos migrado a Sirius Insumos Core
 **Mantenido por**: DataLab Development Team

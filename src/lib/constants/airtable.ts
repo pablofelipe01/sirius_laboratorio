@@ -407,6 +407,9 @@ export const SIRIUS_INSUMOS_CORE_CONFIG = {
     ID_RESPONSABLE: 'fldFNuAsLQeaOWrTm',
     ID_AREA_ORIGEN: 'fldEIxRDq2uWaJ2kr',
     ID_AREA_DESTINO: 'fldQN68Eo1tke7Bsz',
+    // Lote al que fue el consumo. En pirólisis lleva el código BLEND-…; en el
+    // laboratorio, el recId de la inoculación, cepa o fermentación de DataLab.
+    ID_PRODUCCION_DESTINO: 'fldYn19nIy1Gf7i3b',
     // Añadidos para el inventario de laboratorio (2026-09)
     FECHA_VENCIMIENTO: 'fldsFiS7zwfdDi0TH',
     LOTE: 'fld7QaRmTJyhkjl5K',

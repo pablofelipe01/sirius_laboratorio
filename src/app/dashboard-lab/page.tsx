@@ -95,6 +95,8 @@ interface SalidaInsumosRecord {
     'Presentacion del Insumo'?: number[];
     'Fecha Evento'?: string;
     'Cantidad Salida Unidades'?: number;
+    /** Solo en los consumos que vienen de Insumos Core. */
+    Unidad?: string;
     'Cantidad Salida Formato Granel'?: number;
     'Realiza Registro'?: string;
     'Nombre Evento'?: string;
@@ -1264,7 +1266,7 @@ export default function DashboardLabPage() {
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <span className="font-bold text-teal-600 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
-                                      {insumo.fields['Cantidad Salida Unidades'] || 0} unidades
+                                      {Number(insumo.fields['Cantidad Salida Unidades'] || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} {insumo.fields.Unidad || 'unidades'}
                                     </span>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{insumo.fields['Realiza Registro'] || '-'}</td>

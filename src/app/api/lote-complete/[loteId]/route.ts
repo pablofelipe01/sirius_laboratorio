@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AIRTABLE_CONFIG, buildAirtableUrl, getAirtableHeaders } from '@/lib/constants/airtable';
+import { listarConsumoDeProduccion } from '@/lib/insumos/core';
 
 const { TABLES } = AIRTABLE_CONFIG;
 
@@ -72,7 +73,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Procesar respuestas
     const salidas = salidasInoculacionResponse.ok ? (await salidasInoculacionResponse.json()).records || [] : [];
     const cepas = cepasUtilizadasResponse.ok ? (await cepasUtilizadasResponse.json()).records || [] : [];
-    const insumos = insumosConsumidosResponse.ok ? (await insumosConsumidosResponse.json()).records || [] : [];
+    // Los lotes anteriores a la migración tienen sus insumos en la tabla
+    // Salida Insumos de DataLab; los nuevos, en Movimientos de Insumos Core.
+    // Se juntan las dos fuentes para que ningún lote pierda su historia.
+    const insumosHistoricos = insumosConsumidosResponse.ok ? (await insumosConsumidosResponse.json()).records || [] : [];
+    let insumosCore: Awaited<ReturnType<typeof listarConsumoDeProduccion>> = [];
+    try {
+      insumosCore = await listarConsumoDeProduccion(loteId);
+    } catch (error) {
+      console.warn('⚠️ No se pudo leer el consumo de insumos en Insumos Core:', error);
+    }
+    const insumos = [...insumosHistoricos, ...insumosCore];
     const descartes = descartesResponse.ok ? (await descartesResponse.json()).records || [] : [];
     const cosechas = cosechasResponse.ok ? (await cosechasResponse.json()).records || [] : [];
     const cepasProducidas = cepasProducidasResponse.ok ? (await cepasProducidasResponse.json()).records || [] : [];

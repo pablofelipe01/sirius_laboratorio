@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { calcularConsumo, FORMULA_CEPAS } from '@/lib/insumos/formulas-produccion';
 
 interface CepasData {
   fechaCreacion: string;
@@ -378,16 +379,16 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
             console.log('📦 Creando salidas de insumos para cepa con lógica FIFO...');
             
             const salidaInsumosData = insumosCalculados.map(insumo => ({
-              insumoId: insumo.id,
-              cantidadSalida: insumo.cantidad, // Cantidad ya calculada (bolsas × factor)
+              insumoId: insumo.id, // Código SIRIUS-INS de Core
+              cantidadSalida: insumo.cantidad, // En la unidad de la receta; el servidor la convierte
               unidad: insumo.unidad,
+              gramosPorUnidad: insumo.gramosPorUnidad,
               fecha: formData.fechaCreacion,
               userName: user?.nombre || 'Usuario Desconocido',
               nombreEvento: `Producción de cepa - ${formData.cantidadBolsas} bolsas`
             }));
 
             console.log('📦 Datos de salida de insumos a enviar:', salidaInsumosData);
-            console.log('🔍 Clorafenicol específicamente:', salidaInsumosData.find(i => i.insumoId === 'rec6U8tw8EEoFx52A'));
 
             const salidaResponse = await fetch('/api/salida-insumos-auto', {
               method: 'POST',
@@ -492,51 +493,8 @@ const CepasForm = ({ tipoMicroorganismo }: CepasFormProps) => {
   const calcularInsumosCepa = (cantidadBolsas: number) => {
     console.log('🧮 calcularInsumosCepa llamada con:', cantidadBolsas, 'bolsas');
     
-    // Fórmula de producción de cepas: cantidad = bolsas × factor
-    const formulaCepas = [
-      {
-        id: 'recAhttbj6RjnpACX',
-        nombre: 'Arroz',
-        cantidad: cantidadBolsas * 100, // 100g arroz por bolsa
-        unidad: 'GRAMOS',
-        descripcion: 'Arroz para sustrato de cepa'
-      },
-      {
-        id: 'rec6U8tw8EEoFx52A',
-        nombre: 'Clorafenicol',
-        cantidad: cantidadBolsas * 0.009, // 0.009g clorafenicol por bolsa
-        unidad: 'GRAMOS',
-        descripcion: 'Antibiótico-cloranfenicol'
-      },
-      {
-        id: 'recXBHudUK2T0OcPI',
-        nombre: 'Melaza',
-        cantidad: cantidadBolsas * 0.36, // 0.36g melaza por bolsa
-        unidad: 'GRAMOS',
-        descripcion: 'Melaza'
-      },
-      {
-        id: 'recHlpm0r9IILswJP',
-        nombre: 'Bolsa polipropileno',
-        cantidad: cantidadBolsas * 1, // 1 bolsa por bolsa
-        unidad: 'UNIDADES',
-        descripcion: 'Bolsas de Polipropileno x 100und'
-      },
-      {
-        id: 'rec9AVRKuMfYoLozj',
-        nombre: 'Tween 80',
-        cantidad: cantidadBolsas * 0.018, // 0.018ml tween por bolsa
-        unidad: 'MILILITROS',
-        descripcion: 'Tween 80 x 500ml'
-      },
-      {
-        id: 'recd9ipWHpeMzBX3O',
-        nombre: 'Algodón',
-        cantidad: cantidadBolsas * 0.42, // 0.42g algodón por bolsa
-        unidad: 'GRAMOS',
-        descripcion: 'Bolsa copos de algodón x 500 gr'
-      }
-    ];
+    // Fórmula de producción de cepas: cantidad = bolsas × factor (ver formulas-produccion.ts)
+    const formulaCepas = calcularConsumo(FORMULA_CEPAS, cantidadBolsas);
 
     console.log('📦 Fórmula completa de cepas calculada:', formulaCepas);
     return formulaCepas;

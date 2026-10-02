@@ -491,3 +491,380 @@ export async function listarMovimientos(insumoId: string) {
     }))
     .sort((a, b) => (b.fecha ?? b.createdTime).localeCompare(a.fecha ?? a.createdTime));
 }
+
+// ---------------------------------------------------------------------------
+// Consumo automático: inoculación, cepas y fermentación
+// ---------------------------------------------------------------------------
+//
+// Las fórmulas de producción hablan en la unidad de la receta (gramos de
+// cloranfenicol por bolsa) y Core guarda cada insumo en la unidad en que se
+// contó (pastillas). La conversión vive aquí y no en cada formulario: así la
+// melaza en kg o el Dipel en unidades se resuelven igual para todos los que
+// descuentan, y si alguien cambia la unidad de un insumo en Core el error salta
+// en un solo lugar en vez de descontar mil veces de más en silencio.
+
+const EPSILON = 1e-9;
+
+/** Etiquetas que mandan los formularios y la tabla vieja -> nombre en el catálogo de Core. */
+const ALIAS_UNIDAD: Record<string, string> = {
+  g: 'Gramo', gr: 'Gramo', gramo: 'Gramo', gramos: 'Gramo',
+  kg: 'Kilogramo', kilogramo: 'Kilogramo', kilogramos: 'Kilogramo',
+  ml: 'Mililitro', mililitro: 'Mililitro', mililitros: 'Mililitro',
+  l: 'Litro', litro: 'Litro', litros: 'Litro',
+  und: 'Unidad', unidad: 'Unidad', unidades: 'Unidad',
+};
+
+function buscarUnidad(etiqueta: string, catalogo: UnidadMedida[]): UnidadMedida | undefined {
+  const limpia = etiqueta.trim().toLowerCase();
+  const nombre = (ALIAS_UNIDAD[limpia] ?? etiqueta.trim()).toLowerCase();
+  return catalogo.find(
+    (u) => u.nombre.toLowerCase() === nombre || u.simbolo.toLowerCase() === limpia,
+  );
+}
+
+/**
+ * Pasa una cantidad de una unidad a otra con los factores de Core.
+ *
+ * Entre unidades del mismo tipo (g ↔ kg, ml ↔ L) basta el factor a base. De
+ * masa a conteo hace falta saber cuánto pesa cada unidad — p. ej. pastillas de
+ * 250 mg —, y si no se da, no se adivina: devuelve null.
+ */
+export function convertirCantidad(
+  cantidad: number,
+  desde: string,
+  hacia: string,
+  catalogo: UnidadMedida[],
+  gramosPorUnidad?: number,
+): number | null {
+  const d = buscarUnidad(desde, catalogo);
+  const h = buscarUnidad(hacia, catalogo);
+  if (!d || !h) return null;
+  if (d.id === h.id) return cantidad;
+  if (!d.factorABase || !h.factorABase) return null;
+  if (d.tipo === h.tipo) return (cantidad * d.factorABase) / h.factorABase;
+  if (d.tipo === 'Masa' && h.tipo === 'Conteo' && gramosPorUnidad && gramosPorUnidad > 0) {
+    return (cantidad * d.factorABase) / gramosPorUnidad / h.factorABase;
+  }
+  return null;
+}
+
+export type SolicitudConsumo = {
+  /** recId de Core o código `SIRIUS-INS-XXXX`. El código no cambia si se recrea el registro. */
+  insumo: string;
+  /** En `unidad`; si no se indica, en la unidad que el insumo tiene en Core. */
+  cantidad: number;
+  unidad?: string;
+  /** Solo para pasar de masa a conteo (p. ej. 0,25 para pastillas de 250 mg). */
+  gramosPorUnidad?: number;
+  /**
+   * Si el insumo no existe en Core o su unidad no se puede convertir, se omite
+   * con aviso en lugar de frenar todo el registro. La falta de stock nunca se omite.
+   */
+  opcional?: boolean;
+};
+
+export type TomaDeLote = { loteId: string; loteCodigo: string; cantidad: number; vence: string | null };
+
+export type PlanConsumo = {
+  insumoId: string;
+  codigo: string;
+  nombre: string;
+  unidadCore: string;
+  cantidadSolicitada: number;
+  unidadSolicitada: string;
+  /** Lo que se va a descontar, en la unidad de Core. */
+  requerido: number;
+  /** Lo que hay en lotes no vencidos. */
+  disponible: number;
+  /** Lo que hay en lotes vencidos: existe, pero no se consume solo. */
+  disponibleVencido: number;
+  /** `disponible` expresado en la unidad que pidió quien llama, para mostrarlo tal cual. */
+  disponibleEnUnidadSolicitada: number;
+  suficiente: boolean;
+  tomas: TomaDeLote[];
+};
+
+export type ResultadoPlan = {
+  planes: PlanConsumo[];
+  omitidos: { insumo: string; motivo: string }[];
+  errores: string[];
+};
+
+function escaparFormula(valor: string): string {
+  return valor.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+/** Resuelve referencias (recId o código SIRIUS-INS) a registros de Insumo de Core. */
+async function resolverInsumos(referencias: string[]): Promise<Map<string, Registro>> {
+  const resultado = new Map<string, Registro>();
+  const recIds = referencias.filter((r) => /^rec[A-Za-z0-9]{14}$/.test(r));
+  const codigos = referencias.filter((r) => !recIds.includes(r));
+
+  for (const r of await coreObtenerPorIds(CORE.TABLES.INSUMO, recIds)) {
+    resultado.set(r.id, r);
+  }
+
+  if (codigos.length > 0) {
+    const filtro = `OR(${codigos.map((c) => `{Código SIRIUS-INS}='${escaparFormula(c)}'`).join(',')})`;
+    for (const r of await coreListar(CORE.TABLES.INSUMO, filtro)) {
+      resultado.set(String(r.fields[F_INS.CODIGO]), r);
+    }
+  }
+
+  return resultado;
+}
+
+/**
+ * Calcula, sin escribir nada, de qué lotes sale cada insumo.
+ *
+ * Gasta primero lo que vence antes y no toca lotes vencidos: el sistema viejo
+ * consumía por fecha de ingreso sin mirar el vencimiento, y eso metía
+ * antibiótico caducado en las bolsas de producción.
+ */
+export async function planificarConsumo(solicitudes: SolicitudConsumo[]): Promise<ResultadoPlan> {
+  const [registros, catalogo] = await Promise.all([
+    resolverInsumos([...new Set(solicitudes.map((s) => s.insumo))]),
+    listarUnidades(),
+  ]);
+
+  const planes: PlanConsumo[] = [];
+  const omitidos: ResultadoPlan['omitidos'] = [];
+  const errores: string[] = [];
+
+  const noUsable = (s: SolicitudConsumo, motivo: string) => {
+    if (s.opcional) omitidos.push({ insumo: s.insumo, motivo });
+    else errores.push(`${s.insumo}: ${motivo}`);
+  };
+
+  for (const s of solicitudes) {
+    const registro = registros.get(s.insumo);
+    if (!registro) {
+      noUsable(s, 'no existe en Sirius Insumos Core');
+      continue;
+    }
+
+    const nombre = String(registro.fields[F_INS.NOMBRE] ?? s.insumo);
+    const unidadCore = String(registro.fields[F_INS.UNIDAD_MEDIDA] ?? '').trim();
+    const unidadSolicitada = s.unidad?.trim() || unidadCore;
+
+    if (!unidadCore) {
+      noUsable(s, `${nombre} no tiene unidad de medida en Core`);
+      continue;
+    }
+
+    const convertido = convertirCantidad(s.cantidad, unidadSolicitada, unidadCore, catalogo, s.gramosPorUnidad);
+    // Seis decimales: miligramos si la unidad es kg. Evita guardar 0,0005600000000000001.
+    const requerido = convertido === null ? null : Math.round(convertido * 1e6) / 1e6;
+    if (requerido === null) {
+      noUsable(
+        s,
+        `no se puede convertir de "${unidadSolicitada}" a "${unidadCore}" para ${nombre}` +
+          (s.gramosPorUnidad ? '' : ' (falta indicar cuántos gramos pesa cada unidad)'),
+      );
+      continue;
+    }
+
+    const lotes = await listarLotesDisponibles(registro.id);
+    const vigentes = lotes.filter((l) => l.estadoVencimiento !== 'vencido');
+    const disponible = vigentes.reduce((suma, l) => suma + l.cantidadDisponible, 0);
+    const disponibleVencido = lotes
+      .filter((l) => l.estadoVencimiento === 'vencido')
+      .reduce((suma, l) => suma + l.cantidadDisponible, 0);
+
+    const tomas: TomaDeLote[] = [];
+    let pendiente = requerido;
+    for (const lote of vigentes) {
+      if (pendiente <= EPSILON) break;
+      const cantidad = Math.min(pendiente, lote.cantidadDisponible);
+      tomas.push({ loteId: lote.id, loteCodigo: lote.codigo, cantidad, vence: lote.fechaVencimiento });
+      pendiente -= cantidad;
+    }
+
+    const suficiente = pendiente <= EPSILON;
+    // La conversión es lineal, así que la proporción vale también para lo disponible.
+    const disponibleEnUnidadSolicitada = requerido > EPSILON ? disponible * (s.cantidad / requerido) : disponible;
+
+    planes.push({
+      insumoId: registro.id,
+      codigo: String(registro.fields[F_INS.CODIGO] ?? ''),
+      nombre,
+      unidadCore,
+      cantidadSolicitada: s.cantidad,
+      unidadSolicitada,
+      requerido,
+      disponible,
+      disponibleVencido,
+      disponibleEnUnidadSolicitada,
+      suficiente,
+      tomas,
+    });
+
+    if (!suficiente) {
+      const vencido = disponibleVencido > EPSILON ? ` (hay ${redondear(disponibleVencido)} más en lotes vencidos, que no se usan)` : '';
+      errores.push(
+        `Stock insuficiente de ${nombre}: se necesitan ${redondear(requerido)} ${unidadCore} y hay ${redondear(disponible)}${vencido}`,
+      );
+    }
+  }
+
+  return { planes, omitidos, errores };
+}
+
+/**
+ * Salidas de Core consumidas por un registro de producción de DataLab.
+ *
+ * Devuelve la misma forma que tenían los registros de `Salida Insumos` de la
+ * base DataLab, para que la trazabilidad del lote junte el histórico viejo y lo
+ * nuevo en una sola tabla sin cambiar la vista.
+ */
+export async function listarConsumoDeProduccion(produccionId: string) {
+  const movimientos = await coreListar(
+    CORE.TABLES.MOVIMIENTOS_INSUMOS,
+    `AND({Tipo Movimiento}='Salida', {ID Produccion Destino}='${escaparFormula(produccionId)}')`,
+  );
+  if (movimientos.length === 0) return [];
+
+  const idsInsumo = [...new Set(movimientos.flatMap((m) => (m.fields[F_MOV.INSUMO] as string[]) ?? []))];
+  const insumos = await coreObtenerPorIds(CORE.TABLES.INSUMO, idsInsumo);
+  const porId = new Map(insumos.map((i) => [i.id, i]));
+
+  return movimientos.map((m) => {
+    const insumo = porId.get(((m.fields[F_MOV.INSUMO] as string[]) ?? [])[0]);
+    return {
+      id: m.id,
+      createdTime: m.createdTime,
+      fields: {
+        ID: String(m.fields[F_MOV.CODIGO] ?? ''),
+        'Fecha Evento': (m.fields[F_MOV.FECHA_MOVIMIENTO] as string) ?? undefined,
+        'nombre (from Insumos Laboratorio)': [String(insumo?.fields[F_INS.NOMBRE] ?? 'Insumo')],
+        'Cantidad Salida Unidades': aNumero(m.fields[F_MOV.CANTIDAD]),
+        Unidad: String(insumo?.fields[F_INS.UNIDAD_MEDIDA] ?? ''),
+        'Realiza Registro': String(m.fields[F_MOV.ID_RESPONSABLE] ?? ''),
+        'Nombre Evento': String(m.fields[F_MOV.NAME] ?? ''),
+      },
+    };
+  });
+}
+
+function normalizarNombre(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Busca un insumo del laboratorio por nombre.
+ *
+ * Prefiere la coincidencia exacta y, si no la hay, el nombre más corto que lo
+ * contenga: buscar "Levadura" no debe devolver "Extracto de levadura" solo
+ * porque Airtable lo listó primero.
+ */
+export async function buscarInsumoLaboratorioPorNombre(
+  nombre: string,
+): Promise<{ id: string; codigo: string; nombre: string; unidad: string } | null> {
+  const filtro = `AND(${FILTRO_LABORATORIO}, SEARCH(LOWER('${escaparFormula(nombre)}'), LOWER({Nombre})))`;
+  const candidatos = await coreListar(CORE.TABLES.INSUMO, filtro);
+  if (candidatos.length === 0) return null;
+
+  const buscado = normalizarNombre(nombre);
+  const elegido =
+    candidatos.find((c) => normalizarNombre(String(c.fields[F_INS.NOMBRE] ?? '')) === buscado) ??
+    [...candidatos].sort(
+      (a, b) => String(a.fields[F_INS.NOMBRE] ?? '').length - String(b.fields[F_INS.NOMBRE] ?? '').length,
+    )[0];
+
+  return {
+    id: elegido.id,
+    codigo: String(elegido.fields[F_INS.CODIGO] ?? ''),
+    nombre: String(elegido.fields[F_INS.NOMBRE] ?? nombre),
+    unidad: String(elegido.fields[F_INS.UNIDAD_MEDIDA] ?? ''),
+  };
+}
+
+function redondear(n: number): string {
+  return Number(n.toFixed(4)).toLocaleString('es-CO');
+}
+
+/**
+ * Escribe las salidas de un plan ya validado.
+ *
+ * Todo o nada: si una escritura falla a medias se borran las salidas creadas,
+ * porque quien llama (inoculación, fermentación) deshace su propio registro al
+ * ver el error, y dejar salidas sueltas descontaría material de un evento que
+ * ya no existe.
+ */
+export async function ejecutarConsumo(
+  planes: PlanConsumo[],
+  contexto: {
+    evento: string;
+    referencia: string;
+    /** recId del registro de DataLab que consumió; es la llave de la trazabilidad del lote. */
+    produccionDestino: string;
+    fecha?: string;
+    responsable?: string;
+  },
+): Promise<{ movimientos: { id: string; insumo: string; lote: string; cantidad: number }[] }> {
+  const fecha = contexto.fecha || new Date().toISOString().split('T')[0];
+
+  const porCrear = planes.flatMap((p) =>
+    p.tomas
+      .filter((t) => t.cantidad > EPSILON)
+      .map((t) => ({
+        insumoId: p.insumoId,
+        nombre: p.nombre,
+        lote: t.loteCodigo,
+        cantidad: t.cantidad,
+        fields: {
+          [F_MOV.NAME]: `${contexto.evento} — ${contexto.referencia}`,
+          [F_MOV.CANTIDAD]: t.cantidad,
+          [F_MOV.TIPO]: 'Salida',
+          [F_MOV.FECHA_MOVIMIENTO]: fecha,
+          [F_MOV.INSUMO]: [p.insumoId],
+          [F_MOV.ENTRADA_ORIGEN]: [t.loteId],
+          [F_MOV.ID_AREA_ORIGEN]: CORE.AREA_LABORATORIO,
+          [F_MOV.ID_PRODUCCION_DESTINO]: contexto.produccionDestino,
+          ...(contexto.responsable ? { [F_MOV.ID_RESPONSABLE]: contexto.responsable } : {}),
+        } as Record<string, unknown>,
+      })),
+  );
+
+  const creados: { id: string; insumoId: string; nombre: string; lote: string; cantidad: number }[] = [];
+
+  try {
+    for (let i = 0; i < porCrear.length; i += 10) {
+      const tanda = porCrear.slice(i, i + 10);
+      const res = await corePedir<{ records: Registro[] }>(CORE.TABLES.MOVIMIENTOS_INSUMOS, {
+        metodo: 'POST',
+        body: { records: tanda.map((t) => ({ fields: t.fields })), typecast: false },
+      });
+      res.records.forEach((r, j) => creados.push({ id: r.id, ...tanda[j] }));
+    }
+
+    const porInsumo = new Map<string, string[]>();
+    for (const c of creados) porInsumo.set(c.insumoId, [...(porInsumo.get(c.insumoId) ?? []), c.id]);
+    for (const [insumoId, ids] of porInsumo) await vincularMovimientosAlStock(insumoId, ids);
+  } catch (error) {
+    const sinBorrar: string[] = [];
+    for (const c of creados) {
+      try {
+        await corePedir(CORE.TABLES.MOVIMIENTOS_INSUMOS, { metodo: 'DELETE', recordId: c.id });
+      } catch {
+        sinBorrar.push(c.id);
+      }
+    }
+    const detalle = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      sinBorrar.length === 0
+        ? `No se pudieron registrar las salidas y se deshicieron las ${creados.length} ya creadas: ${detalle}`
+        : `No se pudieron registrar las salidas y quedaron ${sinBorrar.length} sin deshacer (${sinBorrar.join(', ')}): ${detalle}`,
+    );
+  }
+
+  return {
+    movimientos: creados.map((c) => ({ id: c.id, insumo: c.nombre, lote: c.lote, cantidad: c.cantidad })),
+  };
+}

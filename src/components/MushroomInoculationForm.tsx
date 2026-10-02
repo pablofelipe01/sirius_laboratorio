@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CepaSelector from './CepaSelector';
+import { calcularConsumo, FORMULA_INOCULACION, type ConsumoCalculado } from '@/lib/insumos/formulas-produccion';
 
 // Componente de Calendario
 interface CalendarioSelectorProps {
@@ -241,44 +242,35 @@ const MushroomInoculationForm = () => {
   const [responsables, setResponsables] = useState<Responsable[]>([]);
   const [loadingResponsables, setLoadingResponsables] = useState(true);
 
-  // Función para verificar stock disponible de un insumo
-  const verificarStockDisponible = async (insumoId: string) => {
+  /**
+   * Pregunta al servidor cuánto hay de cada insumo de la fórmula, con la misma
+   * regla que aplicará al descontar: unidades convertidas a las de Core y sin
+   * contar lotes vencidos. Devuelve lo disponible en la unidad de la receta.
+   */
+  const validarConsumo = async (consumo: ConsumoCalculado[]) => {
+    const disponiblePorCodigo = new Map<string, { disponible: number; suficiente: boolean }>();
     try {
-      console.log(`🔍 Verificando stock para insumo ID: ${insumoId}`);
-      
-      // Usar la misma lógica que la tabla de stock de insumos
-      const response = await fetch('/api/stock-insumos');
-      console.log(`📡 Respuesta de API stock-insumos:`, response.status, response.statusText);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`📊 Datos de stock-insumos:`, data);
-        
-        if (data.success && data.insumos) {
-          // Buscar el insumo específico por ID
-          const insumoEncontrado = data.insumos.find((insumo: any) => insumo.id === insumoId);
-          
-          if (insumoEncontrado) {
-            // Usar el campo 'Total Actual Insumos' para comparar stock disponible
-            const stockDisponible = insumoEncontrado.fields['Total Actual Insumos'] || 0;
-            console.log(`✅ Stock encontrado para ${insumoId}: ${stockDisponible}`);
-            return stockDisponible;
-          } else {
-            console.log(`⚠️ Insumo ${insumoId} no encontrado en la tabla de stock`);
-            return 0;
-          }
-        } else {
-          console.log(`❌ Respuesta no exitosa de stock-insumos:`, data);
-          return 0;
-        }
-      } else {
-        console.log(`❌ Error HTTP en stock-insumos:`, response.status, response.statusText);
-        return 0;
+      const response = await fetch('/api/salida-insumos-auto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          soloValidar: true,
+          registros: consumo.map(i => ({
+            codigo: i.id,
+            cantidadSalida: i.cantidad,
+            unidad: i.unidad,
+            gramosPorUnidad: i.gramosPorUnidad,
+          })),
+        }),
+      });
+      const data = await response.json();
+      for (const d of data.detalle || []) {
+        disponiblePorCodigo.set(d.codigo, { disponible: d.disponibleEnUnidadSolicitada, suficiente: d.suficiente });
       }
     } catch (error) {
-      console.error('❌ Error verificando stock:', error);
-      return 0;
+      console.error('❌ Error validando stock de insumos:', error);
     }
+    return disponiblePorCodigo;
   };
 
   useEffect(() => {
@@ -507,8 +499,10 @@ const MushroomInoculationForm = () => {
                 
                 const salidaInsumosData = insumosCalculados.map(insumo => ({
                   fecha: formData.inoculationDate,
-                  cantidadSalida: insumo.cantidad, // Cantidad directa = bolsas × factor
-                  insumoId: insumo.id,
+                  cantidadSalida: insumo.cantidad, // En la unidad de la receta; el servidor la convierte
+                  unidad: insumo.unidad,
+                  gramosPorUnidad: insumo.gramosPorUnidad,
+                  insumoId: insumo.id, // Código SIRIUS-INS de Core
                   inoculacionId: result.recordId,
                   userName: user?.nombre || formData.registradoPor,
                   nombreEvento: `Inoculación ${formData.microorganism} - ${formData.bagQuantity} bolsas`
@@ -709,64 +703,17 @@ const MushroomInoculationForm = () => {
   // Función para calcular insumos según la fórmula maestra
   // Cantidad Salida = Cantidad de Bolsas × Factor/Bolsa
   const calcularInsumos = async (cantidadBolsas: number) => {
-    const formInsumos = [
-      {
-        id: 'recAhttbj6RjnpACX',
-        nombre: 'Arroz',
-        cantidad: cantidadBolsas * 150,
-        unidad: 'GRAMOS',
-        descripcion: 'Arroz por @'
-      },
-      {
-        id: 'rec6U8tw8EEoFx52A',
-        nombre: 'Clorafenicol',
-        cantidad: cantidadBolsas * 0.014,
-        unidad: 'GRAMOS',
-        descripcion: 'Antibiótico-cloranfenicol'
-      },
-      {
-        id: 'recXBHudUK2T0OcPI',
-        nombre: 'Melaza',
-        cantidad: cantidadBolsas * 0.56,
-        unidad: 'GRAMOS',
-        descripcion: 'Melaza'
-      },
-      {
-        id: 'recHlpm0r9IILswJP',
-        nombre: 'Bolsa polipropileno',
-        cantidad: cantidadBolsas * 1,
-        unidad: 'UNIDADES',
-        descripcion: 'Bolsas de Polipropileno x 100und'
-      },
-      {
-        id: 'rec9AVRKuMfYoLozj',
-        nombre: 'Tween 80',
-        cantidad: cantidadBolsas * 0.028,
-        unidad: 'MILILITROS',
-        descripcion: 'Tween 80 x 500ml'
-      },
-      {
-        id: 'recd9ipWHpeMzBX3O',
-        nombre: 'Algodón',
-        cantidad: cantidadBolsas * 0.42,
-        unidad: 'GRAMOS',
-        descripcion: 'Bolsa copos de algodón x 500 gr'
-      }
-    ];
+    const consumo = calcularConsumo(FORMULA_INOCULACION, cantidadBolsas);
+    const stock = await validarConsumo(consumo);
 
-    // Verificar stock disponible para cada insumo
-    const insumosConStock = await Promise.all(
-      formInsumos.map(async (insumo) => {
-        const stockDisponible = await verificarStockDisponible(insumo.id);
-        return {
-          ...insumo,
-          stockDisponible,
-          disponible: stockDisponible >= insumo.cantidad
-        };
-      })
-    );
-
-    return insumosConStock;
+    return consumo.map(insumo => {
+      const s = stock.get(insumo.id);
+      return {
+        ...insumo,
+        stockDisponible: s?.disponible ?? 0,
+        disponible: s?.suficiente ?? false,
+      };
+    });
   };
 
   return (
