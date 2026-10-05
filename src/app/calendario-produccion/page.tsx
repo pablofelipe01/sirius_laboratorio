@@ -1589,25 +1589,47 @@ export default function CalendarioProduccionPage() {
         ? `Lotes de aplicación: ${Array.from(lotesCliente.values()).map(l => `${l.nombre} (${l.hectareas}ha)`).join(', ')}.`
         : '';
 
-      const response = await fetch('/api/remisiones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pedidoId: selectedPedidoDetalle?.idPedidoCore || selectedPedidoDetalle?.id,
-          productos: productosParaRemision,
-          responsable: user?.nombre || '',
-          areaOrigen: 'Laboratorio',
-          esDespachoCompleto,
-          transportista: transportistaSeleccionado ? {
-            id: transportistaSeleccionado.id,
-            cedula: transportistaSeleccionado.cedula,
-            nombre: transportistaSeleccionado.nombreCompleto
-          } : null,
-          notas: selectedPedidoDetalle?.notas || ''
-        }),
-      });
+      const enviarRemision = async (motivoSinStock?: string) => {
+        const response = await fetch('/api/remisiones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pedidoId: selectedPedidoDetalle?.idPedidoCore || selectedPedidoDetalle?.id,
+            productos: productosParaRemision,
+            responsable: user?.nombre || '',
+            areaOrigen: 'Laboratorio',
+            esDespachoCompleto,
+            transportista: transportistaSeleccionado ? {
+              id: transportistaSeleccionado.id,
+              cedula: transportistaSeleccionado.cedula,
+              nombre: transportistaSeleccionado.nombreCompleto
+            } : null,
+            notas: selectedPedidoDetalle?.notas || '',
+            motivoSinStock
+          }),
+        });
+        return { status: response.status, data: await response.json() };
+      };
 
-      const data = await response.json();
+      let { status, data } = await enviarRemision();
+
+      // El servidor no deja despachar lo que no está producido. Si hay que
+      // hacerlo igual, el motivo queda escrito en la remisión y en cada salida.
+      if (status === 409 && data.requiereMotivo) {
+        const detalle = (data.faltantes || [])
+          .map((f: { nombre: string; solicitado: number; disponible: number }) =>
+            `• ${f.nombre}: se despachan ${f.solicitado}, hay ${f.disponible} registrados`)
+          .join('\n');
+        const motivo = window.prompt(
+          `⚠️ No hay stock registrado suficiente:\n\n${detalle}\n\n` +
+          'Registre primero la producción. Si de todas formas hay que despachar, escriba el motivo (mínimo 10 caracteres):'
+        );
+        if (!motivo || motivo.trim().length < 10) {
+          if (motivo !== null) alert('El motivo debe tener al menos 10 caracteres. La remisión no se generó.');
+          return;
+        }
+        ({ status, data } = await enviarRemision(motivo.trim()));
+      }
 
       if (data.success) {
         const resumenProductos = productosParaRemision

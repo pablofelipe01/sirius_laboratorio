@@ -10,6 +10,9 @@ import {
 import { uploadToS3 } from '@/lib/s3';
 import { generarRemisionPDF, DatosRemisionPDF } from '@/lib/remision-pdf-generator';
 import { buscarOCrearPersona, vincularPersonaARemision } from '@/lib/personas-remision';
+import { buscarFaltantesRemision } from '@/lib/inventario/stock-producto';
+
+const LARGO_MINIMO_MOTIVO_SIN_STOCK = 10;
 
 // Configurar Airtable para Remisiones Core
 const baseRemisiones = new Airtable({
@@ -94,7 +97,8 @@ async function registrarMovimientosInventario(
   pedidoId: string,
   clienteId: string,
   responsable: string,
-  nombresProductos: Map<string, string>
+  nombresProductos: Map<string, string>,
+  motivoSinStock: string
 ): Promise<{ success: boolean; movimientos: string[]; errores: string[] }> {
   const movimientosCreados: string[] = [];
   const errores: string[] = [];
@@ -119,6 +123,7 @@ async function registrarMovimientosInventario(
           'responsable': responsable,
           'fecha_movimiento': new Date().toISOString(),
           'observaciones': `Despacho de ${producto.cantidad} ${producto.unidad || 'Ud'} de ${nombreProducto} - Remisión: ${remisionId} - Pedido: ${pedidoId} - Cliente: ${clienteId}`
+            + (motivoSinStock ? ` - DESPACHO SIN STOCK REGISTRADO: ${motivoSinStock}` : '')
         });
 
       console.log('✅ Movimiento de inventario creado:', movimiento.id, 'para producto:', producto.productoId);
@@ -255,8 +260,10 @@ export async function POST(request: NextRequest) {
       areaOrigen = 'Laboratorio',
       notas = '',
       esDespachoCompleto = true,
-      transportista = null
+      transportista = null,
+      motivoSinStock: motivoSinStockRaw = ''
     } = body;
+    const motivoSinStock = String(motivoSinStockRaw).trim();
 
     console.log('📦 Creando remisión para pedido:', pedidoId);
     console.log('📋 Productos a remitir:', productos?.length || 0);
@@ -301,6 +308,26 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Pedido encontrado:', idPedidoCore, 'Cliente:', idCliente);
 
+    // 1b. No se despacha lo que no está producido. Sin esta validación una
+    // remisión deja el stock en negativo y alguien termina cargando una entrada
+    // de ajuste para cuadrarlo (2.492 L así en 2026). Si de verdad hay que
+    // despachar antes de registrar la producción, el motivo queda escrito en
+    // cada Salida y en la remisión.
+    const faltantes = await buscarFaltantesRemision(productos, [idPedidoCore, pedidoRecord.id]);
+    if (faltantes.length > 0 && motivoSinStock.length < LARGO_MINIMO_MOTIVO_SIN_STOCK) {
+      const nombres = await obtenerNombresProductos(faltantes.map(f => f.productoId));
+      return NextResponse.json({
+        success: false,
+        error: 'No hay stock registrado suficiente para esta remisión',
+        faltantes: faltantes.map(f => ({ ...f, nombre: nombres.get(f.productoId) || f.productoId })),
+        requiereMotivo: true
+      }, { status: 409 });
+    }
+    if (faltantes.length > 0) {
+      console.warn('⚠️ Remisión sin stock registrado, con motivo:', motivoSinStock, faltantes);
+    }
+    const motivoDespachoSinStock = faltantes.length > 0 ? motivoSinStock : '';
+
     // 2. Obtener nombres de productos
     const productIds = productos.map((p: any) => p.productoId);
     const nombresProductos = await obtenerNombresProductos(productIds);
@@ -322,7 +349,10 @@ export async function POST(request: NextRequest) {
     );
 
     // 4. Crear la remisión con los productos vinculados
-    const notasRemision = notas || '';
+    const notasRemision = [
+      notas || '',
+      motivoDespachoSinStock ? `Despacho sin stock registrado: ${motivoDespachoSinStock}` : ''
+    ].filter(Boolean).join('\n');
 
     // Si hay transportista, marcar como "En Tránsito" y registrar fecha de despacho
     const fechaActual = new Date().toISOString().split('T')[0];
@@ -438,7 +468,8 @@ export async function POST(request: NextRequest) {
       idPedidoCore,
       idCliente,
       responsable || 'Sistema',
-      nombresProductos
+      nombresProductos,
+      motivoDespachoSinStock
     );
 
     if (!resultadoInventario.success) {

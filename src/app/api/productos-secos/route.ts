@@ -7,6 +7,14 @@ import {
   buildSiriusProductCoreUrl,
   buildSiriusInventarioUrl
 } from '@/lib/constants/airtable';
+import {
+  DOCUMENTO_SIN_FERMENTACION,
+  RespaldoInvalido,
+  descontarFermentacion,
+  deshacerDescuentoFermentacion,
+  resolverRespaldo,
+  type RespaldoEntrada,
+} from '@/lib/inventario/respaldo-bacterias';
 
 // ============================================================================
 // Interfaces
@@ -282,6 +290,24 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Producto verificado: ${nombreProducto} (${codigoProducto})`);
 
     // ========================================================================
+    // PASO 1b: Las bacterias entran con respaldo — la fermentación de donde
+    // salen, o el lote y el motivo si no está registrada. Ver respaldo-bacterias.
+    // ========================================================================
+    let respaldo: RespaldoEntrada | null;
+    try {
+      respaldo = await resolverRespaldo(codigoProducto, Number(body.cantidad), {
+        fermentacionId: body.fermentacionId,
+        codigoLote: body.codigoLote,
+        motivoSinFermentacion: body.motivoSinFermentacion,
+      });
+    } catch (error) {
+      if (error instanceof RespaldoInvalido) {
+        return NextResponse.json({ success: false, error: error.message }, { status: error.status });
+      }
+      throw error;
+    }
+
+    // ========================================================================
     // PASO 2: Crear movimiento de inventario (Entrada = Compra)
     // Usamos Field IDs de las variables de entorno
     // ========================================================================
@@ -337,9 +363,22 @@ export async function POST(request: NextRequest) {
     if ((body.documentoReferencia || body.numeroFactura) && FIELD_IDS.DOCUMENTO_REFERENCIA) {
       movimientoFields[FIELD_IDS.DOCUMENTO_REFERENCIA] = body.documentoReferencia || body.numeroFactura;
     }
-    
+
+    // El lote va en el origen del movimiento y la fermentación en el documento:
+    // es lo que permite ir de una entrada de bacterias a su producción.
+    if (respaldo) {
+      movimientoFields[FIELD_IDS.UBICACION_ORIGEN_ID] = respaldo.codigoLote;
+      movimientoFields[FIELD_IDS.DOCUMENTO_REFERENCIA] =
+        respaldo.tipo === 'fermentacion' ? `FERMENTACION-${respaldo.fermentacionId}` : DOCUMENTO_SIN_FERMENTACION;
+    }
+
     // Construir observaciones
     let observaciones = '';
+    if (respaldo?.tipo === 'fermentacion') {
+      observaciones += `Fermentación ${respaldo.codigoLote}. `;
+    } else if (respaldo?.tipo === 'sin-fermentacion') {
+      observaciones += `Sin fermentación registrada (lote ${respaldo.codigoLote}): ${respaldo.motivo}. `;
+    }
     if (body.fechaVencimiento) {
       observaciones += `Vencimiento: ${body.fechaVencimiento}. `;
     }
@@ -363,15 +402,36 @@ export async function POST(request: NextRequest) {
 
     console.log('📤 Creando movimiento de inventario:', movimientoData);
 
-    const movimientoResponse = await fetch(movimientosUrl, {
-      method: 'POST',
-      headers: getSiriusInventarioHeaders(),
-      body: JSON.stringify(movimientoData),
-    });
+    // Primero se descuenta la fermentación: si eso falla no se ha escrito nada.
+    const salidaFermentacionId =
+      respaldo?.tipo === 'fermentacion'
+        ? await descontarFermentacion(respaldo.fermentacionId, Number(body.cantidad), body.responsable || 'Sistema')
+        : null;
+
+    // Sin la entrada, el descuento dejaría litros de la fermentación perdidos.
+    const deshacerDescuento = async () => {
+      if (!salidaFermentacionId) return;
+      await deshacerDescuentoFermentacion(salidaFermentacionId).catch((e) =>
+        console.error('❌ No se pudo deshacer la salida de fermentación', salidaFermentacionId, e),
+      );
+    };
+
+    let movimientoResponse: Response;
+    try {
+      movimientoResponse = await fetch(movimientosUrl, {
+        method: 'POST',
+        headers: getSiriusInventarioHeaders(),
+        body: JSON.stringify(movimientoData),
+      });
+    } catch (error) {
+      await deshacerDescuento();
+      throw error;
+    }
 
     if (!movimientoResponse.ok) {
       const errorText = await movimientoResponse.text();
       console.error('❌ Error creando movimiento:', errorText);
+      await deshacerDescuento();
       throw new Error(`Error registrando ingreso: ${movimientoResponse.status} - ${errorText}`);
     }
 
