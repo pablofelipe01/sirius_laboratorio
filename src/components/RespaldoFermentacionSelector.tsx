@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react';
 
 /**
- * De dónde sale una entrada de bacterias: la fermentación de DataLab, o el
- * lote y el motivo cuando no está registrada. El servidor lo vuelve a validar
- * (ver src/lib/inventario/respaldo-bacterias.ts); esto solo guía al usuario.
+ * De dónde sale una entrada de bacterias: la fermentación de DataLab, o la
+ * marca de que no está registrada (con lote y motivo opcionales). El servidor
+ * lo vuelve a validar (ver src/lib/inventario/respaldo-bacterias.ts).
  */
 export type RespaldoFermentacion = {
   requiere: boolean;
   fermentacionId: string;
+  /** El usuario indicó que la fermentación no está en DataLab. */
+  sinFermentacion: boolean;
   codigoLote: string;
   motivo: string;
 };
@@ -17,17 +19,15 @@ export type RespaldoFermentacion = {
 export const RESPALDO_VACIO: RespaldoFermentacion = {
   requiere: false,
   fermentacionId: '',
+  sinFermentacion: false,
   codigoLote: '',
   motivo: '',
 };
 
 const SIN_FERMENTACION = '__sin_fermentacion__';
-const LARGO_MINIMO_MOTIVO = 10;
 
 export function respaldoListo(r: RespaldoFermentacion): boolean {
-  if (!r.requiere) return true;
-  if (r.fermentacionId) return true;
-  return r.codigoLote.trim() !== '' && r.motivo.trim().length >= LARGO_MINIMO_MOTIVO;
+  return !r.requiere || Boolean(r.fermentacionId) || r.sinFermentacion;
 }
 
 /** El cuerpo que espera POST /api/productos-secos. */
@@ -57,32 +57,31 @@ export default function RespaldoFermentacionSelector({
   const [fermentaciones, setFermentaciones] = useState<Fermentacion[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
-  const [sinFermentacion, setSinFermentacion] = useState(false);
+  const sinFermentacion = value.sinFermentacion;
 
   useEffect(() => {
     if (!productoId) return;
     let vigente = true;
     setCargando(true);
     setError('');
-    setSinFermentacion(false);
 
     fetch(`/api/fermentacion/disponibles?productoId=${encodeURIComponent(productoId)}`)
       .then((res) => res.json())
       .then((data) => {
         if (!vigente) return;
         if (!data.success) throw new Error(data.error);
-        setFermentaciones(data.fermentaciones || []);
-        // Sin fermentaciones no hay nada que escoger: se va directo al lote y motivo.
-        setSinFermentacion(data.requiereRespaldo && (data.fermentaciones || []).length === 0);
-        onChange({ ...RESPALDO_VACIO, requiere: Boolean(data.requiereRespaldo) });
+        const lista: Fermentacion[] = data.fermentaciones || [];
+        setFermentaciones(lista);
+        const requiere = Boolean(data.requiereRespaldo);
+        // Sin fermentaciones no hay nada que escoger: queda marcada sin fermentación.
+        onChange({ ...RESPALDO_VACIO, requiere, sinFermentacion: requiere && lista.length === 0 });
       })
       .catch((e) => {
         if (!vigente) return;
         console.error('❌ Error cargando fermentaciones disponibles:', e);
-        setError('No se pudieron cargar las fermentaciones. Puedes registrar con lote y motivo.');
+        setError('No se pudieron cargar las fermentaciones. La entrada quedará marcada sin fermentación.');
         setFermentaciones([]);
-        setSinFermentacion(true);
-        onChange({ ...RESPALDO_VACIO, requiere: true });
+        onChange({ ...RESPALDO_VACIO, requiere: true, sinFermentacion: true });
       })
       .finally(() => vigente && setCargando(false));
 
@@ -110,8 +109,7 @@ export default function RespaldoFermentacionSelector({
               value={sinFermentacion ? SIN_FERMENTACION : value.fermentacionId}
               onChange={(e) => {
                 const sin = e.target.value === SIN_FERMENTACION;
-                setSinFermentacion(sin);
-                onChange({ ...value, fermentacionId: sin ? '' : e.target.value });
+                onChange({ ...value, sinFermentacion: sin, fermentacionId: sin ? '' : e.target.value });
               }}
               className={claseCampo}
             >
@@ -145,19 +143,16 @@ export default function RespaldoFermentacionSelector({
                 type="text"
                 value={value.codigoLote}
                 onChange={(e) => onChange({ ...value, codigoLote: e.target.value })}
-                placeholder="Código del lote (ej: 051026BT)"
+                placeholder="Código del lote (opcional, ej: 051026BT)"
                 className={claseCampo}
               />
               <textarea
                 value={value.motivo}
                 onChange={(e) => onChange({ ...value, motivo: e.target.value })}
-                placeholder="¿Por qué no está registrada la fermentación?"
+                placeholder="¿Por qué no está registrada la fermentación? (opcional)"
                 rows={2}
                 className={claseCampo}
               />
-              {value.motivo.trim().length > 0 && value.motivo.trim().length < LARGO_MINIMO_MOTIVO && (
-                <p className="text-xs text-gray-500">El motivo necesita al menos {LARGO_MINIMO_MOTIVO} caracteres.</p>
-              )}
             </>
           )}
         </>

@@ -114,11 +114,13 @@ describe('resolverRespaldo', () => {
     );
   });
 
-  it('sin fermentación exige lote y un motivo de verdad', async () => {
+  it('sin fermentación queda marcada aunque falten lote y motivo', async () => {
     mockAirtable([BT]);
-    await expect(
-      resolverRespaldo('SIRIUS-PRODUCT-0005', 100, { codigoLote: '051026BT', motivoSinFermentacion: 'no' }),
-    ).rejects.toMatchObject({ status: 400 });
+    expect(await resolverRespaldo('SIRIUS-PRODUCT-0005', 100, {})).toEqual({
+      tipo: 'sin-fermentacion',
+      codigoLote: '',
+      motivo: '',
+    });
 
     expect(
       await resolverRespaldo('SIRIUS-PRODUCT-0005', 100, {

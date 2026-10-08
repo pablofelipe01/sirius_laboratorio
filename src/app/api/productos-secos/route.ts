@@ -367,7 +367,7 @@ export async function POST(request: NextRequest) {
     // El lote va en el origen del movimiento y la fermentación en el documento:
     // es lo que permite ir de una entrada de bacterias a su producción.
     if (respaldo) {
-      movimientoFields[FIELD_IDS.UBICACION_ORIGEN_ID] = respaldo.codigoLote;
+      if (respaldo.codigoLote) movimientoFields[FIELD_IDS.UBICACION_ORIGEN_ID] = respaldo.codigoLote;
       movimientoFields[FIELD_IDS.DOCUMENTO_REFERENCIA] =
         respaldo.tipo === 'fermentacion' ? `FERMENTACION-${respaldo.fermentacionId}` : DOCUMENTO_SIN_FERMENTACION;
     }
@@ -377,7 +377,9 @@ export async function POST(request: NextRequest) {
     if (respaldo?.tipo === 'fermentacion') {
       observaciones += `Fermentación ${respaldo.codigoLote}. `;
     } else if (respaldo?.tipo === 'sin-fermentacion') {
-      observaciones += `Sin fermentación registrada (lote ${respaldo.codigoLote}): ${respaldo.motivo}. `;
+      observaciones += 'Sin fermentación registrada';
+      if (respaldo.codigoLote) observaciones += ` (lote ${respaldo.codigoLote})`;
+      observaciones += respaldo.motivo ? `: ${respaldo.motivo}. ` : '. ';
     }
     if (body.fechaVencimiento) {
       observaciones += `Vencimiento: ${body.fechaVencimiento}. `;

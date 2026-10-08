@@ -441,7 +441,7 @@ export default function BacteriasPage() {
     }
 
     if (!respaldoListo(respaldoSB)) {
-      alert('Escoja la fermentación de origen, o escriba el código del lote y el motivo si no está registrada.');
+      alert('Escoja la fermentación de origen, o «No está registrada en DataLab» si no aparece.');
       return;
     }
 
@@ -670,7 +670,7 @@ export default function BacteriasPage() {
     }
 
     if (!respaldoListo(respaldoBT)) {
-      alert('Escoja la fermentación de origen, o escriba el código del lote y el motivo si no está registrada.');
+      alert('Escoja la fermentación de origen, o «No está registrada en DataLab» si no aparece.');
       return;
     }
 

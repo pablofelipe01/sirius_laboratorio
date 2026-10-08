@@ -10,9 +10,9 @@
  * Desde aquí toda entrada de una bacteria trae una de dos cosas:
  * - la fermentación de DataLab de donde sale, que se descuenta con una
  *   `Salida Fermentacion` para que el mismo litro no respalde dos entradas, o
- * - el código del lote y el motivo por el que no hay fermentación registrada,
- *   y entonces la entrada queda marcada `SIN-FERMENTACION`: el faltante queda
- *   documentado en vez de esconderse.
+ * - si no hay fermentación registrada, la marca `SIN-FERMENTACION`, con el
+ *   código del lote y el motivo cuando se conocen (son opcionales): el
+ *   faltante queda documentado en vez de esconderse.
  *
  * Qué es bacteria lo dice DataLab, no una lista en el código: el producto cuyo
  * `ID Producto` está en un Microorganismo de tipo Bacteria.
@@ -21,7 +21,6 @@
 import { AIRTABLE_CONFIG, buildAirtableUrl, getAirtableHeaders } from '@/lib/constants/airtable';
 
 export const DOCUMENTO_SIN_FERMENTACION = 'SIN-FERMENTACION';
-const LARGO_MINIMO_MOTIVO = 10;
 
 export type FermentacionDisponible = {
   id: string;
@@ -164,15 +163,14 @@ export async function resolverRespaldo(
     return { tipo: 'fermentacion', fermentacionId: registro.id, codigoLote: fermentacion.codigoLote };
   }
 
-  const codigoLote = entrada.codigoLote?.trim() ?? '';
-  const motivo = entrada.motivoSinFermentacion?.trim() ?? '';
-  if (!codigoLote || motivo.length < LARGO_MINIMO_MOTIVO) {
-    throw new RespaldoInvalido(
-      `Para registrar ${bacteria.nombre} escoge la fermentación de donde sale. Si no está registrada en DataLab, escribe el código del lote y el motivo (mínimo ${LARGO_MINIMO_MOTIVO} caracteres).`,
-      400,
-    );
-  }
-  return { tipo: 'sin-fermentacion', codigoLote, motivo };
+  // Lote y motivo son opcionales: el laboratorio no siempre los tiene a mano y
+  // bloquear la entrada dejaba los litros por fuera del inventario. La marca
+  // SIN-FERMENTACION basta para que el faltante se vea en la conciliación.
+  return {
+    tipo: 'sin-fermentacion',
+    codigoLote: entrada.codigoLote?.trim() ?? '',
+    motivo: entrada.motivoSinFermentacion?.trim() ?? '',
+  };
 }
 
 /** Descuenta los litros de la fermentación. Devuelve el recId de la salida, para deshacerla. */
