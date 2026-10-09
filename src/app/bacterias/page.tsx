@@ -4,12 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import AudioRecorderSimple from '@/components/AudioRecorderSimple';
-import RespaldoFermentacionSelector, {
-  RESPALDO_VACIO,
-  respaldoListo,
-  respaldoParaEnviar,
-  type RespaldoFermentacion,
-} from '@/components/RespaldoFermentacionSelector';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Microorganismo {
@@ -159,7 +153,6 @@ export default function BacteriasPage() {
   const [productosCatalogoSB, setProductosCatalogoSB] = useState<Array<{id: string; codigo: string; nombre: string}>>([]);
   const [productoCatalogoSelSB, setProductoCatalogoSelSB] = useState('');
   const [loadingCatalogoSB, setLoadingCatalogoSB] = useState(false);
-  const [respaldoSB, setRespaldoSB] = useState<RespaldoFermentacion>(RESPALDO_VACIO);
 
   // ========================================================================
   // Estados para el modal de Bacillus thuringiensis (Agregar Producto)
@@ -183,7 +176,6 @@ export default function BacteriasPage() {
   const [productosCatalogoBT, setProductosCatalogoBT] = useState<Array<{id: string; codigo: string; nombre: string}>>([]);
   const [productoCatalogoSelBT, setProductoCatalogoSelBT] = useState('');
   const [loadingCatalogoBT, setLoadingCatalogoBT] = useState(false);
-  const [respaldoBT, setRespaldoBT] = useState<RespaldoFermentacion>(RESPALDO_VACIO);
   const [productosCacheSB, setProductosCacheSB] = useState<Record<string, { id: string; codigoProducto: string; nombre: string }>>({});
 
   // Cargar microorganismos desde Airtable
@@ -386,15 +378,9 @@ export default function BacteriasPage() {
     console.log(`🧬 Productos Sirius Bacter del pedido ${pedidoId}:`, productosSiriusBacter.length);
   };
 
-  // Código de producto que se va a registrar, en cualquiera de los dos modos
-  const codigoProductoSB = modoProduccionSB === 'normal'
-    ? productoCatalogoSelSB
-    : productosSB.find(p => p.id === productoSeleccionadoSB)?.idProductoCore || '';
-
   // Abrir modal de Sirius Bacter
   const handleAbrirModalSiriusBacter = () => {
     setShowSiriusBacterModal(true);
-    setRespaldoSB(RESPALDO_VACIO);
     setModoProduccionSB('normal');
     setClienteSeleccionadoSB('');
     setPedidoSeleccionadoSB('');
@@ -440,11 +426,6 @@ export default function BacteriasPage() {
       }
     }
 
-    if (!respaldoListo(respaldoSB)) {
-      alert('Escoja la fermentación de origen, o «No está registrada en DataLab» si no aparece.');
-      return;
-    }
-
     setIsSubmittingSB(true);
     try {
       let productoId = '';
@@ -481,8 +462,7 @@ export default function BacteriasPage() {
           ubicacionDestinoId: ubicacionDestino,
           responsable: responsableSB || user?.nombre || 'Sistema',
           observaciones,
-          fechaMovimiento: new Date().toISOString(),
-          ...respaldoParaEnviar(respaldoSB)
+          fechaMovimiento: new Date().toISOString()
         })
       });
 
@@ -619,14 +599,9 @@ export default function BacteriasPage() {
     console.log(`🦠 Productos Bacillus thuringiensis del pedido ${pedidoId}:`, productosBacillus.length);
   };
 
-  const codigoProductoBT = modoProduccionBT === 'normal'
-    ? productoCatalogoSelBT
-    : productosBT.find(p => p.id === productoSeleccionadoBT)?.idProductoCore || '';
-
   // Abrir modal de Bacillus thuringiensis
   const handleAbrirModalBacillus = () => {
     setShowBacillusModal(true);
-    setRespaldoBT(RESPALDO_VACIO);
     setModoProduccionBT('normal');
     setClienteSeleccionadoBT('');
     setPedidoSeleccionadoBT('');
@@ -669,11 +644,6 @@ export default function BacteriasPage() {
       }
     }
 
-    if (!respaldoListo(respaldoBT)) {
-      alert('Escoja la fermentación de origen, o «No está registrada en DataLab» si no aparece.');
-      return;
-    }
-
     setIsSubmittingBT(true);
     try {
       let productoId = '';
@@ -707,8 +677,7 @@ export default function BacteriasPage() {
           ubicacionDestinoId: ubicacionDestino,
           responsable: responsableBT || user?.nombre || 'Sistema',
           observaciones,
-          fechaMovimiento: new Date().toISOString(),
-          ...respaldoParaEnviar(respaldoBT)
+          fechaMovimiento: new Date().toISOString()
         })
       });
 
@@ -2599,13 +2568,6 @@ export default function BacteriasPage() {
                 </>
               )}
 
-              <RespaldoFermentacionSelector
-                productoId={codigoProductoSB}
-                litros={parseFloat(cantidadSB) || 0}
-                value={respaldoSB}
-                onChange={setRespaldoSB}
-              />
-
               {/* Botones de acción */}
               <div className="flex gap-4 pt-4 border-t">
                 <button
@@ -2617,11 +2579,11 @@ export default function BacteriasPage() {
                 <button
                   onClick={handleSubmitSiriusBacter}
                   disabled={
-                    isSubmittingSB || !cantidadSB || !respaldoListo(respaldoSB) ||
+                    isSubmittingSB || !cantidadSB ||
                     (modoProduccionSB === 'normal' ? !productoCatalogoSelSB : !productoSeleccionadoSB)
                   }
                   className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                    isSubmittingSB || !cantidadSB || !respaldoListo(respaldoSB) ||
+                    isSubmittingSB || !cantidadSB ||
                     (modoProduccionSB === 'normal' ? !productoCatalogoSelSB : !productoSeleccionadoSB)
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-purple-600 hover:bg-purple-700 text-white'
@@ -2931,12 +2893,6 @@ export default function BacteriasPage() {
                 </>
               )}
 
-              <RespaldoFermentacionSelector
-                productoId={codigoProductoBT}
-                litros={parseFloat(cantidadBT) || 0}
-                value={respaldoBT}
-                onChange={setRespaldoBT}
-              />
             </div>
 
             {/* Footer con botones */}
@@ -2951,11 +2907,11 @@ export default function BacteriasPage() {
                 <button
                   onClick={handleSubmitBacillus}
                   disabled={
-                    isSubmittingBT || !cantidadBT || !respaldoListo(respaldoBT) ||
+                    isSubmittingBT || !cantidadBT ||
                     (modoProduccionBT === 'normal' ? !productoCatalogoSelBT : !productoSeleccionadoBT)
                   }
                   className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                    isSubmittingBT || !cantidadBT || !respaldoListo(respaldoBT) ||
+                    isSubmittingBT || !cantidadBT ||
                     (modoProduccionBT === 'normal' ? !productoCatalogoSelBT : !productoSeleccionadoBT)
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-orange-600 hover:bg-orange-700 text-white'
