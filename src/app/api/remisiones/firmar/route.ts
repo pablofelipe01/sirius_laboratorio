@@ -91,6 +91,19 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    // 1b. Las remisiones de PiroliApp (Area Origen = Producción) viven en la misma
+    // tabla del Core pero se reciben por el enlace firmado de PiroliApp, que además
+    // registra la autorización de datos y envía su correo. Firmarlas aquí las
+    // pasaría a Entregada por fuera de ese flujo. Se responde igual que si no
+    // existiera, para no confirmar el código. Solo bloquea la firma: el GET sigue
+    // mostrándolas como antes.
+    if ((remisionRecord.get('Area Origen') as string) === 'Producción') {
+      return NextResponse.json({
+        success: false,
+        error: 'Remisión no encontrada'
+      }, { status: 404 });
+    }
+
     // 2. Verificar que no esté ya entregada
     const estadoActual = remisionRecord.get('Estado') as string;
     if (estadoActual === 'Entregada') {
