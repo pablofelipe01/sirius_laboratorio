@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import Airtable from 'airtable';
 import { 
   SIRIUS_REMISIONES_CORE_CONFIG, 
@@ -11,6 +11,7 @@ import { uploadToS3 } from '@/lib/s3';
 import { generarRemisionPDF, DatosRemisionPDF } from '@/lib/remision-pdf-generator';
 import { buscarOCrearPersona, vincularPersonaARemision } from '@/lib/personas-remision';
 import { buscarFaltantesRemision } from '@/lib/inventario/stock-producto';
+import { sincronizarRemisionFlujoCaja } from '@/lib/remisiones/flujo-caja';
 
 const LARGO_MINIMO_MOTIVO_SIN_STOCK = 10;
 
@@ -495,6 +496,10 @@ export async function POST(request: NextRequest) {
         // No lanzar error para no bloquear el flujo principal
       }
     }
+
+    // 11. Copiar la remisión a Flujo de caja para finanzas. Corre después de
+    // responder y nunca lanza; las que quedan Pendiente se copian al firmarse.
+    after(() => sincronizarRemisionFlujoCaja(remisionRecord.id));
 
     return NextResponse.json({
       success: true,

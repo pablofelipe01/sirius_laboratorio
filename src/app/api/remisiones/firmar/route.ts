@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import Airtable from 'airtable';
 import { 
   SIRIUS_REMISIONES_CORE_CONFIG,
@@ -10,6 +10,7 @@ import { uploadToS3 } from '@/lib/s3';
 import { generarRemisionPDF, DatosRemisionPDF } from '@/lib/remision-pdf-generator';
 import { buscarOCrearPersona, vincularPersonaARemision, obtenerPersonasDeRemision } from '@/lib/personas-remision';
 import { enviarCorreo } from '@/lib/email';
+import { sincronizarRemisionFlujoCaja } from '@/lib/remisiones/flujo-caja';
 
 const baseRemisiones = new Airtable({
   apiKey: SIRIUS_REMISIONES_CORE_CONFIG.API_KEY
@@ -441,6 +442,10 @@ export async function POST(request: NextRequest) {
       // No bloquear el flujo principal si falla el correo
       console.error('⚠️ Error enviando correo de remisión firmada (no bloquea):', emailError);
     }
+
+    // 9. Completar en Flujo de caja quién recibió y cuándo. Corre después de
+    // responder y nunca lanza.
+    after(() => sincronizarRemisionFlujoCaja(remisionRecord.id));
 
     return NextResponse.json({
       success: true,

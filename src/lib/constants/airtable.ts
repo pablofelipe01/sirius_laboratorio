@@ -495,8 +495,24 @@ export const SIRIUS_NOVEDADES_NOMINA_CONFIG = {
   },
 } as const;
 
+/**
+ * Flujo de caja — la base de finanzas. DataLab solo escribe ahí la copia de sus
+ * remisiones (src/lib/remisiones/flujo-caja.ts); las tablas y field IDs viven
+ * en ese módulo.
+ *
+ * Es opcional: sin AIRTABLE_BASE_ID_FLUJO_CAJA la sincronización no corre y las
+ * remisiones funcionan igual. La PAT global de DataLab no incluye esta base
+ * (Airtable responde 403), así que la key específica va primero, como en
+ * Novedades Nómina. No pasa por `getApiKey()` porque esa lanza si no hay key, y
+ * una base opcional no puede tumbar el arranque.
+ */
+export const FLUJO_CAJA_CONFIG = {
+  BASE_ID: process.env.AIRTABLE_BASE_ID_FLUJO_CAJA || '',
+  API_KEY: process.env.AIRTABLE_API_KEY_FLUJO_CAJA || GLOBAL_API_KEY || '',
+} as const;
+
 // Helper para construir URLs de la API
-export const buildAirtableUrl = (tableId: string, recordId?: string, baseId?: string) => {
+export const buildAirtableUrl =(tableId: string, recordId?: string, baseId?: string) => {
   const base = baseId || AIRTABLE_CONFIG.BASE_ID;
   const baseUrl = `https://api.airtable.com/v0/${base}/${tableId}`;
   return recordId ? `${baseUrl}/${recordId}` : baseUrl;

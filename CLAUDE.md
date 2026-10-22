@@ -413,6 +413,35 @@ Las tablas `Insumos Laboratorio`, `Entrada Insumos` y `Salida Insumos` de la bas
 DataLab quedan **solo como histórico**: `lote-complete` las lee para los lotes
 anteriores a la migración. Nada escribe en ellas.
 
+## Remisiones → Flujo de caja (finanzas)
+
+Las remisiones viven en Sirius Remisiones Core. Finanzas las concilia contra la
+factura en **Flujo de caja** (`appBNCVj4Njbyu1En`), en `Remisiones Laboratorio`
++ `Productos Remisiones`. Antes esa copia se hacía a mano; ahora la hace
+`src/lib/remisiones/flujo-caja.ts`, que se ejecuta con `after()` en dos puntos:
+
+| Momento | Qué hace |
+|---|---|
+| `POST /api/remisiones` con transportista (En Tránsito) | Crea el registro, sus líneas de producto y quién lleva |
+| `POST /api/remisiones/firmar` (Entregada) | Completa quién recibe y cuándo; si no existía, lo crea completo |
+
+La llave entre bases es `Numero Remision` = el número de `SIRIUS-REM-XXXX`. Si ya
+hay un registro con ese número, **solo se llenan los campos vacíos**: lo que
+finanzas haya corregido no se pisa. Si hay dos, no se toca ninguno. Solo se copian
+las remisiones del área Laboratorio; las de PiroliApp (Producción), las Pendiente
+y las Canceladas no.
+
+⚠️ **Nunca bloquea la remisión.** Corre después de responder y no lanza: si falla,
+deja un `❌ [Flujo de caja]` en el log y la remisión, el PDF, el inventario y el
+correo siguen igual. Sin `AIRTABLE_BASE_ID_FLUJO_CAJA` está apagada. La PAT global
+no incluye esa base (403), así que necesita `AIRTABLE_API_KEY_FLUJO_CAJA`.
+
+Lo que sigue siendo de finanzas es `Factura Relacionada` y el `Precio Unitario
+Facturado` de cada línea; mientras falten, `Valor Total` usa la tarifa de
+referencia. El mapeo (formato de Observaciones, bloque/parcela sacados de las
+notas, cliente interno → "SIRIUS - CONSUMO INTERNO") está en
+`flujo-caja-registro.ts`, con tests en `src/__tests__/remisiones-flujo-caja.test.ts`.
+
 ## Testing
 
 - Framework: Vitest
