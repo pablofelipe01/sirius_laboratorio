@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import Airtable from 'airtable';
 import { SIRIUS_CLIENT_CORE_CONFIG } from '@/lib/constants/airtable';
 import { enviarCorreo } from '@/lib/email';
+import {
+  CAMPO_AREAS_CONTACTO,
+  codigoAreaClientePedido,
+  contactoRecibeRemision,
+  resolverAreaCliente,
+} from '@/lib/remisiones/area-cliente';
 
 // Configurar Airtable para Client Core
 const baseClientCore = new Airtable({
@@ -78,6 +84,7 @@ export async function POST(request: NextRequest) {
     // ====================================================================
     const emailsUnicos: Set<string> = new Set();
     const nombresNotificados: string[] = [];
+    const areaRemision = await resolverAreaCliente(await codigoAreaClientePedido(idPedido));
 
     try {
       // Obtener todo el personal activo — filtramos el cliente en JS
@@ -92,6 +99,7 @@ export async function POST(request: NextRequest) {
             FIELDS.EMAIL,
             FIELDS.CLIENTE,
             FIELDS.ESTADO_PERSONAL,
+            CAMPO_AREAS_CONTACTO,
           ]
         })
         .all();
@@ -129,6 +137,10 @@ export async function POST(request: NextRequest) {
 
         if (!isClienteMatch) {
           return; // Este personal no pertenece al cliente
+        }
+        if (!contactoRecibeRemision(record.get(CAMPO_AREAS_CONTACTO), areaRemision)) {
+          console.log(`  ⏭️ ${nombre}: no es del área del pedido`);
+          return;
         }
 
         // Prioridad: Email Notificacion > Email

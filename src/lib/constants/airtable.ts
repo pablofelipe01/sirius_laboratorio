@@ -117,6 +117,7 @@ export const SIRIUS_CLIENT_CORE_CONFIG = {
   TABLES: {
     CLIENTES: process.env.AIRTABLE_TABLE_CLIENTES_CORE!,
     PERSONAL_CLIENTE: process.env.AIRTABLE_TABLE_PERSONAL_CLIENTE!,
+    AREAS_CLIENTE: 'tblzdplFPfTsWCQik',
   },
 
   // Field IDs para tabla Personal Cliente

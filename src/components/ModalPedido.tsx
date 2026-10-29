@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Sparkles, PenTool, Mic, MicOff, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { BuscadorCliente } from './BuscadorCliente';
 
 interface Producto {
   productoId: string;
@@ -23,6 +24,12 @@ interface Pedido {
   total?: number;
   observaciones?: string;
   idUsuarioResponsable?: string; // ID Empleado de quien registra el pedido
+  idAreaCliente?: string; // AC-XXXX: a qué área del cliente va, define quién recibe la remisión
+}
+
+interface AreaCliente {
+  codigo: string;
+  nombre: string;
 }
 
 interface Cliente {
@@ -113,6 +120,29 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [productosDisponibles, setProductosDisponibles] = useState<{id: string; nombre: string; precioBase: number}[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
+  const [areasCliente, setAreasCliente] = useState<AreaCliente[]>([]);
+  const [loadingAreas, setLoadingAreas] = useState(false);
+
+  useEffect(() => {
+    const clienteId = formData.clienteId;
+    setAreasCliente([]);
+    if (!clienteId) return;
+
+    let cancelado = false;
+    setLoadingAreas(true);
+    fetch(`/api/areas-cliente?clienteId=${encodeURIComponent(clienteId)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelado && data.success) setAreasCliente(data.areas || []);
+      })
+      .catch(error => console.error('Error cargando áreas del cliente:', error))
+      .finally(() => {
+        if (!cancelado) setLoadingAreas(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [formData.clienteId]);
 
   // Cargar todos los productos del laboratorio desde API
   useEffect(() => {
@@ -233,7 +263,8 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
     setFormData(prev => ({
       ...prev,
       clienteId,
-      clienteNombre: cliente?.nombre || ''
+      clienteNombre: cliente?.nombre || '',
+      idAreaCliente: ''
     }));
   };
 
@@ -582,19 +613,12 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Cliente <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <BuscadorCliente
+                    clientes={clientes}
                     value={formData.clienteId}
-                    onChange={(e) => actualizarCliente(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                    required
-                  >
-                    <option value="" className="text-black">Seleccionar cliente...</option>
-                    {clientes.map((cliente) => (
-                      <option key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={actualizarCliente}
+                    focusClassName="focus:ring-purple-500"
+                  />
                   {errors.cliente && (
                     <p className="mt-1 text-sm text-red-600">{errors.cliente}</p>
                   )}
@@ -797,19 +821,11 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
                 <label className="block text-sm font-medium text-black mb-2">
                   Cliente <span className="text-red-500">*</span>
                 </label>
-                <select
+                <BuscadorCliente
+                  clientes={clientes}
                   value={formData.clienteId}
-                  onChange={(e) => actualizarCliente(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-black"
-                  required
-                >
-                  <option value="" className="text-black">Seleccionar cliente...</option>
-                  {clientes.map((cliente) => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.nombre}
-                    </option>
-                  ))}
-                </select>
+                  onChange={actualizarCliente}
+                />
                 {errors.cliente && (
                   <p className="mt-1 text-sm text-red-600">{errors.cliente}</p>
                 )}
@@ -830,6 +846,32 @@ export const ModalPedido: React.FC<ModalPedidoProps> = ({
                   <p className="mt-1 text-sm text-red-600">{errors.fechaEntrega}</p>
                 )}
               </div>
+
+              {formData.clienteId && (loadingAreas || areasCliente.length > 0) && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Área del cliente
+                  </label>
+                  <select
+                    value={formData.idAreaCliente || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, idAreaCliente: e.target.value }))}
+                    disabled={loadingAreas}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-black disabled:bg-gray-100"
+                  >
+                    <option value="">
+                      {loadingAreas ? 'Cargando áreas...' : 'Sin área específica'}
+                    </option>
+                    {areasCliente.map((area) => (
+                      <option key={area.codigo} value={area.codigo}>
+                        {area.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Los correos de la remisión le llegan al personal de esta área y a quienes no tienen área asignada (almacén).
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

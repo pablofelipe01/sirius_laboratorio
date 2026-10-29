@@ -11,6 +11,13 @@ import { generarRemisionPDF, DatosRemisionPDF } from '@/lib/remision-pdf-generat
 import { buscarOCrearPersona, vincularPersonaARemision, obtenerPersonasDeRemision } from '@/lib/personas-remision';
 import { enviarCorreo } from '@/lib/email';
 import { sincronizarRemisionFlujoCaja } from '@/lib/remisiones/flujo-caja';
+import {
+  CAMPO_AREAS_CONTACTO,
+  CAMPO_ID_AREA_CLIENTE,
+  codigoAreaClientePedido,
+  contactoRecibeRemision,
+  resolverAreaCliente,
+} from '@/lib/remisiones/area-cliente';
 
 const baseRemisiones = new Airtable({
   apiKey: SIRIUS_REMISIONES_CORE_CONFIG.API_KEY
@@ -333,9 +340,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 8b. Obtener personal activo del cliente
+      // 8b. Obtener personal activo del cliente, solo del área a la que va el pedido
       const emailsUnicos: Set<string> = new Set();
-      
+      const codigoAreaRemision = String(remisionRecord.get(CAMPO_ID_AREA_CLIENTE) ?? '').trim();
+      const areaRemision = await resolverAreaCliente(
+        codigoAreaRemision || await codigoAreaClientePedido(idPedido)
+      );
+
       if (clienteRecordId) {
         const personalRecords = await baseClientCore(SIRIUS_CLIENT_CORE_CONFIG.TABLES.PERSONAL_CLIENTE)
           .select({
@@ -347,6 +358,7 @@ export async function POST(request: NextRequest) {
               FIELDS.EMAIL,
               FIELDS.CLIENTE,
               FIELDS.ESTADO_PERSONAL,
+              CAMPO_AREAS_CONTACTO,
             ]
           })
           .all();
@@ -368,6 +380,7 @@ export async function POST(request: NextRequest) {
           }
 
           if (!isClienteMatch) return;
+          if (!contactoRecibeRemision(record.get(CAMPO_AREAS_CONTACTO), areaRemision)) return;
 
           const emailNotif = record.get('Email Notificacion') as string;
           const emailNormal = record.get('Email') as string;

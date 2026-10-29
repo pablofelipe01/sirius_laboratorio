@@ -9,6 +9,7 @@ import {
   EstadoPedido,
   OrigenPedido
 } from '@/lib/constants/airtable';
+import { CAMPO_ID_AREA_CLIENTE, esCodigoAreaCliente } from '@/lib/remisiones/area-cliente';
 
 // ============================================================================
 // Helpers
@@ -482,6 +483,17 @@ export async function POST(request: NextRequest) {
       'Estado': body.estado || 'Recibido',
       'Notas': body.observaciones || body.notas || '',
     };
+
+    // Área del cliente a la que va el pedido: decide quién recibe los correos de la remisión
+    if (body.idAreaCliente) {
+      if (!esCodigoAreaCliente(body.idAreaCliente)) {
+        return NextResponse.json(
+          { success: false, error: 'Área del cliente inválida' },
+          { status: 400 }
+        );
+      }
+      pedidoFields[CAMPO_ID_AREA_CLIENTE] = body.idAreaCliente;
+    }
 
     // Agregar ID Usuario Responsable si está disponible
     if (body.idUsuarioResponsable) {

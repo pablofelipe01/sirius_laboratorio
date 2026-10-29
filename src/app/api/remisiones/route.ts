@@ -12,6 +12,7 @@ import { generarRemisionPDF, DatosRemisionPDF } from '@/lib/remision-pdf-generat
 import { buscarOCrearPersona, vincularPersonaARemision } from '@/lib/personas-remision';
 import { buscarFaltantesRemision } from '@/lib/inventario/stock-producto';
 import { sincronizarRemisionFlujoCaja } from '@/lib/remisiones/flujo-caja';
+import { CAMPO_ID_AREA_CLIENTE } from '@/lib/remisiones/area-cliente';
 
 const LARGO_MINIMO_MOTIVO_SIN_STOCK = 10;
 
@@ -306,6 +307,7 @@ export async function POST(request: NextRequest) {
 
     const idPedidoCore = pedidoRecord.get('ID Pedido Core') as string || pedidoId;
     const idCliente = pedidoRecord.get('ID Cliente Core') as string || '';
+    const idAreaCliente = String(pedidoRecord.get(CAMPO_ID_AREA_CLIENTE) ?? '').trim();
 
     console.log('✅ Pedido encontrado:', idPedidoCore, 'Cliente:', idCliente);
 
@@ -368,6 +370,7 @@ export async function POST(request: NextRequest) {
         'Notas de Remisión': notasRemision,
         'Productos Remitidos': productosRemitidosRecords,
         'Fecha Pedido Despachado': transportista ? fechaActual : undefined,
+        ...(idAreaCliente ? { [CAMPO_ID_AREA_CLIENTE]: idAreaCliente } : {}),
       });
 
     console.log('✅ Remisión creada:', remisionRecord.id);
